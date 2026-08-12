@@ -16,15 +16,15 @@ transcripts.**
 
 ## Developing
 
-The source is TypeScript (`index.html` plus ES modules), so it needs a dev server —
-`file://` blocks module imports. Vite provides one, with hot reload:
+The source is React 19 and TypeScript, so it needs a dev server — `file://` blocks module
+imports. Vite provides one, with Fast Refresh:
 
 ```sh
 pnpm install
 pnpm dev              # http://127.0.0.1:8000
 pnpm typecheck        # tsc --noEmit, the only thing that judges types
 pnpm build            # bundle + inline everything back into cost-report.html
-pnpm check            # typecheck, build, then both test suites
+pnpm check            # typecheck, build, then all three test suites
 ```
 
 `pnpm build` is what regenerates the committed `cost-report.html`. It bundles to a single
@@ -36,10 +36,15 @@ and fails rather than ship a page that would reach the network when opened.
 Nothing type-checks as a side effect of bundling: Vite and Node both *erase* types rather
 than verify them, so `pnpm typecheck` is the only step that will tell you a type is wrong.
 `tsconfig.json` sets `erasableSyntaxOnly`, which bans the constructs Node's stripper cannot
-handle (enums, namespaces, parameter properties) — that is what keeps the test suites
-runnable as plain scripts. Relative imports carry their real `.ts` extension for the same
-reason: Node does no extension guessing, so `./engine.ts` is the one specifier both it and
-Vite accept.
+handle (enums, namespaces, parameter properties) — that is what keeps the engine and model
+suites runnable as plain `node` scripts. Relative imports carry their real `.ts` / `.tsx`
+extension for the same reason: Node does no extension guessing, so `./engine.ts` is the one
+specifier both it and Vite accept.
+
+The split between `model.ts` and the components is the one worth knowing about. Everything
+that has to *reconcile* — folding, drill-down, the ledger walk — is plain functions with no
+React and no DOM, so it can be asserted directly and run against a real transcript
+directory with nothing in between. The `.tsx` files only draw.
 
 The dev server binds `127.0.0.1` deliberately. Do not put transcripts, symlinks to
 `~/.claude`, or an index of them inside this folder: anything under a served directory is
@@ -48,22 +53,28 @@ fetchable by any page that can reach localhost while the server runs.
 ## Tests
 
 ```sh
-pnpm test                            # both suites
+pnpm test                            # all three suites
 pnpm test:engine                     # synthetic corpus: unknown model, tool, command, tag
-pnpm test:render                     # every view state, on a synthetic dataset
+pnpm test:model                      # folding, drill-down and reconciliation, no DOM
+pnpm test:render                     # every view state, rendered into a real DOM
 
 node test/engine.test.ts <dir>       # optionally also check a real transcript directory
-node test/render.test.ts <dir>
+node test/model.test.ts <dir>
+TRANSCRIPT_DIR=<dir> pnpm test:render
 ```
 
-They are plain Node scripts with no test-runner dependency, which is what lets you point
-them at a real transcript directory as an argument. Node runs the TypeScript directly by
-stripping the types — there is no build step and no runner between you and the assertion.
+The engine and model suites are plain Node scripts with no test-runner dependency: Node
+runs the TypeScript directly by stripping the types, so there is no build step and nothing
+between you and the assertion. The render suite is the exception — JSX needs a transform
+and components need a DOM — so it runs under Vitest with happy-dom, and takes its
+directory from the environment instead of `argv`. No transcript directory is discovered
+automatically; it must be passed in.
 
-The synthetic suite is the one that matters: it feeds the engine a model id, an MCP tool, a
-shell program, a file type and a harness tag that appear nowhere in the source, and asserts
-each lands in the right group, drills correctly, and reconciles to the cent. No transcript
-directory is discovered automatically — it must be passed in.
+The synthetic engine suite is the one that matters most: it feeds the engine a model id, an
+MCP tool, a shell program, a file type and a harness tag that appear nowhere in the source,
+and asserts each lands in the right group, drills correctly, and reconciles to the cent.
+The model suite makes the same reconciliation claim about what the page actually *draws* —
+folded rows included, at every drill level, under both TTL lenses.
 
 ## Where your transcripts are
 
@@ -146,12 +157,22 @@ file tool under any name gets the same treatment.
 | file | what it is |
 |---|---|
 | `cost-report.html` | standalone build — open directly; regenerate with `pnpm build` |
-| `index.html` | source page and Vite entry (needs the dev server) |
-| `main.ts` | upload screen: picker, folder drop, hand-off to the engine |
-| `engine.ts` | attribution engine: JSONL → cost tree |
-| `views.ts` | linked views + ledger table; takes group identity, labels and insights from the engine |
+| `index.html` | document shell and Vite entry (needs the dev server) |
+| `engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
+| `model.ts` | view model: folding, drill-down, the ledger walk, the palette. No React, no DOM |
+| `store.ts` | view state, held outside the tree so the URL hash and the tests can drive it |
+| `context.ts` | the one context the report's components read: dataset, state, palette, formatters |
+| `main.tsx` | entry: mounts `<App>` |
+| `App.tsx` | upload screen until an analysis exists, report after; owns the theme attribute |
+| `Upload.tsx` | picker, folder drop, hand-off to the engine |
+| `Report.tsx` | header, thesis strip, breakdown section, footnotes |
+| `Mosaic.tsx` | the primary view — column width = share of bill — and the hover readout |
+| `Panels.tsx` | the same data ranked and labelled instead of packed |
+| `Ledger.tsx` | the table, where identity does not rest on colour |
+| `Toolbar.tsx` | TTL lens, `$`/`%`, theme, copy link, copy summary |
 | `style.css` | tokens and layout |
-| `vite.config.ts` | build: bundles and inlines the above into `cost-report.html`, and asserts it is self-contained |
+| `vite.config.ts` | build: bundles and inlines everything into `cost-report.html`, and asserts it is self-contained |
+| `vitest.config.ts` | the render suite only — deliberately without the build plugins, so tests can never write the deliverable |
 | `tsconfig.json` | type-checking only — `noEmit`; Vite and Node do the erasing |
 | `DESIGN_BRIEF.md` | design constraints and acceptance checks for the report UI |
 

@@ -10,18 +10,28 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "pnpm run test:engine && pnpm run test:render",
+    "test": "pnpm run test:engine && pnpm run test:model && pnpm run test:render",
     "test:engine": "node test/engine.test.ts",
-    "test:render": "node test/render.test.ts",
+    "test:model": "node test/model.test.ts",
+    "test:render": "vitest run",
     "check": "pnpm run typecheck && pnpm run build && pnpm run test"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "happy-dom": "^20.11.2",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
-    "vite-plugin-singlefile": "^2.3.3"
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   }
 }

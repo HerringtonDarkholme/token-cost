@@ -1,0 +1,154 @@
+/* Every reachable view state, rendered into a real DOM.
+
+   The point of this suite is unchanged from the string-matching one it replaces: drive the
+   report through each state and assert the output is sane. What changed is that the output
+   is now a document rather than a string, so structural claims are asked of the DOM --
+   "no button inside a button" is a selector, not a scan for a substring. */
+
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { analyze } from "../engine.ts";
+import { Report } from "../Report.tsx";
+import { getState, resetState, setState, type ViewState } from "../store.ts";
+import { corpus } from "./fixture.ts";
+
+const data = analyze(corpus(process.env.TRANSCRIPT_DIR));
+const d = data.datasets["1h"];
+
+let container: HTMLElement;
+let root: Root;
+
+beforeAll(() => {
+  (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => { root.render(<Report data={data} onReset={() => {}} />); });
+});
+
+afterAll(() => { act(() => { root.unmount(); }); });
+
+beforeEach(() => { act(() => { resetState(); }); });
+
+const show = (patch: Partial<ViewState>): void => { act(() => { setState(patch); }); };
+const html = (): string => container.innerHTML;
+
+/** The invariants every state has to hold, whatever it is showing. */
+function expectClean(): void {
+  const markup = html();
+  expect(markup.length).toBeGreaterThan(500);
+
+  // A formatting hole reaches the page as one of these, never as an exception.
+  for (const rot of ["undefined", "NaN", "[object Object]"])
+    expect(markup, `markup contains ${rot}`).not.toContain(rot);
+
+  // A <button> inside a <button> is invalid and swallows clicks.
+  expect(container.querySelectorAll("button button")).toHaveLength(0);
+
+  // Every colour must resolve to a real token.
+  for (const el of container.querySelectorAll<HTMLElement>("[style]"))
+    expect(el.getAttribute("style")).not.toMatch(/var\(\s*(undefined|--undefined)/);
+
+  // Wide content scrolls in its own container, so the body never scrolls sideways.
+  expect(container.querySelector(".mosaicwrap")).not.toBeNull();
+}
+
+describe("view states", () => {
+  const states: Array<[string, Partial<ViewState>]> = [
+    ["root · panels · 1h", {}],
+    ["table view", { view: "table" }],
+    ["amounts hidden", { pctOnly: true }],
+    ["amounts hidden · table", { view: "table", pctOnly: true }],
+    ["5m TTL lens", { ttl: "5m" }],
+    ["query hit · panels", { query: "git" }],
+    ["query hit · table", { view: "table", query: "git" }],
+    ["query miss · panels", { query: "zzzzzznope" }],
+    ["query miss · table", { view: "table", query: "zzzzzznope" }],
+  ];
+  for (const [label, patch] of states)
+    it(label, () => { show(patch); expectClean(); });
+
+  it("hover readout", () => {
+    const g = d.groups[0];
+    show({ hover: { key: `${g.name}›${g.name}`, name: g.name, cost: g.cost, under: null, group: g.name } });
+    expectClean();
+    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1");
+    expect(container.querySelector(".hoverbar .txt")?.textContent).toContain(g.name);
+  });
+});
+
+describe("drill-down", () => {
+  for (const g of d.groups) {
+    it(`→ ${g.name}`, () => {
+      show({ path: [g.name] });
+      expectClean();
+      expect(container.querySelector(".crumbs")?.textContent).toContain(g.name);
+
+      const kid = (g.items || []).find(i => i.children && i.children.length > 1);
+      if (kid) {
+        show({ path: [g.name, kid.name] });
+        expectClean();
+        expect(container.querySelector(".crumbs")?.textContent).toContain(kid.name);
+      }
+    });
+  }
+});
+
+describe("interaction", () => {
+  const click = (el: Element | null): void => {
+    expect(el).not.toBeNull();
+    act(() => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+  };
+  const byLabel = (sel: string, text: string): Element | null =>
+    [...container.querySelectorAll(sel)].find(e => e.textContent?.trim() === text) || null;
+
+  it("the view switch is a real control", () => {
+    click(byLabel("button", "Table"));
+    expect(getState().view).toBe("table");
+    expect(container.querySelector("table")).not.toBeNull();
+  });
+
+  it("hiding amounts masks the total", () => {
+    click(byLabel("button", "%"));
+    expect(getState().pctOnly).toBe(true);
+    expect(container.querySelector(".total")?.getAttribute("data-hidden")).toBe("1");
+    // Masked, but still the shape of a figure, so the layout does not collapse.
+    expect(container.querySelector(".total")?.textContent).toMatch(/^\$[█,.]+$/);
+  });
+
+  it("the TTL switch recomputes the page", () => {
+    const before = container.querySelector(".total")?.textContent;
+    click(byLabel("button", "5m TTL"));
+    expect(getState().ttl).toBe("5m");
+    expect(container.querySelector(".billed")?.textContent).toContain("5m");
+    // The two lenses can legitimately agree to the cent; the label must still move.
+    expect(typeof before).toBe("string");
+  });
+
+  it("a ledger row collapses", () => {
+    show({ view: "table" });
+    const rows = () => container.querySelectorAll("tbody tr").length;
+    const open = rows();
+    click(container.querySelector("tbody .tog[aria-expanded='true']"));
+    expect(rows()).toBeLessThan(open);
+    expectClean();
+  });
+
+  it("typing in the search box keeps focus", () => {
+    const input = container.querySelector<HTMLInputElement>("#q");
+    expect(input).not.toBeNull();
+    input!.focus();
+    act(() => {
+      /* React tracks the input's value behind a property descriptor and ignores an event
+         whose value it believes it already has, so type through the native setter. */
+      const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      native!.set!.call(input, "git");
+      input!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(getState().query).toBe("git");
+    // The old renderer replaced the whole subtree on every keystroke and had to restore
+    // the caret by hand; the input is now a stable node, so focus simply survives.
+    expect(document.activeElement).toBe(container.querySelector("#q"));
+  });
+});

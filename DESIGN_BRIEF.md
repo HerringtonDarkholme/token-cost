@@ -138,18 +138,21 @@ carry-cost mechanism in body copy nobody reads.
 
 ## 7. Acceptance checks — verify before declaring done
 
-Run these against `node test/render.test.ts`, which exercises every view state on a
-synthetic dataset. Don't eyeball them:
+Run these against `pnpm test:model` (the arithmetic, no DOM) and `pnpm test:render` (every
+view state, rendered into a real one). Don't eyeball them:
 
 1. **Every displayed level reconciles.** Rendered children sum to their parent, at every
-   drill level, in every view, under both TTL scenarios.
+   drill level, in every view, under both TTL scenarios. This is asserted on the view model
+   rather than on markup, because it is a claim about the numbers, not about the pixels —
+   `test/model.test.ts`, which also takes a real transcript directory as an argument.
 2. **No `var(undefined)`, `NaN`, or `undefined` in any generated markup.** (An `indexOf`
    miss returning `-1` used to index a palette array and emit `fill="var(undefined)"` —
    guard your lookups.)
 3. **Scan the stylesheet** for any color declared only inside a media or `[data-theme]`
    block. There must be none.
 4. **No nested interactive elements** — a `<button>` inside a `<button>` is invalid and
-   breaks click handling.
+   breaks click handling. Asked of the DOM as `button button`, not of the markup as a
+   substring.
 5. **Both themes render legibly**, and the accent works on both grounds.
 6. **Validate any categorical palette** against the actual surface colors rather than
    reasoning about it.
@@ -157,6 +160,11 @@ synthetic dataset. Don't eyeball them:
    with an unpriced model each produce a sane page.
 8. **The build stays self-contained** — `pnpm build` fails loudly if the output carries a
    `<script src>`, a stylesheet link, an absolute URL, a CSS `@import`, or a
-   `type="module"` script, because each of those breaks or leaks under `file://`.
+   `type="module"` script, because each of those breaks or leaks under `file://`. It also
+   fails if the inline script ends up in `<head>`: dropping `type="module"` drops its
+   deferral too, so a script there runs before `<body>` exists and the page mounts against
+   nothing. That one shipped once — the page painted and simply did nothing — so it is
+   asserted rather than assumed.
 9. **`pnpm typecheck` is clean.** Neither Vite nor Node checks types — both only erase
-   them — so a wrong type ships silently unless this is run. `pnpm check` runs all three.
+   them — so a wrong type ships silently unless this is run. `pnpm check` runs typecheck,
+   build and all three suites.
