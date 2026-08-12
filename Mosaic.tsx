@@ -2,14 +2,15 @@
    inside = the item's own breakdown. It is the dense, scannable thing the page leads with,
    rather than a wide stacked bar carrying nine numbers. */
 
+import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
 import { branches, fold, pctOf, type CostNode } from "./model.ts";
-import { setState, type HoverTarget } from "./store.ts";
+import { setHover, useHover, type HoverTarget } from "./store.ts";
 
 /** Hover *and* keyboard focus report the same target, so tabbing through the mosaic gives
    the same readout the pointer does. */
 export function hoverBind(t: HoverTarget): { onMouseEnter: () => void; onFocus: () => void } {
-  const on = (): void => setState({ hover: t });
+  const on = (): void => setHover(t);
   return { onMouseEnter: on, onFocus: on };
 }
 
@@ -22,13 +23,19 @@ function segmentsOf(node: CostNode): CostNode[] {
     : [{ name: node.name, cost: node.cost, children: null, self: true }];
 }
 
-function Column({ node, gname, cumFrom, cumTo, width }: {
+/* Memoised, and given the hover as two primitives rather than the target itself: `hit` is
+   the hovered key when it falls inside this column and null when it does not. Hovering one
+   block therefore changes props for only the column entered and the column left -- the rest
+   compare equal and never re-render, which is the difference between touching two columns
+   and touching every block on the page. */
+const Column = memo(function Column({ node, gname, cumFrom, cumTo, width, hit, anyHover }: {
   node: CostNode; gname: string; cumFrom: number; cumTo: number; width: number;
+  hit: string | null; anyHover: boolean;
 }): React.JSX.Element {
-  const { state, pal, focus, amt, drill } = useReport();
+  const { pal, focus, amt, drill } = useReport();
   const h = pal.hue(gname);
   const key = gname + "›" + node.name;
-  const dim = !!state.hover && !state.hover.key.startsWith(key);
+  const dim = anyHover && !hit;
 
   const segs = segmentsOf(node);
   const segTotal = segs.reduce((s, x) => s + x.cost, 0) || 1;
@@ -45,7 +52,7 @@ function Column({ node, gname, cumFrom, cumTo, width }: {
         {segs.map((s, i) => {
           const share = s.cost / segTotal, pct = share * 100;
           const segKey = key + "›" + s.name;
-          const active = state.hover?.key === segKey || state.hover?.key === key;
+          const active = hit === segKey || hit === key;
           /* Prose re-billed as input is the one block the page argues about, so it keeps
              full strength and a dashed edge while the rest of the column ramps down. */
           const carry = s.name.includes("re-billed");
@@ -83,12 +90,18 @@ function Column({ node, gname, cumFrom, cumTo, width }: {
       </button>
     </div>
   );
-}
+});
 
 export function Mosaic(): React.JSX.Element {
   const { focus } = useReport();
+  const hover = useHover();
+  const hk = hover?.key ?? null;
   const rootCost = focus.node.cost || 1;
-  const cols = fold(focus.node.items || [], rootCost, !focus.groupName);
+
+  /* Memoised so the folded nodes keep their identity when only the hover moved -- otherwise
+     every column would get a fresh `node` prop and the memo above would never hit. */
+  const cols = useMemo(
+    () => fold(focus.node.items || [], rootCost, !focus.groupName), [focus, rootCost]);
   const colTotal = cols.reduce((s, n) => s + n.cost, 0) || 1;
 
   let run = 0;
@@ -98,9 +111,11 @@ export function Mosaic(): React.JSX.Element {
         {cols.map(n => {
           const cumFrom = pctOf(run, rootCost);
           run += n.cost;
+          const key = (focus.groupName || n.name) + "›" + n.name;
           return (
             <Column key={n.name} node={n} gname={focus.groupName || n.name}
-              cumFrom={cumFrom} cumTo={pctOf(run, rootCost)} width={n.cost / colTotal} />
+              cumFrom={cumFrom} cumTo={pctOf(run, rootCost)} width={n.cost / colTotal}
+              hit={hk && hk.startsWith(key) ? hk : null} anyHover={!!hk} />
           );
         })}
       </div>
@@ -112,7 +127,7 @@ export function Mosaic(): React.JSX.Element {
  *  sitting empty, because that is the sentence the page exists to teach. */
 export function HoverBar(): React.JSX.Element {
   const { state, pal, focus, amt, d } = useReport();
-  const h = state.hover;
+  const h = useHover();
   const rootCost = focus.node.cost || 1;
   const share = h ? (rootCost > 0 ? h.cost / rootCost : 0) : 0;
   const under = state.path.length ? state.path[state.path.length - 1] : "the bill";

@@ -2,17 +2,22 @@
    the mosaic rather than a peer of it -- same data, sorted and labelled instead of packed,
    for when you want to read names rather than compare areas. */
 
+import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
 import { fold, maxCost, pctOf, type CostNode } from "./model.ts";
 import { hoverBind } from "./Mosaic.tsx";
+import { useHover } from "./store.ts";
 
-function Panel({ panel, gname, maxPanel, kids }: {
+/* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when
+   it lands inside this panel, null otherwise. See `Column` in Mosaic.tsx. */
+const Panel = memo(function Panel({ panel, gname, maxPanel, kids, hit, anyHover }: {
   panel: CostNode; gname: string; maxPanel: number; kids: CostNode[];
+  hit: string | null; anyHover: boolean;
 }): React.JSX.Element {
   const { state, pal, amt, reqs, drill } = useReport();
   const h = pal.hue(gname);
   const key = gname + "›" + panel.name;
-  const dim = !!state.hover && !state.hover.key.startsWith(key);
+  const dim = anyHover && !hit;
   const maxKid = maxCost(kids);
 
   /* Two different footers, and the difference matters: a panel with no children is a
@@ -46,7 +51,7 @@ function Panel({ panel, gname, maxPanel, kids }: {
       <div className="panitems">
         {kids.map(k => {
           const kk = key + "›" + k.name;
-          const active = state.hover?.key === kk;
+          const active = hit === kk;
           return (
             <div className="pi" key={kk} data-on={active ? 1 : 0}
               {...hoverBind({ key: kk, name: k.name, cost: k.cost, under: panel.name, group: gname })}>
@@ -65,32 +70,42 @@ function Panel({ panel, gname, maxPanel, kids }: {
       {foot ? <div className="panfoot">{foot}</div> : null}
     </div>
   );
-}
+});
 
 export function Panels(): React.JSX.Element {
   const { d, focus, state } = useReport();
+  const hover = useHover();
+  const hk = hover?.key ?? null;
   const q = state.query.trim().toLowerCase();
   const rootCost = focus.node.cost || 1;
 
-  /* At the root the nine groups are shown whole -- they are the page's spine, and folding
-     one away would hide a role rather than a long tail. Below the root, fold as usual. */
-  const src: CostNode[] = focus.groupName
-    ? fold(focus.node.items || [], rootCost)
-    : d.groups.slice().sort((a, b) => b.cost - a.cost);
-  const maxPanel = maxCost(src);
-
-  const panels = src.map(p => {
-    const kids = fold(p.items || p.children || [], p.cost)
-      .filter(k => !q || k.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
-    return { p, kids };
-  }).filter(({ kids }) => !q || kids.length);
+  /* Memoised for node identity, so a hover leaves the memoised panels' props untouched. */
+  const { panels, maxPanel } = useMemo(() => {
+    /* At the root the nine groups are shown whole -- they are the page's spine, and folding
+       one away would hide a role rather than a long tail. Below the root, fold as usual. */
+    const src: CostNode[] = focus.groupName
+      ? fold(focus.node.items || [], rootCost)
+      : d.groups.slice().sort((a, b) => b.cost - a.cost);
+    return {
+      maxPanel: maxCost(src),
+      panels: src.map(p => {
+        const kids = fold(p.items || p.children || [], p.cost)
+          .filter(k => !q || k.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+        return { p, kids };
+      }).filter(({ kids }) => !q || kids.length),
+    };
+  }, [d, focus, rootCost, q]);
 
   return (
     <div className="panels">
-      {panels.map(({ p, kids }) => (
-        <Panel key={p.name} panel={p} gname={focus.groupName || p.name}
-               maxPanel={maxPanel} kids={kids} />
-      ))}
+      {panels.map(({ p, kids }) => {
+        const key = (focus.groupName || p.name) + "›" + p.name;
+        return (
+          <Panel key={p.name} panel={p} gname={focus.groupName || p.name}
+                 maxPanel={maxPanel} kids={kids}
+                 hit={hk && hk.startsWith(key) ? hk : null} anyHover={!!hk} />
+        );
+      })}
     </div>
   );
 }

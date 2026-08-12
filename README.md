@@ -46,6 +46,15 @@ that has to *reconcile* — folding, drill-down, the ledger walk — is plain fu
 React and no DOM, so it can be asserted directly and run against a real transcript
 directory with nothing in between. The `.tsx` files only draw.
 
+The second split is hover. It lives in its own store slice rather than in `ViewState`,
+because it changes on every block the pointer crosses while nothing about the shareable
+view depends on it. The mosaic, the panels and the table each read the hovered key once and
+hand each column, panel and row two primitives — whether anything is hovered, and the
+hovered key if it falls inside *that* one — so those components are `memo`'d on values that
+change for the block entered and the block left, not for all of them. Highlighting still
+comes from one store, so the views cannot disagree about what is hovered; it just no longer
+re-renders the header, the strip, the footnotes and the whole ledger to move a highlight.
+
 The dev server binds `127.0.0.1` deliberately. Do not put transcripts, symlinks to
 `~/.claude`, or an index of them inside this folder: anything under a served directory is
 fetchable by any page that can reach localhost while the server runs.
@@ -160,7 +169,7 @@ file tool under any name gets the same treatment.
 | `index.html` | document shell and Vite entry (needs the dev server) |
 | `engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
 | `model.ts` | view model: folding, drill-down, the ledger walk, the palette. No React, no DOM |
-| `store.ts` | view state, held outside the tree so the URL hash and the tests can drive it |
+| `store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
 | `context.ts` | the one context the report's components read: dataset, state, palette, formatters |
 | `main.tsx` | entry: mounts `<App>` |
 | `App.tsx` | upload screen until an analysis exists, report after; owns the theme attribute |

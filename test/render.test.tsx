@@ -10,7 +10,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { analyze } from "../engine.ts";
 import { Report } from "../Report.tsx";
-import { getState, resetState, setState, type ViewState } from "../store.ts";
+import { getState, resetState, setHover, setState, type ViewState } from "../store.ts";
 import { corpus } from "./fixture.ts";
 
 const data = analyze(corpus(process.env.TRANSCRIPT_DIR));
@@ -71,7 +71,9 @@ describe("view states", () => {
 
   it("hover readout", () => {
     const g = d.groups[0];
-    show({ hover: { key: `${g.name}›${g.name}`, name: g.name, cost: g.cost, under: null, group: g.name } });
+    act(() => {
+      setHover({ key: `${g.name}›${g.name}`, name: g.name, cost: g.cost, under: null, group: g.name });
+    });
     expectClean();
     expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1");
     expect(container.querySelector(".hoverbar .txt")?.textContent).toContain(g.name);

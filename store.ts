@@ -28,7 +28,6 @@ export interface ViewState {
   path: string[];
   /** Ledger disclosure, keyed by row. Absent means "the default for that depth". */
   open: Record<string, boolean>;
-  hover: HoverTarget | null;
   query: string;
   view: "panels" | "table";
   /** Amounts hidden for screen-sharing: shares of the bill instead of dollars. */
@@ -37,7 +36,7 @@ export interface ViewState {
 }
 
 const INITIAL: ViewState = {
-  ttl: "1h", path: [], open: {}, hover: null, query: "", view: "panels",
+  ttl: "1h", path: [], open: {}, query: "", view: "panels",
   pctOnly: false, theme: "system",
 };
 
@@ -57,16 +56,47 @@ function subscribe(fn: () => void): () => void {
 }
 
 /** Subscribe a component to the whole state. The report re-renders from the top on any
- *  change -- including hover -- which is cheap because React diffs it, and is what keeps
- *  the charts and the table provably the same instrument rather than two that agree by
- *  hand. */
+ *  change, and React diffs it down to the attributes that moved -- which is what keeps the
+ *  charts and the table provably the same instrument rather than two that agree by hand. */
 export function useViewState(): ViewState {
   return useSyncExternalStore(subscribe, getState, getState);
+}
+
+/* ---------- hover ----------
+   Deliberately its own slice rather than a field of `ViewState`. Hover changes on every
+   block the pointer crosses -- dozens per second during a sweep -- while nothing about the
+   shareable view depends on it. Keeping it separate means a hover re-renders the handful of
+   components that draw a highlight, not the header, the strip, the footnotes and the whole
+   ledger. It is still one store read by every view, so the mosaic, the panels and the table
+   cannot fall out of step about what is hovered. */
+
+let hover: HoverTarget | null = null;
+const hoverListeners = new Set<() => void>();
+
+export const getHover = (): HoverTarget | null => hover;
+
+export function setHover(t: HoverTarget | null): void {
+  /* Enter and focus both fire for the same block, so the echo is dropped. The cost is part
+     of the comparison and not just the key: switching the TTL lens reprices every line item
+     without moving the pointer, and re-entering the same block has to pick that up. */
+  if (hover === t || (hover?.key === t?.key && hover?.cost === t?.cost)) return;
+  hover = t;
+  hoverListeners.forEach(fn => fn());
+}
+
+function subscribeHover(fn: () => void): () => void {
+  hoverListeners.add(fn);
+  return () => { hoverListeners.delete(fn); };
+}
+
+export function useHover(): HoverTarget | null {
+  return useSyncExternalStore(subscribeHover, getHover, getHover);
 }
 
 /** Back to a clean slate, keeping the reader's theme: they chose it for the session, not
  *  for the file. */
 export function resetState(): void {
+  setHover(null);
   setState({ ...INITIAL, theme: state.theme });
 }
 
