@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Where the money went — Claude Code cost attribution</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="shell" id="uploadView">
+  <div class="toolbar"><span class="tick"></span>
+    <span class="seg">
+      <button type="button" data-th="light">Light</button>
+      <button type="button" data-th="system" aria-pressed="true">System</button>
+      <button type="button" data-th="dark">Dark</button>
+    </span>
+  </div>
+  <p class="eyebrow">Cost attribution · Claude Code</p>
+  <h1 class="big-title">Where did your <em>Claude Code</em> money go?</h1>
+  <p class="lede">Drop in your session transcripts to itemise every dollar down to the
+  subcommand. Billing is per request and each request re-bills the whole context, so what
+  you get back is <strong>carry cost</strong> — what each source cost across every request
+  it survived in, not its face value.</p>
+
+  <div class="drop" id="drop">
+    <h2>Drop <code>.jsonl</code> transcripts here</h2>
+    <p>Or pick a whole project folder. Multiple files are combined into one report.</p>
+    <div class="picks">
+      <button class="btn primary" id="pickFiles" type="button">Choose files</button>
+      <button class="btn" id="pickDir" type="button">Choose folder</button>
+    </div>
+    <input type="file" id="fileInput" multiple accept=".jsonl" class="hidden">
+    <input type="file" id="dirInput" webkitdirectory directory multiple class="hidden">
+    <p class="privacy">Parsed in this page · nothing is uploaded</p>
+    <div class="status" id="status"></div>
+    <div class="filelist hidden" id="filelist"></div>
+  </div>
+
+  <div class="where">
+    <p class="whead"><strong>Where your transcripts live</strong></p>
+    <p>One <code>.jsonl</code> file per session, in one folder per project, under
+    <code>~/.claude/projects/</code>.</p>
+
+    <p class="whead"><strong>Getting there — the folder is hidden</strong></p>
+    <p><code>.claude</code> starts with a dot, so file pickers hide it by default. It is
+    still reachable; you just have to ask for it by name.</p>
+    <ul class="steps">
+      <li><b>macOS</b> — click <em>Choose folder</em> above, then in the Finder dialog press
+        <kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>, paste <code>~/.claude/projects</code>, hit
+        <kbd>return</kbd>, and pick a project folder.
+        <span class="alt"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>.</kbd> also toggles hidden files
+        into view, in the dialog and in Finder.</span></li>
+      <li><b>Windows</b> — type <code>%USERPROFILE%\.claude\projects</code> into the
+        dialog's <em>File name</em> box and press <kbd>Enter</kbd>.</li>
+      <li><b>Linux</b> — press <kbd>Ctrl</kbd><kbd>L</kbd> in the GTK dialog and type
+        <code>~/.claude/projects</code>, or <kbd>Ctrl</kbd><kbd>H</kbd> to show hidden files.</li>
+    </ul>
+    <p>Prefer the terminal? Open the folder in your file manager, then drag a project onto
+    the box above:</p>
+    <p><code>open ~/.claude/projects</code> &nbsp;·&nbsp; largest projects first:
+    <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code></p>
+  </div>
+</div>
+
+<div class="shell hidden" id="reportView"></div>
+
+<script type="module">
+import { analyze, PRICES } from "./engine.js";
+import { initReport } from "./views.js";
+
+const $ = id => document.getElementById(id);
+const say = (html, err) => { const s = $("status"); s.innerHTML = html; s.dataset.err = err ? "1" : "0"; };
+
+async function handle(list) {
+  const all = [...list], files = all.filter(f => f.name.endsWith(".jsonl"));
+  if (!files.length) {
+    say(all.length ? `None of those ${all.length} file(s) are <code>.jsonl</code> transcripts.`
+                   : "No files selected.", true);
+    return;
+  }
+  say(`Reading <b>${files.length}</b> file${files.length>1?"s":""}…`);
+  $("filelist").classList.remove("hidden");
+  $("filelist").textContent = files.slice(0,60).map(f => f.name).join("\n")
+    + (files.length > 60 ? `\n… +${files.length-60} more` : "");
+  let payload;
+  try { payload = await Promise.all(files.map(async f => ({ name:f.name, text:await f.text() }))); }
+  catch (e) { say(`Could not read the files: ${e.message}`, true); return; }
+
+  await run(payload);
+}
+
+async function run(payload, label) {
+  const bytes = payload.reduce((a,b) => a + b.text.length, 0);
+  say(`Analyzing <b>${(bytes/1e6).toFixed(1)} MB</b>${label?` from <b>${label}</b>`:""}…`);
+  await new Promise(r => setTimeout(r, 16));
+  let data;
+  try { data = analyze(payload); }
+  catch (e) { say(`Analysis failed: ${e.message}`, true); console.error(e); return; }
+  if (!data.requests) {
+    say(`Parsed ${payload.length} file(s) but found no priced API requests — are these Claude
+         Code transcripts from <code>~/.claude/projects/</code>?`, true);
+    return;
+  }
+  $("uploadView").classList.add("hidden");
+  $("reportView").classList.remove("hidden");
+  initReport(data);
+  window.scrollTo(0,0);
+}
+
+$("pickFiles").addEventListener("click", () => $("fileInput").click());
+$("pickDir").addEventListener("click", () => $("dirInput").click());
+$("fileInput").addEventListener("change", e => handle(e.target.files));
+$("dirInput").addEventListener("change", e => handle(e.target.files));
+$("uploadView").addEventListener("click", e => {
+  const b = e.target.closest("[data-th]"); if (!b) return;
+  const r = document.documentElement;
+  if (b.dataset.th === "system") r.removeAttribute("data-theme");
+  else r.setAttribute("data-theme", b.dataset.th);
+  [...b.parentElement.children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+});
+
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  if (ev === "dragleave" && drop.contains(e.relatedTarget)) return;
+  drop.classList.remove("over"); }));
+drop.addEventListener("drop", async e => {
+  e.preventDefault();
+  const items = e.dataTransfer.items;
+  if (items && items.length && items[0].webkitGetAsEntry) {
+    const out = [];
+    const walk = entry => new Promise(res => {
+      if (entry.isFile) entry.file(f => { out.push(f); res(); });
+      else if (entry.isDirectory) {
+        const rd = entry.createReader();
+        const more = () => rd.readEntries(async ents => {
+          if (!ents.length) return res();
+          await Promise.all(ents.map(walk)); more();
+        }, () => res());
+        more();
+      } else res();
+    });
+    await Promise.all([...items].map(i => i.webkitGetAsEntry()).filter(Boolean).map(walk));
+    handle(out);
+  } else handle(e.dataTransfer.files);
+});
+</script>
+</body>
+</html>

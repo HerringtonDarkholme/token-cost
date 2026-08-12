@@ -1,0 +1,24 @@
+# Transcripts and anything derived from them. This app's whole input is private session
+# data; none of it belongs in version control. Keep these patterns even if you never
+# intend to put a transcript here -- the point is that an accident is not committable.
+*.jsonl
+.claude/
+projects/
+transcripts/
+report_data.json
+*.report.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,1789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Where the money went — Claude Code cost attribution</title>
+<style>
+/* Palette, type and layout from "Cost Report.dc.html" (claude.ai/design d41a68ba):
+   warm grey-green paper, brick accent, 8 categorical hues + neutral for the 9th. */
+:root{
+  --paper:#EBEDE8; --panel:#F4F5F2; --sunk:#E1E4DE; --ink:#121614; --ink2:#4C5450; --ink3:#78817C;
+  --rule:#CBD0C9; --hair:#DCE0D9; --accent:#A8330E; --accent-soft:#F0DDD5;
+  --c1:#C2410C; --c2:#A16207; --c3:#4D7C0F; --c4:#0F766E; --c5:#1D4ED8;
+  --c6:#6D28D9; --c7:#A21CAF; --c8:#BE123C; --cn:#6B7280; --on-cat:#FFFFFF;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:"Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0C0F0E; --panel:#141817; --sunk:#1B201E; --ink:#E9EDE9; --ink2:#9AA39E; --ink3:#727B76;
+  --rule:#2B312E; --hair:#202623; --accent:#FF7A45; --accent-soft:#2E1A12;
+  --c1:#FB923C; --c2:#FBBF24; --c3:#A3E635; --c4:#2DD4BF; --c5:#60A5FA;
+  --c6:#A78BFA; --c7:#E879F9; --c8:#FB7185; --cn:#9CA3AF; --on-cat:#0A0D0C;
+}}
+:root[data-theme="dark"]{
+  --paper:#0C0F0E; --panel:#141817; --sunk:#1B201E; --ink:#E9EDE9; --ink2:#9AA39E; --ink3:#727B76;
+  --rule:#2B312E; --hair:#202623; --accent:#FF7A45; --accent-soft:#2E1A12;
+  --c1:#FB923C; --c2:#FBBF24; --c3:#A3E635; --c4:#2DD4BF; --c5:#60A5FA;
+  --c6:#A78BFA; --c7:#E879F9; --c8:#FB7185; --cn:#9CA3AF; --on-cat:#0A0D0C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.shell{max-width:1180px;margin:0 auto;padding:28px 24px 96px}
+.hidden{display:none!important}
+.toolbar{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.tick{flex:1;min-width:60px;height:9px;background:repeating-linear-gradient(to right,var(--rule) 0 1px,transparent 1px 9px)}
+.linkish{background:none;border:0;padding:0 0 2px;cursor:pointer;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;color:var(--ink2);border-bottom:1px solid var(--rule)}
+.linkish[data-on="1"]{color:var(--accent);border-bottom-color:var(--accent)}
+.seg{display:flex;border:1px solid var(--rule);background:var(--panel)}
+.seg button{padding:5px 11px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;
+  white-space:nowrap;border:0;cursor:pointer;background:transparent;color:var(--ink2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.card{position:relative;aspect-ratio:16/9;min-height:600px;display:flex;flex-direction:column;
+  border:1px solid var(--ink);background:var(--panel);padding:20px 22px 16px}
+.br{position:absolute;width:10px;height:10px}
+.br1{top:5px;left:5px;border-top:2px solid var(--accent);border-left:2px solid var(--accent)}
+.br2{top:5px;right:5px;border-top:2px solid var(--accent);border-right:2px solid var(--accent)}
+.br3{bottom:5px;left:5px;border-bottom:2px solid var(--accent);border-left:2px solid var(--accent)}
+.br4{bottom:5px;right:5px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent)}
+.chead{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3)}
+.chead h1{margin:5px 0 0;font-size:31px;line-height:1.02;letter-spacing:-.025em;font-weight:700}
+.billed{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3)}
+.total{font-family:var(--mono);font-size:33px;font-weight:600;line-height:1.02;letter-spacing:-.03em}
+.total[data-hidden="1"]{color:var(--ink3)}
+.strip{margin-top:13px;display:grid;grid-template-columns:1.55fr 1fr 1fr 1fr;
+  border-top:1px solid var(--ink);border-bottom:1px solid var(--hair)}
+.strip>div{padding:11px 16px;border-right:1px solid var(--hair)}
+.strip>div:first-child{padding:11px 18px 11px 0}
+.strip>div:last-child{padding:11px 0 11px 16px;border-right:0}
+.thesis{font-size:17px;line-height:1.3;font-weight:600;letter-spacing:-.01em;text-wrap:pretty}
+.thesis em{font-style:normal;color:var(--accent)}
+.big{font-family:var(--mono);font-size:21px;font-weight:600}
+.big .sm{color:var(--ink3);font-weight:400;font-size:15px}
+.big .dim{color:var(--ink2)}
+.cap{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);margin-top:5px}
+.carryrow{display:flex;align-items:baseline;gap:7px;font-family:var(--mono)}
+.carryrow .from{font-size:14px;color:var(--ink2)}
+.carryrow .arrow{color:var(--ink3)}
+.carryrow .to{font-size:21px;font-weight:600;color:var(--accent)}
+.mosaichead{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:9px 0 7px}
+.mosaichead .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3)}
+.crumbs{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;flex-wrap:wrap}
+.crumbs button{background:none;border:0;padding:2px 0;cursor:pointer;color:var(--ink2);border-bottom:1px solid var(--rule)}
+.crumbs button[data-cur="1"]{color:var(--ink);border-bottom-color:var(--ink)}
+.crumbs .sep{color:var(--ink3)}
+.mosaicwrap{flex:1;min-height:0;overflow-x:auto;border-top:1px solid var(--hair)}
+.mosaic{display:flex;height:100%;min-width:860px}
+.col{display:flex;flex-direction:column;min-width:62px;border-right:1px solid var(--hair);transition:filter .16s}
+.col[data-dim="1"]{filter:saturate(.5) opacity(.9)}
+.colsegs{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.segb{display:flex;flex-direction:column;justify-content:flex-start;min-height:2px;border:0;
+  border-bottom:1px solid var(--panel);text-align:left;cursor:pointer;overflow:hidden;transition:opacity .14s,filter .14s}
+.segb .sl{display:block;font-family:var(--mono);font-size:10.5px;line-height:1.2;color:var(--on-cat);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.colhead{display:flex;flex-direction:column;justify-content:flex-start;background:none;border:0;
+  padding:7px 7px 2px;text-align:left;cursor:pointer;flex:0 0 auto;min-height:64px}
+.colhead .cn{display:block;font-size:11.5px;font-weight:600;line-height:1.14;overflow:hidden;word-break:break-word}
+.colhead .cc{display:block;font-family:var(--mono);font-size:11px;color:var(--ink2);margin-top:3px}
+.colhead .cp{display:flex;justify-content:space-between;gap:5px;font-family:var(--mono);font-size:9.5px;
+  color:var(--ink3);margin-top:1px}
+.colhead .cum80{color:var(--accent)}
+.hoverbar{display:flex;align-items:center;gap:9px;padding-top:9px;border-top:1px solid var(--ink);min-height:20px}
+.hoverbar .sw{width:9px;height:9px;flex:0 0 auto}
+.hoverbar .txt{font-size:12px;line-height:1.35;color:var(--ink2);overflow:hidden}
+.hoverbar .txt[data-on="1"]{color:var(--ink);font-family:var(--mono)}
+.bsec{margin-top:30px}
+.bhead{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+  border-bottom:2px solid var(--ink);padding-bottom:8px}
+.bhead h2{margin:0;font-size:13px;font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.bctl{display:flex;align-items:center;gap:10px}
+.bctl label{font-family:var(--mono);font-size:11px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase}
+.bctl input{font:inherit;font-size:13px;font-family:var(--mono);background:var(--panel);color:var(--ink);
+  border:1px solid var(--rule);padding:5px 9px;width:230px}
+.panels{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-top:0}
+.pan{background:var(--paper);padding:13px 15px 12px}
+.pantop{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.pantop button{background:none;border:0;padding:0 0 2px;cursor:pointer;font-size:14.5px;font-weight:600;
+  text-align:left;color:var(--ink)}
+.pantop .pc{font-family:var(--mono);font-size:15px;font-weight:600}
+.panbar{display:flex;align-items:center;gap:9px;margin-top:8px}
+.track{flex:1;height:6px;background:var(--sunk);display:block}
+.track>span{display:block;height:6px}
+.panbar .pr{font-family:var(--mono);font-size:11px;color:var(--ink3);width:104px;text-align:right}
+.panitems{margin-top:10px;display:flex;flex-direction:column;gap:3px}
+.pi{display:flex;align-items:center;gap:9px;padding:2px 0}
+.pi[data-on="1"]{background:var(--sunk)}
+.pi button{background:none;border:0;padding:0;cursor:pointer;font-family:var(--mono);font-size:11.5px;
+  width:128px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
+.pi button[data-folded="1"]{color:var(--ink3);font-style:italic}
+.pi .tk{flex:1;height:4px;background:var(--sunk);display:block;min-width:34px}
+.pi .tk>span{display:block;height:4px}
+.pi .pv{font-family:var(--mono);font-size:11.5px;width:72px;text-align:right;color:var(--ink2)}
+.panfoot{margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+.tblwrap{overflow-x:auto}
+table{width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px}
+thead tr{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+thead th{font-weight:400;padding:8px}
+thead th.l{text-align:left;padding-left:0}
+thead th.r{text-align:right}
+thead th.last{text-align:right;padding-right:0}
+tbody tr{border-bottom:1px solid var(--hair)}
+tbody tr[data-on="1"]{background:var(--sunk)}
+td{padding:7px 8px}
+td.name{padding:7px 8px 7px 0}
+td.num{text-align:right;font-family:var(--mono)}
+td.pct{text-align:right;font-family:var(--mono);color:var(--ink2);font-size:12.5px}
+td.per{text-align:right;padding-right:0;font-family:var(--mono);font-size:12px;color:var(--ink2)}
+.namecell{display:flex;align-items:center;gap:8px}
+.chip{flex:0 0 auto}
+.tog{display:flex;align-items:center;gap:7px;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.caret{font-family:var(--mono);font-size:10px;color:var(--ink3);width:8px}
+tr.d0 .nm{font-family:var(--sans);font-size:13.5px;font-weight:600}
+tr.d1 .nm,tr.d2 .nm{font-family:var(--mono);font-size:12.5px;font-weight:400}
+.nm[data-folded="1"]{color:var(--ink3);font-style:italic}
+tr.d0 td.num{font-weight:600}
+.magbar{display:block}
+tfoot tr{border-top:2px solid var(--ink)}
+tfoot td{padding:10px 8px}
+tfoot .lbl{padding-left:0;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+tfoot .v{text-align:right;font-family:var(--mono);font-weight:600}
+tfoot .p{text-align:right;font-family:var(--mono);color:var(--ink2)}
+tfoot .n{padding-left:8px;padding-right:0;font-size:12px;color:var(--ink3)}
+.reconline{margin-top:10px;font-size:11.5px;color:var(--ink3);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.reconline strong{font-family:var(--mono);color:var(--ink2)}
+.foot{margin-top:34px;display:grid;grid-template-columns:1fr 1fr;gap:24px;border-top:1px solid var(--rule);padding-top:16px}
+.foot h3{margin:0 0 6px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)}
+.foot ul{margin:0;padding-left:18px;font-size:13px;line-height:1.55;color:var(--ink2);max-width:52ch}
+.foot .cav{font-size:12.5px;color:var(--ink3)}
+.foot strong{color:var(--ink)}
+@media (max-width:820px){
+  .strip{grid-template-columns:1fr 1fr}
+  .strip>div,.strip>div:first-child,.strip>div:last-child{padding:11px 12px;border-right:0;border-bottom:1px solid var(--hair)}
+  .foot{grid-template-columns:1fr}
+  .card{aspect-ratio:auto}
+}
+.drop{border:1.5px dashed var(--rule);background:var(--panel);padding:clamp(26px,5vw,54px) 26px;
+  text-align:center;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop h2{font-size:21px;font-weight:700;margin:0 0 8px;letter-spacing:-.015em}
+.drop p{color:var(--ink2);margin:0 auto 18px;max-width:56ch;font-size:14px}
+.picks{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{border:1px solid var(--rule);background:var(--panel);color:var(--ink);font-size:11px;font-family:var(--mono);
+  letter-spacing:.08em;text-transform:uppercase;padding:9px 16px;cursor:pointer}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.privacy{display:flex;gap:9px;align-items:flex-start;margin-top:16px;font-size:11.5px;color:var(--ink3);
+  justify-content:center;font-family:var(--mono)}
+.status{margin-top:16px;font-size:13px;color:var(--ink2);min-height:22px}
+.status b{color:var(--ink)}
+.status[data-err="1"]{color:var(--accent)}
+.filelist{margin-top:14px;font-size:11.5px;color:var(--ink3);font-family:var(--mono);max-height:88px;overflow:auto;
+  text-align:left;border:1px solid var(--rule);padding:8px 10px;background:var(--panel)}
+.where{margin-top:22px;padding-top:18px;border-top:1px solid var(--rule);font-size:13px;color:var(--ink2);
+  display:flex;flex-direction:column;gap:6px;max-width:74ch}
+.where p{margin:0}
+.where code{font-family:var(--mono);font-size:.92em;background:var(--panel);border:1px solid var(--hair);padding:2px 6px;user-select:all}
+.where .whead{margin-top:8px;color:var(--ink)}
+.where .whead:first-child{margin-top:0}
+.where .steps{margin:2px 0 4px;padding-left:18px;display:flex;flex-direction:column;gap:7px}
+.where .steps li{line-height:1.6}
+.where .steps b{color:var(--ink);font-weight:600}
+.where .steps em{font-style:normal;color:var(--ink);font-weight:500}
+.where .alt{display:block;color:var(--ink3);font-size:12.5px;margin-top:2px}
+kbd{font-family:var(--mono);font-size:11.5px;line-height:1;display:inline-block;
+  padding:3px 5px;margin:0 1px;color:var(--ink);background:var(--panel);
+  border:1px solid var(--hair);border-bottom-width:2px;border-radius:3px;vertical-align:baseline}
+h1.big-title{font-size:clamp(26px,4vw,38px);line-height:1.05;letter-spacing:-.025em;font-weight:700;margin:0 0 8px;text-wrap:balance}
+h1.big-title em{font-style:normal;color:var(--accent)}
+.lede{color:var(--ink2);max-width:66ch;margin:0 0 26px;font-size:14.5px}
+.scopebar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-family:var(--mono);font-size:11px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);border-top:1px solid var(--hair);
+  border-bottom:1px solid var(--hair);padding:8px 0;margin-bottom:14px}
+.scopebar b{color:var(--ink2);font-weight:600}
+/* a mark with nothing underneath shouldn't advertise a click */
+.col[data-flat="1"] .colhead,.col[data-flat="1"] .segb{cursor:default}
+
+</style>
+</head>
+<body>
+<div class="shell" id="uploadView">
+  <div class="toolbar"><span class="tick"></span>
+    <span class="seg">
+      <button type="button" data-th="light">Light</button>
+      <button type="button" data-th="system" aria-pressed="true">System</button>
+      <button type="button" data-th="dark">Dark</button>
+    </span>
+  </div>
+  <p class="eyebrow">Cost attribution · Claude Code</p>
+  <h1 class="big-title">Where did your <em>Claude Code</em> money go?</h1>
+  <p class="lede">Drop in your session transcripts to itemise every dollar down to the
+  subcommand. Billing is per request and each request re-bills the whole context, so what
+  you get back is <strong>carry cost</strong> — what each source cost across every request
+  it survived in, not its face value.</p>
+
+  <div class="drop" id="drop">
+    <h2>Drop <code>.jsonl</code> transcripts here</h2>
+    <p>Or pick a whole project folder. Multiple files are combined into one report.</p>
+    <div class="picks">
+      <button class="btn primary" id="pickFiles" type="button">Choose files</button>
+      <button class="btn" id="pickDir" type="button">Choose folder</button>
+    </div>
+    <input type="file" id="fileInput" multiple accept=".jsonl" class="hidden">
+    <input type="file" id="dirInput" webkitdirectory directory multiple class="hidden">
+    <p class="privacy">Parsed in this page · nothing is uploaded</p>
+    <div class="status" id="status"></div>
+    <div class="filelist hidden" id="filelist"></div>
+  </div>
+
+  <div class="where">
+    <p class="whead"><strong>Where your transcripts live</strong></p>
+    <p>One <code>.jsonl</code> file per session, in one folder per project, under
+    <code>~/.claude/projects/</code>.</p>
+
+    <p class="whead"><strong>Getting there — the folder is hidden</strong></p>
+    <p><code>.claude</code> starts with a dot, so file pickers hide it by default. It is
+    still reachable; you just have to ask for it by name.</p>
+    <ul class="steps">
+      <li><b>macOS</b> — click <em>Choose folder</em> above, then in the Finder dialog press
+        <kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>, paste <code>~/.claude/projects</code>, hit
+        <kbd>return</kbd>, and pick a project folder.
+        <span class="alt"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>.</kbd> also toggles hidden files
+        into view, in the dialog and in Finder.</span></li>
+      <li><b>Windows</b> — type <code>%USERPROFILE%\.claude\projects</code> into the
+        dialog's <em>File name</em> box and press <kbd>Enter</kbd>.</li>
+      <li><b>Linux</b> — press <kbd>Ctrl</kbd><kbd>L</kbd> in the GTK dialog and type
+        <code>~/.claude/projects</code>, or <kbd>Ctrl</kbd><kbd>H</kbd> to show hidden files.</li>
+    </ul>
+    <p>Prefer the terminal? Open the folder in your file manager, then drag a project onto
+    the box above:</p>
+    <p><code>open ~/.claude/projects</code> &nbsp;·&nbsp; largest projects first:
+    <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code></p>
+  </div>
+</div>
+
+<div class="shell hidden" id="reportView"></div>
+
+<script>
+/* ---- engine.js ---- */
+/* Cost attribution engine for Claude Code transcripts. Runs entirely client-side.
+ *
+ * METHOD -- "carry cost". Billing is per request, and each request bills the ENTIRE
+ * input prefix (fresh input + cache read + cache write) plus its own output. So a piece
+ * of content does not cost its face value; it costs its token share of every subsequent
+ * request it survives in. For each request we take the exact billed cost from `usage`,
+ * then allocate it across the content already in context, proportional to token share.
+ * Totals are exact; the split across rows is an estimate.
+ *
+ * DESIGN RULES -- this file must work for transcripts it has never seen:
+ *   1. Nothing is silently dropped. An unknown model, tool, tag or command is counted
+ *      and surfaced, never skipped.
+ *   2. Buckets are structured records ({role, tool, dir, sub}), never strings that get
+ *      re-parsed by character offset.
+ *   3. Classification is derived from the data (measured ratios, learned vocabulary,
+ *      calibrated constants) or from a documented, published spec (POSIX shell
+ *      builtins, the Anthropic rate card, the transcript schema). It is never a list
+ *      of the things one particular author happens to use.
+ *
+ * PASSES
+ *   scan()      -- cheap: calibrate chars-per-token, learn which programs dispatch
+ *                  subcommands, dedupe sessions.
+ *   allocate()  -- full walk: build the per-key cost accumulators.
+ *   price()     -- O(keys), so any TTL assumption or rate card is free to re-apply.
+ *   buildTree() -- decides direction splits and grouping from the measured costs.
+ */
+
+/* ------------------------------------------------------------------ pricing --
+ * A rate card, not a model whitelist. Keys are matched exactly, then by longest
+ * prefix, then by tier keyword; anything still unresolved is reported as unpriced
+ * rather than dropped. Rates are $ per 1M tokens, [input, output].
+ * Override or extend at runtime with setRates() -- no source edit required.
+ */
+const RATES = {
+  "claude-fable-5":    [10, 50],
+  "claude-mythos-5":   [10, 50],
+  "claude-opus-5":     [5, 25],
+  "claude-opus-4":     [5, 25],     // 4, 4-5, 4-6, 4-7, 4-8 all share this rate
+  "claude-sonnet-5":   [3, 15],
+  "claude-sonnet-4":   [3, 15],
+  "claude-haiku-4":    [1, 5],
+  "claude-3-opus":     [15, 75],    // legacy 3.x cards differ from their tier default
+  "claude-3-5-sonnet": [3, 15],
+  "claude-3-7-sonnet": [3, 15],
+  "claude-3-5-haiku":  [0.8, 4],
+  "claude-3-haiku":    [0.25, 1.25],
+  "claude-2":          [8, 24],
+};
+/* Last resort before giving up: the tier word implies the current rate for that tier. */
+const TIERS = [[/\bopus\b|opus/, [5, 25]], [/sonnet/, [3, 15]], [/haiku/, [1, 5]],
+               [/fable|mythos/, [10, 50]]];
+const CACHE_READ_MULT = 0.1;
+const CACHE_WRITE_MULT = { "1h": 2.0, "5m": 1.25 };
+function setRates(partial) { Object.assign(RATES, partial); }
+
+/** Strip the decorations cloud vendors and release dates add, so one card serves all. */
+function normalizeModel(id) {
+  let m = String(id || "").toLowerCase().trim();
+  m = m.replace(/\[[^\]]*\]/g, "");                 // context-window suffix: [1m]
+  m = m.replace(/^publishers\/anthropic\/models\//, "");  // Vertex AI
+  // Bedrock stacks these: "us.anthropic.claude-…" is a region prefix on a vendor prefix.
+  for (let prev = null; prev !== m; ) {
+    prev = m;
+    m = m.replace(/^(anthropic|us|eu|apac|global|gov)\./, "");
+  }
+  m = m.replace(/[:@]\d+(\.\d+)?$/, "");            // :0, @1
+  m = m.replace(/-v\d+$/, "");                      // -v1
+  m = m.replace(/[-@](\d{8}|\d{6})$/, "");          // -20250219 / @250219
+  m = m.replace(/-latest$/, "");
+  return m.replace(/-+$/, "");
+}
+
+/** @returns {{rate:[number,number]|null, basis:string, id:string}} -- never throws,
+ *  never returns undefined. `basis` explains the match so the UI can show its work. */
+function resolveRate(model) {
+  const raw = String(model || "");
+  if (!raw) return { rate: null, basis: "missing", id: raw };
+  // Claude Code writes <synthetic> for records it produced locally with no API call.
+  if (raw.startsWith("<")) return { rate: null, basis: "synthetic", id: raw };
+  const id = normalizeModel(raw);
+  if (RATES[id]) return { rate: RATES[id], basis: "exact", id };
+  let best = null;
+  for (const k of Object.keys(RATES)) {
+    if (id.startsWith(k) && (!best || k.length > best.length)) best = k;
+  }
+  if (best) return { rate: RATES[best], basis: "prefix:" + best, id };
+  for (const [re, rate] of TIERS) if (re.test(id)) return { rate, basis: "tier", id };
+  return { rate: null, basis: "unpriced", id };
+}
+
+/* ------------------------------------------------------- shell interpretation --
+ * The sets below are the shell language, not a taste list: POSIX special builtins
+ * and reserved words. Everything program-specific (which commands take subcommands,
+ * which ones matter) is learned from the corpus in scan().
+ */
+const KEYWORDS = new Set(["for","while","until","if","elif","case","esac","select",
+  "function","do","done","then","else","fi","in","{","}","[[","]]","time"]);
+/** Builtins that only change shell state -- they are never "the command that ran". */
+const STATE_ONLY = new Set(["cd","export","set","unset","shopt","alias","unalias","pushd",
+  "popd","dirs","umask","local","readonly","declare","typeset","source",".","eval","trap",
+  "hash","ulimit","shift","getopts","let"]);
+/** Builtins that exec another command in place -- transparent, skip to the real one. */
+const EXEC_WRAPPERS = new Set(["sudo","doas","env","nohup","command","builtin","exec",
+  "time","timeout","stdbuf","nice","ionice","setsid","unbuffer","script","xargs","watch"]);
+/** Builtins that emit but do no work -- outranked by any external command present. */
+const NO_WORK = new Set(["echo","printf","true","false",":","test","[","read","wait",
+  "times","sleep","pwd","type","jobs","kill","trap"]);
+
+/** Split a shell string on top-level | || && ; and newlines, honouring quotes,
+ *  parens/brackets/braces, and skipping heredoc bodies entirely. */
+function splitSegments(cmd) {
+  const segs = []; let buf = "", i = 0, quote = null, depth = 0, pending = null;
+  const n = cmd.length;
+  while (i < n) {
+    const c = cmd[i];
+    if (quote) {
+      if (c === "\\" && quote === '"') { buf += cmd.slice(i, i + 2); i += 2; continue; }
+      if (c === quote) quote = null;
+      buf += c; i++; continue;
+    }
+    if (c === "'" || c === '"') { quote = c; buf += c; i++; continue; }
+    // `<<TAG` only *arms* a heredoc: the rest of THIS line is still part of the pipeline
+    // (`cat <<EOF | grep x`), and the body starts at the next newline. Recording it as
+    // pending keeps both halves right; consuming the line immediately loses the pipe, and
+    // resuming into the same buffer afterwards silently welds the next command onto this
+    // one (which is how `python3 - <<PY … PY` + `grep foo` became "python3 grep").
+    if (cmd.startsWith("<<", i) && cmd[i + 2] !== "<") {
+      let j = i + 2; if (cmd[j] === "-") j++;
+      while (j < n && /\s/.test(cmd[j])) j++;
+      let q = null; if (cmd[j] === "'" || cmd[j] === '"') { q = cmd[j]; j++; }
+      let tag = "";
+      while (j < n && (/[\w-]/.test(cmd[j]) || (q && cmd[j] !== q))) { tag += cmd[j]; j++; }
+      if (q && cmd[j] === q) j++;
+      if (tag) { pending = tag; i = j; continue; }
+    }
+    if (c === "(" || c === "[" || c === "{") { depth++; buf += c; i++; continue; }
+    if (c === ")" || c === "]" || c === "}") { depth = Math.max(0, depth - 1); buf += c; i++; continue; }
+    if (depth === 0) {
+      if (cmd.startsWith("&&", i) || cmd.startsWith("||", i)) { segs.push(buf); buf = ""; i += 2; continue; }
+      if (c === "|" || c === ";") { segs.push(buf); buf = ""; i++; continue; }
+      if (c === "\n") {
+        segs.push(buf); buf = ""; i++;
+        if (pending !== null) {                   // skip the heredoc body, then carry on
+          while (i < n) {
+            const nl = cmd.indexOf("\n", i);
+            const line = cmd.slice(i, nl === -1 ? n : nl).trim();
+            i = nl === -1 ? n : nl + 1;
+            if (line === pending) break;
+          }
+          pending = null;
+        }
+        continue;
+      }
+    }
+    buf += c; i++;
+  }
+  segs.push(buf);
+  return segs.map(s => s.trim()).filter(Boolean);
+}
+
+/** Could this word be a subcommand verb? A bare lowercase-ish token -- not a flag,
+ *  path, filename, number, URL or variable. Whether it IS one is decided by scan(). */
+function isVerbShaped(w) {
+  return !!w && w.length <= 24 && /^[a-z][a-z0-9]*([-_:][a-z0-9]+)*$/.test(w)
+      && !/^\d/.test(w) && !KEYWORDS.has(w);
+}
+
+/** Resolve one pipeline segment.
+ *  @returns {{prog:string, verb:string|null, rank:number}|null}
+ *  rank orders candidates for labelling a whole invocation: 0 = external command
+ *  (real work), 1 = builtin that emits but does no work, 2 = state-only builtin. */
+function resolveSegment(seg) {
+  const words = seg.replace(/[()]/g, " ").split(/\s+/).filter(Boolean);
+  if (!words.length || words[0].startsWith("#")) return null;   // comment line
+  let idx = 0, wrapped = false;
+  while (idx < words.length) {
+    const w = words[idx];
+    if (/^[A-Za-z_]\w*=/.test(w)) { idx++; continue; }        // VAR=value prefix
+    if (EXEC_WRAPPERS.has(w)) { idx++; wrapped = true; continue; }   // sudo/env/timeout/...
+    if (KEYWORDS.has(w)) return null;                         // control flow, not a command
+    // A wrapper takes its own options before the command it execs: `timeout 5 kubectl`,
+    // `xargs -n1 grep`, `nice -n10 cargo`. Skip flags and duration/count values.
+    // (A flag whose value is a bare word -- `sudo -u alice cmd` -- still resolves to the
+    // value; that needs per-wrapper arity, so it is reported as-is rather than guessed.)
+    if (wrapped && (w.startsWith("-") || /^\d+(\.\d+)?[smhd]?$/.test(w))) { idx++; continue; }
+    break;
+  }
+  if (idx >= words.length) return null;
+  let prog = words[idx].split("/").pop().replace(/^[$(]+/, "").replace(/^["']|["']$/g, "");
+  if (!prog || prog.startsWith("-") || prog.startsWith("$")) return null;
+  const rank = STATE_ONLY.has(prog) ? 2 : NO_WORK.has(prog) ? 1 : 0;
+  let verb = null;
+  for (const w of words.slice(idx + 1)) {
+    if (w.startsWith("-")) continue;                          // flags are not verbs
+    if (isVerbShaped(w)) verb = w;
+    break;                                                    // only the first operand
+  }
+  return { prog, verb, rank };
+}
+
+/** Every (program, candidate-verb) pair a Bash invocation contains -- the raw material
+ *  scan() aggregates to learn which programs actually dispatch subcommands. */
+function shellCandidates(cmd) {
+  return splitSegments(cmd).map(resolveSegment).filter(Boolean);
+}
+
+/** Label an invocation: pick the segment doing real work, then apply the learned
+ *  vocabulary to decide whether its second token is a subcommand.
+ *  @param {Set<string>} dispatchers programs scan() observed dispatching subcommands */
+function labelShell(cmd, dispatchers) {
+  const cands = shellCandidates(cmd);
+  if (!cands.length) return { prog: "(no command)", verb: null };
+  let pick = cands[0];
+  for (const c of cands) if (c.rank < pick.rank) pick = c;    // lowest rank wins
+  const verb = (pick.verb && dispatchers && dispatchers.has(pick.prog)) ? pick.verb : null;
+  return { prog: pick.prog, verb };
+}
+
+/* ------------------------------------------------------------- content sizing --
+ * Token counts are estimated from character length. The divisor is CALIBRATED per
+ * dataset rather than assumed, using an identity that holds exactly:
+ *
+ *   Δ(context tokens) between consecutive requests
+ *     = the previous turn's output_tokens  +  the user-side content added since
+ *
+ * The first term is reported exactly by `usage`, so subtracting it isolates content
+ * that IS fully persisted in the transcript (tool results and typed text) from content
+ * that is not (thinking text, which is replaced by a signature). Regressing against the
+ * raw delta instead charges invisible thinking tokens to visible characters and lands
+ * near 2.2 chars/token -- below anything real text can be.
+ *
+ * TWO densities, not one. Machine text (tool output, JSON arguments, source) tokenises
+ * far denser than prose, so a single constant is wrong for one of them no matter which
+ * value it takes. Each interval contributes one equation
+ *
+ *   userTokens = codeChars * a  +  textChars * b        (a = 1/density, per class)
+ *
+ * and the whole dataset is solved for [a, b] by least squares. Falls back to a pooled
+ * single density when there is not enough of one class to identify both.
+ */
+const CPT_FALLBACK = 4.0, CPT_MIN = 1.5, CPT_MAX = 12.0;
+const clampCpt = v => Math.min(CPT_MAX, Math.max(CPT_MIN, v));
+
+/** Least squares for userTokens = code*a + text*b, returned as densities (chars/token).
+ *
+ *  Whether the two classes can be told apart is decided by the STANDARD ERROR of each
+ *  fitted coefficient, not by a threshold on how much of each class happens to be
+ *  present. If one class is too sparse or too collinear with the other to pin down, its
+ *  error bar blows up and the fit is rejected in favour of a single pooled density --
+ *  automatically, and for the actual reason. A share-of-corpus floor would instead reject
+ *  perfectly identifiable fits (this was measured: a corpus with only 3% prose still
+ *  yields collinearity of 0.0004, i.e. cleanly separable).
+ *
+ *  Note there is no assumption about which class is denser. Harness-injected "text" is
+ *  often markdown and config rather than prose, and does measure denser than tool output
+ *  in some corpora; encoding a prior about that would just be another hardcoded opinion.
+ */
+const MAX_REL_SE = 0.25;
+function solveDensities(S) {
+  const { cc, ct, tt, cy, ty, yy, n, code, text, tok } = S;
+  if (n < 20 || tok <= 0) return null;
+  const pooled = clampCpt((code + text) / tok);
+  const fallback = { code: pooled, text: pooled, basis: "pooled", pooled, relSE: null };
+  const det = cc * tt - ct * ct;
+  if (!(det > 0)) return fallback;
+
+  const a = (cy * tt - ty * ct) / det, b = (ty * cc - cy * ct) / det;
+  if (!(a > 0) || !(b > 0)) return fallback;
+  // Residual sum of squares, then the usual (X'X)^-1 * sigma^2 coefficient variances.
+  const rss = yy - 2 * a * cy - 2 * b * ty + a * a * cc + 2 * a * b * ct + b * b * tt;
+  if (!(rss >= 0) || n <= 2) return fallback;
+  const s2 = rss / (n - 2);
+  const seA = Math.sqrt(s2 * tt / det), seB = Math.sqrt(s2 * cc / det);
+  const relSE = [seA / a, seB / b];
+  if (relSE[0] > MAX_REL_SE || relSE[1] > MAX_REL_SE) return fallback;
+  return { code: clampCpt(1 / a), text: clampCpt(1 / b),
+           basis: "least-squares", pooled, relSE };
+}
+
+/** Characters of billable text in a content block. Images are excluded here and
+ *  sized separately -- they bill by pixel dimensions, so their base64 length is
+ *  meaningless (counting it once inflated a run by 40%). */
+function charsOf(block) {
+  if (typeof block === "string") return block.length;
+  if (Array.isArray(block)) return block.reduce((n, b) => n + charsOf(b), 0);
+  if (!block || typeof block !== "object") return 0;
+  switch (block.type) {
+    case "text":        return (block.text || "").length;
+    case "thinking":    return (block.thinking || "").length;
+    case "redacted_thinking": return (block.data || "").length;
+    case "tool_use":    return JSON.stringify(block.input || {}).length;
+    case "tool_result": return charsOf(block.content);
+    case "image":       return 0;
+    case "document":    return 0;
+    default:            return JSON.stringify(block).length;
+  }
+}
+function textOf(block) {
+  if (typeof block === "string") return block;
+  if (Array.isArray(block)) return block.map(textOf).join("");
+  if (!block || typeof block !== "object") return "";
+  if (block.type === "text") return block.text || "";
+  if (block.type === "tool_result") return textOf(block.content);
+  return "";
+}
+
+/* Image tokens from real dimensions. Anthropic bills roughly (w*h)/750 tokens and caps
+ * long edges at 1568px, so a decoded header beats any flat constant. Only the first few
+ * KB are decoded; unparseable or absent data falls back to a mid-size estimate. */
+const IMAGE_FALLBACK = 1500, IMAGE_CAP = 1600;
+function b64Bytes(data, limit) {
+  try {
+    const clean = String(data).replace(/^data:[^,]*,/, "").replace(/[^A-Za-z0-9+/=]/g, "");
+    const slice = clean.slice(0, Math.ceil(limit / 3) * 4);
+    const bin = (typeof atob === "function") ? atob(slice.replace(/=+$/, ""))
+      : Buffer.from(slice, "base64").toString("binary");
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch { return null; }
+}
+function imageDims(b) {
+  const src = (b && b.source) || {};
+  if (src.type === "url" || !src.data) return null;
+  const B = b64Bytes(src.data, 65536);
+  if (!B || B.length < 24) return null;
+  const be16 = i => (B[i] << 8) | B[i + 1], be32 = i => (B[i] << 24 | B[i + 1] << 16 | B[i + 2] << 8 | B[i + 3]) >>> 0;
+  if (B[0] === 0x89 && B[1] === 0x50) return { w: be32(16), h: be32(20) };            // PNG IHDR
+  if (B[0] === 0x47 && B[1] === 0x49) return { w: B[6] | B[7] << 8, h: B[8] | B[9] << 8 }; // GIF
+  if (B[0] === 0xFF && B[1] === 0xD8) {                                               // JPEG: find SOFn
+    let i = 2;
+    while (i + 9 < B.length) {
+      if (B[i] !== 0xFF) { i++; continue; }
+      const mk = B[i + 1];
+      if (mk >= 0xC0 && mk <= 0xCF && mk !== 0xC4 && mk !== 0xC8 && mk !== 0xCC)
+        return { h: be16(i + 5), w: be16(i + 7) };
+      if (mk === 0xD8 || (mk >= 0xD0 && mk <= 0xD9)) { i += 2; continue; }
+      i += 2 + be16(i + 2);
+    }
+    return null;
+  }
+  if (B[8] === 0x57 && B[9] === 0x45 && B[10] === 0x42 && B[11] === 0x50) {            // WEBP
+    const le16 = i => B[i] | B[i + 1] << 8;
+    if (B[15] === 0x58) return { w: (B[24] | B[25] << 8 | B[26] << 16) + 1, h: (B[27] | B[28] << 8 | B[29] << 16) + 1 };
+    if (B[15] === 0x20) return { w: le16(26) & 0x3fff, h: le16(28) & 0x3fff };
+    return null;
+  }
+  return null;
+}
+function imageTokens(b) {
+  const d = imageDims(b);
+  if (!d || !d.w || !d.h || d.w > 20000 || d.h > 20000) return IMAGE_FALLBACK;
+  const scale = Math.min(1, 1568 / Math.max(d.w, d.h));       // long edge is clamped
+  return Math.max(1, Math.min(IMAGE_CAP, Math.round(d.w * scale * d.h * scale / 750)));
+}
+
+/* -------------------------------------------------------------------- records --
+ * A bucket is a record, and its key is derived from the record. Nothing downstream
+ * parses a label by character offset.
+ *   role: preamble | harness | typed | assistant | tool | image
+ *   dir : call | result   (tools only)
+ */
+const keyOf = r => [r.role, r.tool || "", r.dir || "", r.sub || "", r.kind || ""].join(" ");
+
+/** Harness-injected user content, identified structurally where the schema allows and
+ *  by its own wrapper tag otherwise -- so an unfamiliar tag becomes its own row instead
+ *  of being misfiled as something the human typed. */
+const TAG_SPAN = /<([a-z][a-z0-9_-]*)>([\s\S]*?)<\/\1>/gi;
+const TAG_OPEN = /^\s*<([a-z][a-z0-9_-]*)>/i;
+
+/** Split one user block into harness-injected spans and whatever is left, which is what
+ *  the human actually typed. Returns [{role, sub, chars}].
+ *
+ *  Injected content is not always the whole block: a harness routinely appends reminders
+ *  after a typed message, so matching only a tag at position 0 charges those characters to
+ *  the human. Tag names are read out of the text rather than compared against a list, so a
+ *  wrapper this build has never seen still gets its own row. */
+function classifyUserBlock(text, rec) {
+  if (rec && rec.isCompactSummary === true)
+    return [{ role: "harness", sub: "compaction summary", chars: text.length }];
+  const out = [];
+  let covered = 0;
+  TAG_SPAN.lastIndex = 0;
+  for (let m; (m = TAG_SPAN.exec(text)); ) {
+    out.push({ role: "harness", sub: "<" + m[1].toLowerCase() + ">", chars: m[0].length });
+    covered += m[0].length;
+  }
+  const rest = text.length - covered;
+  if (rest > 0) {
+    // An unterminated wrapper still identifies the block it opens.
+    const open = out.length ? null : TAG_OPEN.exec(text);
+    if (open) out.push({ role: "harness", sub: "<" + open[1].toLowerCase() + ">", chars: rest });
+    else if (rec && rec.isMeta === true) out.push({ role: "harness", sub: "harness metadata", chars: rest });
+    else out.push({ role: "typed", sub: null, chars: rest });
+  }
+  return out;
+}
+
+/** A tool's input often carries a natural sub-key. Detected by FIELD SHAPE, not by
+ *  tool name, so it works for a shell tool or file tool nobody has registered:
+ *    - a `command`-ish string  -> the program (and subcommand) it runs
+ *    - a path-ish string       -> the file extension
+ *  Returns {sub, shell} where shell marks command-running tools. */
+const PATH_FIELDS = ["file_path", "filePath", "path", "notebook_path", "notebookPath", "file"];
+function subKeyOf(input, dispatchers) {
+  if (!input || typeof input !== "object") return { sub: null, shell: false };
+  for (const f of ["command", "cmd", "script", "shell_command"]) {
+    if (typeof input[f] === "string" && input[f].trim()) {
+      const { prog, verb } = labelShell(input[f], dispatchers);
+      return { sub: verb ? prog + " " + verb : prog, shell: true };
+    }
+  }
+  for (const f of PATH_FIELDS) {
+    if (typeof input[f] === "string" && input[f].trim()) {
+      const base = input[f].split(/[\\/]/).pop() || "";
+      const dot = base.lastIndexOf(".");
+      const ext = dot > 0 ? base.slice(dot).toLowerCase() : "(no extension)";
+      return { sub: ext.length <= 12 ? "*" + ext : "(other)", shell: false };
+    }
+  }
+  return { sub: null, shell: false };
+}
+
+/** Display name for a tool. MCP's `mcp__<server>__<tool>` is a protocol convention,
+ *  so it is parsed generically -- no gateway-specific prefix is stripped by name. */
+function toolDisplay(tool) {
+  if (!tool.startsWith("mcp__")) return tool;
+  const p = tool.split("__").filter(Boolean);
+  return p.length >= 3 ? `${p[1]} · ${p.slice(2).join("__")}` : tool;
+}
+
+/* --------------------------------------------------------------------- pass 1 --
+ * Cheap scan: dedupe sessions, calibrate chars-per-token, learn which programs
+ * dispatch subcommands.
+ */
+const SESSION_RE = /"sessionId"\s*:\s*"([^"]+)"/;
+
+/* Which programs dispatch subcommands is LEARNED, because any list of them is a list of
+ * one author's toolchain. Three properties separate a real multiplexer from a program
+ * that merely takes an argument, and all three are needed:
+ *
+ *   coverage  -- `git`/`docker`/`poetry` are called with a verb-shaped first operand
+ *                nearly every time. `ls`, `rm`, `find`, `grep` are usually given a path,
+ *                glob, quoted string or flag instead, so their coverage is low.
+ *   repetition-- a verb vocabulary is closed and reused: distinct/observed is tiny for
+ *                `git` (~10 verbs over hundreds of calls) and near 1.0 for `grep`, whose
+ *                operand is a different search pattern almost every time.
+ * State-only and no-work builtins (`cd`, `echo`) are excluded outright: their operand is
+ * a path or a string, never a subcommand.
+ *
+ * Both thresholds are scale-free ratios on purpose. An absolute cap on vocabulary size
+ * would be one more arbitrary constant, and it misfires immediately: `git` is used with 42
+ * distinct subcommands in the corpus this was tested on, so a "max 40 verbs" rule would
+ * reject the most obvious dispatcher there is.
+ */
+const DISPATCH_MIN_CALLS = 5, DISPATCH_MIN_COVERAGE = 0.6, DISPATCH_MAX_RATIO = 0.5;
+function scan(files) {
+  const seen = new Set(), kept = [];
+  let duplicatesDropped = 0;
+  for (const f of files) {
+    const m = SESSION_RE.exec(f.text || "");
+    const id = (m ? m[1] : f.name) + "::" + (f.text || "").length;
+    if (seen.has(id)) { duplicatesDropped++; continue; }
+    seen.add(id); kept.push(f);
+  }
+
+  const verbs = new Map();      // prog -> {calls, withVerb, set:Set<verb>}
+  // Accumulators for the two-class least-squares fit described above.
+  const S = { cc: 0, ct: 0, tt: 0, cy: 0, ty: 0, yy: 0, n: 0, code: 0, text: 0, tok: 0 };
+  let badLines = 0;
+
+  for (const f of kept) {
+    let prevTokens = null, prevOut = 0, codeChars = 0, textChars = 0, dirty = false;
+    for (const line of f.text.split("\n")) {
+      const s = line.trim(); if (!s) continue;
+      let rec; try { rec = JSON.parse(s); } catch { badLines++; continue; }
+      const msg = rec && rec.message;
+      if (!msg || typeof msg !== "object") continue;
+      let content = msg.content;
+      if (typeof content === "string") content = [{ type: "text", text: content }];
+      if (!Array.isArray(content)) content = [];
+
+      if (msg.role === "assistant") {
+        const u = msg.usage || {};
+        const tokens = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0)
+                     + (u.cache_creation_input_tokens || 0);
+        if (tokens) {
+          // Δcontext − previous output_tokens == tokens for the user-side content we
+          // can actually measure. Anything invisible is accounted for by the first term.
+          const chars = codeChars + textChars;
+          if (prevTokens !== null && !dirty && chars > 400) {
+            const y = tokens - prevTokens - prevOut;
+            // Keep only physically plausible observations; a delta outside this band
+            // means the prefix was rewritten, not appended to.
+            if (y > 50 && chars / y >= CPT_MIN / 2 && chars / y <= CPT_MAX * 2) {
+              const c = codeChars, t = textChars;
+              S.cc += c * c; S.ct += c * t; S.tt += t * t;
+              S.cy += c * y; S.ty += t * y; S.yy += y * y;
+              S.code += c; S.text += t; S.tok += y; S.n++;
+            }
+          }
+          prevTokens = tokens; prevOut = u.output_tokens || 0;
+          codeChars = 0; textChars = 0; dirty = false;
+        }
+        for (const b of content) {
+          if (!b || typeof b !== "object") continue;
+          if (b.type === "tool_use") {
+            const inp = b.input || {};
+            for (const fld of ["command", "cmd", "script", "shell_command"]) {
+              if (typeof inp[fld] !== "string") continue;
+              for (const c of shellCandidates(inp[fld])) {
+                if (c.rank !== 0) continue;              // builtins never dispatch
+                if (!verbs.has(c.prog)) verbs.set(c.prog, { calls: 0, withVerb: 0, set: new Set() });
+                const e = verbs.get(c.prog);
+                e.calls++;
+                if (c.verb) { e.withVerb++; e.set.add(c.verb); }
+              }
+              break;
+            }
+          }
+        }
+      } else if (msg.role === "user") {
+        // Compaction rewrites the prefix, so deltas across it are not calibration data.
+        if (rec.isCompactSummary === true) dirty = true;
+        for (const b of content) {
+          if (!b || typeof b !== "object") { textChars += charsOf(b); continue; }
+          if (b.type === "image") { dirty = true; continue; }
+          // Tool output is machine text; what a person (or the harness) writes is prose.
+          if (b.type === "tool_result") codeChars += charsOf(b);
+          else textChars += charsOf(b);
+        }
+      }
+    }
+  }
+
+  const dispatchers = new Set();
+  for (const [prog, e] of verbs) {
+    if (e.calls < DISPATCH_MIN_CALLS || e.set.size < 2) continue;
+    if (e.withVerb / e.calls < DISPATCH_MIN_COVERAGE) continue;
+    if (e.set.size / e.withVerb > DISPATCH_MAX_RATIO) continue;
+    dispatchers.add(prog);
+  }
+  const fit = solveDensities(S);
+  return { files: kept, duplicatesDropped, badLines, dispatchers,
+           density: fit || { code: CPT_FALLBACK, text: CPT_FALLBACK,
+                             basis: "default", pooled: CPT_FALLBACK },
+           densitySamples: S.n, densityCalibrated: !!fit };
+}
+
+/* --------------------------------------------------------------------- pass 2 --
+ * Allocate every request's exact billed cost across the content in its context.
+ * Two accumulators per key: `f` is TTL-invariant, `v` scales with whatever multiplier
+ * is assumed for cache writes whose TTL the transcript did not record. So re-pricing
+ * costs O(keys), not another walk.
+ */
+function allocate(scanned) {
+  const { files, dispatchers, density } = scanned;
+  const CODE = density.code, TEXT = density.text;   // chars per token, by content class
+  const acc = new Map();                 // key -> {rec, f, v, out}
+  const recOf = new Map([[PRE_KEY, PRE_REC]]);   // key -> its record, so nothing re-parses keys
+  const addCtx = (ctx, rec, tokens) => {
+    if (!(tokens > 0)) return;
+    const k = keyOf(rec);
+    if (!recOf.has(k)) recOf.set(k, rec);
+    ctx.set(k, (ctx.get(k) || 0) + tokens);
+  };
+  const bump = (rec, f, v, out) => {
+    const k = keyOf(rec);
+    let e = acc.get(k);
+    if (!e) { e = { rec, f: 0, v: 0, out: 0 }; acc.set(k, e); }
+    e.f += f; e.v += v; e.out += out;
+  };
+
+  const billed = { f: 0, v: 0, out: 0 };
+  const models = new Map();              // raw id -> {n, basis, rate}
+  const unpriced = new Map();            // raw id -> requests skipped from pricing
+  const ttl = { "1h": 0, "5m": 0, unknown: 0 };
+  let requests = 0, sessions = 0, sidechainRequests = 0;
+  let tMin = null, tMax = null;
+  const firstCtx = [];
+
+  for (const file of files) {
+    const ctx = new Map();               // key -> estimated tokens in context
+    const toolOf = new Map();            // tool_use id -> {tool, sub}
+    let preamble = null, sawRequest = false;
+
+    for (const line of file.text.split("\n")) {
+      const s = line.trim(); if (!s) continue;
+      let rec; try { rec = JSON.parse(s); } catch { continue; }
+      if (typeof rec.timestamp === "string") {
+        const t = Date.parse(rec.timestamp);
+        if (!isNaN(t)) { if (tMin === null || t < tMin) tMin = t; if (tMax === null || t > tMax) tMax = t; }
+      }
+      const msg = rec.message;
+      if (!msg || typeof msg !== "object") continue;
+      let content = msg.content;
+      if (typeof content === "string") content = [{ type: "text", text: content }];
+      if (!Array.isArray(content)) content = [];
+
+      if (msg.role === "assistant") {
+        const u = msg.usage || {};
+        const inp = u.input_tokens || 0;
+        const cr = u.cache_read_input_tokens || 0;
+        const cw = u.cache_creation_input_tokens || 0;
+        const out = u.output_tokens || 0;
+        const ctxTokens = inp + cr + cw;
+        const { rate, basis } = resolveRate(msg.model);
+
+        if (msg.model) {
+          const e = models.get(msg.model) || { n: 0, basis, rate };
+          e.n++; models.set(msg.model, e);
+        }
+
+        if (rate && ctxTokens) {
+          requests++;
+          if (rec.isSidechain === true) sidechainRequests++;
+          if (!sawRequest) { sessions++; sawRequest = true; firstCtx.push(ctxTokens); }
+          const [pIn, pOut] = rate;
+
+          // The transcript records the cache-write TTL split per request. Use it, and
+          // only fall back to an assumed multiplier for the residual it omits.
+          const cc = u.cache_creation && typeof u.cache_creation === "object" ? u.cache_creation : null;
+          let w1 = 0, w5 = 0;
+          if (cc) {
+            w1 = cc.ephemeral_1h_input_tokens || 0;
+            w5 = cc.ephemeral_5m_input_tokens || 0;
+            if (w1 + w5 > cw) { const k = cw / (w1 + w5); w1 *= k; w5 *= k; }  // trust the total
+          }
+          const wUnknown = Math.max(0, cw - w1 - w5);
+          ttl["1h"] += w1; ttl["5m"] += w5; ttl.unknown += wUnknown;
+
+          const fixedIn = (inp * pIn + cr * pIn * CACHE_READ_MULT
+                          + w1 * pIn * CACHE_WRITE_MULT["1h"] + w5 * pIn * CACHE_WRITE_MULT["5m"]) / 1e6;
+          const varIn = (wUnknown * pIn) / 1e6;
+          const outCost = (out * pOut) / 1e6;
+          billed.f += fixedIn; billed.v += varIn; billed.out += outCost;
+
+          // Preamble (system prompt + tool schemas) is measured ONCE per session, at the
+          // first request, where almost no conversation exists yet. Holding it fixed
+          // matters: char-based sizing undercounts, and a preamble recomputed every turn
+          // would absorb the entire shortfall and grow without bound.
+          let mine = 0; for (const v of ctx.values()) mine += v;
+          if (preamble === null) preamble = Math.max(0, ctxTokens - mine);
+          const body = Math.max(0, ctxTokens - preamble);
+          const shares = [];
+          let denom = 0;
+          if (mine > 0) {
+            const k = body / mine;
+            for (const [key, v] of ctx) { const t = v * k; shares.push([key, t]); denom += t; }
+          }
+          const pre = Math.min(preamble, ctxTokens);
+          if (pre > 0) { shares.push([PRE_KEY, pre]); denom += pre; }
+          for (const [key, t] of (denom > 0 ? shares : [])) {
+            const r = recOf.get(key);
+            if (r) bump(r, fixedIn * (t / denom), varIn * (t / denom), 0);
+          }
+
+          // Output. Thinking text is not persisted (only a signature), so it is the
+          // remainder after the prose and tool arguments we can actually see.
+          let prose = 0, args = 0;
+          for (const b of content) {
+            if (!b || typeof b !== "object") continue;
+            if (b.type === "text") prose += (b.text || "").length / TEXT;
+            else if (b.type === "tool_use") args += JSON.stringify(b.input || {}).length / CODE;
+          }
+          const think = Math.max(0, out - prose - args);
+          const d2 = prose + args + think;
+          if (d2 > 0) {
+            bump({ role: "assistant", kind: "thinking" },   0, 0, outCost * think / d2);
+            bump({ role: "assistant", kind: "prose" },      0, 0, outCost * prose / d2);
+            bump({ role: "assistant", kind: "tool-args" },  0, 0, outCost * args / d2);
+          }
+        } else if (ctxTokens && basis !== "synthetic") {
+          unpriced.set(msg.model || "(no model field)", (unpriced.get(msg.model || "(no model field)") || 0) + 1);
+        }
+
+        // This assistant message now becomes part of the context for later requests.
+        for (const b of content) {
+          if (!b || typeof b !== "object") continue;
+          if (b.type === "text") {
+            addCtx(ctx, { role: "assistant", kind: "prose-carried" }, (b.text || "").length / TEXT);
+          } else if (b.type === "thinking" || b.type === "redacted_thinking") {
+            addCtx(ctx, { role: "assistant", kind: "thinking-carried" }, charsOf(b) / TEXT);
+          } else if (b.type === "tool_use") {
+            const tool = b.name || "(unnamed tool)";
+            const { sub, shell } = subKeyOf(b.input, dispatchers);
+            if (b.id) toolOf.set(b.id, { tool, sub, shell });
+            addCtx(ctx, { role: "tool", tool, dir: "call", sub, shell },
+                   JSON.stringify(b.input || {}).length / CODE);
+          }
+        }
+      } else if (msg.role === "user") {
+        for (const b of content) {
+          const bt = (b && typeof b === "object") ? b.type : "text";
+          if (bt === "tool_result") {
+            const t = toolOf.get(b.tool_use_id) || { tool: "(unmatched tool result)", sub: null, shell: false };
+            addCtx(ctx, { role: "tool", tool: t.tool, dir: "result", sub: t.sub, shell: t.shell },
+                   charsOf(b) / CODE);
+          } else if (bt === "image") {
+            addCtx(ctx, { role: "image", kind: "image" }, imageTokens(b));
+          } else if (bt === "document") {
+            addCtx(ctx, { role: "image", kind: "document" }, charsOf(b) / CODE);
+          } else {
+            for (const part of classifyUserBlock(textOf(b), rec))
+              addCtx(ctx, { role: part.role, sub: part.sub }, part.chars / TEXT);
+          }
+        }
+      }
+    }
+  }
+
+  const days = (tMin !== null && tMax !== null)
+    ? Math.max(1, Math.round((tMax - tMin) / 86400000)) : null;
+  return { acc, billed, requests, sessions, sidechainRequests, models, unpriced, ttl,
+           days, spanFrom: tMin, spanTo: tMax, firstCtx };
+}
+
+const PRE_REC = { role: "preamble" };
+const PRE_KEY = keyOf(PRE_REC);
+
+/* ---------------------------------------------------------------------- price --
+ * Apply a rate for the cache writes whose TTL was not recorded. O(keys).
+ */
+function price(alloc, ttlAssumption = "1h") {
+  const mult = CACHE_WRITE_MULT[ttlAssumption] ?? CACHE_WRITE_MULT["1h"];
+  const rows = [];
+  for (const e of alloc.acc.values()) {
+    const c = e.f + e.v * mult + e.out;
+    if (c > 0) rows.push({ rec: e.rec, cost: c, isOutput: e.out > 0 && e.f === 0 && e.v === 0 });
+  }
+  return { rows,
+           input: alloc.billed.f + alloc.billed.v * mult,
+           output: alloc.billed.out,
+           total: alloc.billed.f + alloc.billed.v * mult + alloc.billed.out };
+}
+
+/* ----------------------------------------------------------------- the report --
+ * Groups are defined by ROLE IN THE REQUEST CYCLE -- a structural property every
+ * transcript has. Membership is then derived from measured cost, so a tool, command,
+ * harness tag or MCP server this file has never heard of still lands correctly.
+ */
+const GROUPS = [
+  { id: "shell",    name: "Shell commands",              short: "Shell" },
+  { id: "ingest",   name: "Tools · content read in",     short: "Read in" },
+  { id: "emit",     name: "Tools · content written out", short: "Written out" },
+  { id: "twoway",   name: "Tools · two-way",             short: "Two-way" },
+  { id: "output",   name: "Model output",                short: "Output" },
+  { id: "preamble", name: "System prompt & tool schemas", short: "System prompt" },
+  { id: "harness",  name: "Harness & reminders",         short: "Harness" },
+  { id: "media",    name: "Images & attachments",        short: "Media" },
+  { id: "typed",    name: "My typing",                   short: "My typing" },
+];
+
+/** A tool is shown as one row, or split into call/result rows, depending on whether
+ *  BOTH directions carry real money. Measured per tool -- no list of tool names. */
+const SPLIT_MIN_SHARE = 0.12;
+/** Above this share of a tool's cost in one direction, that direction defines its role. */
+const DOMINANT = 0.7;
+
+const round = v => Math.round(v * 100) / 100;
+const sumBy = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
+function buildTree(alloc, ttlAssumption = "1h") {
+  const priced = price(alloc, ttlAssumption);
+
+  /* A two-level accumulator: group -> item -> optional child. Every branch below feeds
+   * the same structure, so no group needs bespoke assembly code. */
+  const bucket = new Map();
+  const put = (gid, item, child, cost) => {
+    if (!(cost > 0)) return;
+    if (!bucket.has(gid)) bucket.set(gid, new Map());
+    const items = bucket.get(gid);
+    let e = items.get(item);
+    if (!e) { e = { cost: 0, kids: new Map() }; items.set(item, e); }
+    e.cost += cost;
+    if (child) e.kids.set(child, (e.kids.get(child) || 0) + cost);
+  };
+
+  // 1. Fold tool rows into per-tool direction and sub-key totals; place the rest by role.
+  const tools = new Map();     // tool -> {call, result, shell, subs:Map(sub -> cost)}
+  for (const { rec, cost } of priced.rows) {
+    switch (rec.role) {
+      case "tool": {
+        let t = tools.get(rec.tool);
+        if (!t) { t = { call: 0, result: 0, shell: false, subs: new Map() }; tools.set(rec.tool, t); }
+        if (rec.shell) t.shell = true;
+        t[rec.dir === "call" ? "call" : "result"] += cost;
+        if (rec.sub) t.subs.set(rec.sub, (t.subs.get(rec.sub) || 0) + cost);
+        break;
+      }
+      case "preamble":  put("preamble", "system prompt + tool schemas", null, cost); break;
+      case "harness":   put("harness", rec.sub || "harness", null, cost); break;
+      case "typed":     put("typed", "your typed messages", null, cost); break;
+      case "image":     put("media", rec.kind === "document" ? "attached documents"
+                                                            : "images / screenshots", null, cost); break;
+      case "assistant": put("output", OUT_NAMES[rec.kind] || rec.kind, null, cost); break;
+      default:          put("twoway", "(unclassified)", null, cost);
+    }
+  }
+
+  // 2. Place each tool by its own measured direction balance, and give it a second level
+  //    from whatever sub-keys its inputs yielded. Both are derived, not looked up.
+  for (const [tool, t] of tools) {
+    const total = t.call + t.result;
+    if (total <= 0) continue;
+    const resultShare = t.result / total;
+    const gid = t.shell ? "shell"
+              : resultShare >= DOMINANT ? "ingest"
+              : resultShare <= 1 - DOMINANT ? "emit" : "twoway";
+    const disp = toolDisplay(tool);
+    const subTotal = sumBy([...t.subs.values()], c => c);
+
+    if (t.shell) {
+      // Shell: the sub-key is "prog" or "prog verb", so the program is the item and the
+      // full command the child. One row per program regardless of which tool ran it.
+      for (const [sub, c] of t.subs) {
+        const prog = sub.split(" ")[0];
+        put(gid, prog, sub, c);
+      }
+      put(gid, "(no command parsed)", null, total - subTotal);
+    } else if (t.subs.size > 1 && subTotal / total >= 0.8) {
+      // Enough of this tool's cost carries a sub-key to make a meaningful second level.
+      for (const [sub, c] of t.subs) put(gid, disp, sub, c);
+      put(gid, disp, "(no path parsed)", total - subTotal);
+    } else if (Math.min(t.call, t.result) / total >= SPLIT_MIN_SHARE) {
+      // Both directions carry real money, so one merged row would hide the story --
+      // and drilling a single-child row renders a degenerate 100% block.
+      put(gid, disp + " · results", null, t.result);
+      put(gid, disp + " · call args", null, t.call);
+    } else {
+      put(gid, disp, null, total);
+    }
+  }
+
+  // 3. Emit the tree in the declared group order, largest first within each level.
+  const groups = [];
+  for (const def of GROUPS) {
+    const items = bucket.get(def.id);
+    if (!items || !items.size) continue;
+    const list = [...items].map(([name, e]) => {
+      const kids = [...e.kids].map(([n, c]) => ({ name: n, cost: round(c) }))
+        .sort((a, b) => b.cost - a.cost);
+      return { name, cost: round(e.cost), children: kids.length > 1 ? kids : null };
+    }).sort((a, b) => b.cost - a.cost);
+    groups.push({ id: def.id, name: def.name, short: def.short,
+                  cost: round(sumBy(list, i => i.cost)), items: list });
+  }
+  groups.sort((a, b) => b.cost - a.cost);
+
+  // 4. Insights, measured -- so the views layer never needs a hand-written list of
+  //    "commands that read" versus "commands that write".
+  const gcost = id => (groups.find(g => g.id === id) || { cost: 0 }).cost;
+  const outItems = (groups.find(g => g.id === "output") || { items: [] }).items;
+  const oc = n => (outItems.find(i => i.name === n) || { cost: 0 }).cost;
+  const all = [...tools.values()];
+  const ingest = sumBy(all, t => t.result);
+  const emit = sumBy(all, t => t.call);
+  const mcp = sumBy(priced.rows.filter(r => r.rec.role === "tool"
+                    && String(r.rec.tool).startsWith("mcp__")), r => r.cost);
+
+  return {
+    total: priced.total, input: priced.input, output: priced.output,
+    requests: alloc.requests, sessions: alloc.sessions, days: alloc.days,
+    groups, accounted: round(sumBy(groups, g => g.cost)),
+    insights: {
+      fixed: gcost("preamble"), harness: gcost("harness"),
+      thinking: oc(OUT_NAMES.thinking), proseGen: oc(OUT_NAMES.prose),
+      proseCarry: oc(OUT_NAMES["prose-carried"]),
+      ingest: round(ingest), emit: round(emit), mcp: round(mcp),
+      typed: gcost("typed"),
+    },
+  };
+}
+
+const OUT_NAMES = {
+  thinking: "thinking",
+  prose: "assistant prose (generated)",
+  "tool-args": "tool-call arguments",
+  "prose-carried": "assistant prose (re-billed as input)",
+  "thinking-carried": "thinking blocks (re-billed as input)",
+};
+
+/* ------------------------------------------------------------------ top level --
+ * One scan, one allocation, then a priced tree per TTL assumption -- and the
+ * assumption only affects the cache writes whose TTL the transcript omitted.
+ */
+function analyze(rawFiles, opts = {}) {
+  const scanned = scan(rawFiles);
+  if (!scanned.files.length) throw new Error("no readable transcript files");
+  const alloc = allocate(scanned);
+
+  const datasets = {};
+  for (const t of ["1h", "5m"]) datasets[t] = buildTree(alloc, t);
+
+  const wTotal = alloc.ttl["1h"] + alloc.ttl["5m"] + alloc.ttl.unknown;
+  const warnings = [];
+  if (alloc.unpriced.size) {
+    const n = [...alloc.unpriced.values()].reduce((a, b) => a + b, 0);
+    warnings.push(`${n.toLocaleString("en-US")} request(s) used a model with no known rate `
+      + `(${[...alloc.unpriced.keys()].join(", ")}) and are excluded from the total.`);
+  }
+  if (!scanned.densityCalibrated) {
+    warnings.push(`Not enough clean samples to calibrate token sizing, so the `
+      + `${CPT_FALLBACK} chars/token default is in use and row splits are rougher `
+      + `than usual. Totals are unaffected.`);
+  } else if (scanned.density.basis === "pooled") {
+    warnings.push(`Token sizing calibrated to a single pooled density `
+      + `(${scanned.density.code.toFixed(2)} chars/token); there was not enough of one `
+      + `content class to separate prose from machine text.`);
+  }
+  if (scanned.badLines) warnings.push(`${scanned.badLines} unparseable line(s) skipped.`);
+  if (alloc.sidechainRequests) {
+    warnings.push(`${alloc.sidechainRequests.toLocaleString("en-US")} subagent request(s) `
+      + `included (isSidechain).`);
+  }
+
+  return {
+    datasets,
+    requests: alloc.requests, sessions: alloc.sessions, days: alloc.days,
+    spanFrom: alloc.spanFrom, spanTo: alloc.spanTo,
+    filesUsed: scanned.files.length, duplicatesDropped: scanned.duplicatesDropped,
+    badLines: scanned.badLines,
+    models: [...alloc.models].map(([id, e]) => ({ id, requests: e.n, basis: e.basis, rate: e.rate }))
+      .sort((a, b) => b.requests - a.requests),
+    unpriced: Object.fromEntries(alloc.unpriced),
+    density: scanned.density, densityCalibrated: scanned.densityCalibrated,
+    densitySamples: scanned.densitySamples,
+    dispatchers: [...scanned.dispatchers].sort(),
+    ttlTokens: alloc.ttl,
+    ttlMeasuredShare: wTotal > 0 ? 1 - alloc.ttl.unknown / wTotal : 1,
+    preambleRange: alloc.firstCtx.length
+      ? [Math.min(...alloc.firstCtx), Math.max(...alloc.firstCtx)] : null,
+    warnings,
+    groupDefs: GROUPS,
+  };
+}
+
+/* ---- views.js ---- */
+/* Report views — implementation of "Cost Report.dc.html" (claude.ai/design d41a68ba).
+   The design was authored in the <x-dc> template format against a static cost-data.js;
+   this is the same layout, palette and logic rendered natively against live uploaded
+   data. Full re-render on state change, with event delegation so handler count stays
+   flat regardless of how many rows exist. */
+
+/* Colour follows the group's stable ID from the engine, in the engine's declared order --
+   so a group keeps its hue when you drill in, switch view or change the TTL lens, and a
+   dataset containing tools this file has never heard of still colours consistently. The
+   palette caps at 8 hues; a 9th group takes a deliberate neutral rather than an invented
+   colour. Display names and short labels come from the engine too, so nothing here needs
+   a table of the tools or commands one particular person happens to use. */
+let HUE = new Map(), SHORT = new Map();
+function indexGroups() {
+  HUE = new Map(); SHORT = new Map();
+  const order = ((DATA && DATA.groupDefs) || []).map(g => g.id);
+  ((ds() && ds().groups) || []).forEach(g => {
+    const i = order.indexOf(g.id);
+    HUE.set(g.name, (i >= 0 && i < 8) ? `var(--c${i+1})` : "var(--cn)");
+    if (g.short) SHORT.set(g.name, g.short);
+  });
+}
+const FOLD_MIN = 0.008, FOLD_MAX = 14;
+
+let DATA = null;
+let S = { ttl:"1h", path:[], open:{}, hover:null, hoverInfo:null, query:"",
+          view:"panels", pctOnly:false, copied:false, linked:false };
+
+/** Percentage of a maximum, guarded. Every row in a group can legitimately round to
+ *  $0.00 on a small dataset, which makes the group maximum 0 and any bare v/max a NaN
+ *  that lands straight in a style attribute. */
+const pctOf = (v, max) => (max > 0 && v >= 0) ? v / max * 100 : 0;
+const maxCost = list => (list && list.length) ? Math.max.apply(null, list.map(x => x.cost || 0)) : 0;
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = n => "$" + n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const ds = () => DATA ? DATA.datasets[S.ttl] : null;
+const reqs = () => { const d = ds(); return (d && d.requests) || 1; };
+const hue = g => HUE.get(g) || "var(--cn)";
+/** Dollars, or share-of-bill when the amount is hidden. */
+const M = (c, base) => {
+  if (!S.pctOnly) return money(c);
+  const r = c / (base || ds().total) * 100;
+  return (r < 1 ? r.toFixed(2) : r.toFixed(1)) + "%";
+};
+
+/** Keep the top items, fold the tail into one labelled row. Nothing is dropped. */
+function fold(list, parentCost, noFold) {
+  if (!list || !list.length) return [];
+  const sorted = list.slice().sort((a,b) => b.cost - a.cost);
+  if (noFold) return sorted;
+  const keep = [], rest = [];
+  sorted.forEach((n,i) => ((i < FOLD_MAX && n.cost >= parentCost * FOLD_MIN) ? keep : rest).push(n));
+  if (rest.length) keep.push({ name:`other (${rest.length} items)`,
+    cost:+rest.reduce((s,n) => s+n.cost, 0).toFixed(2), children:null, folded:true });
+  return keep;
+}
+
+/** A node is only worth opening if it actually branches. Drilling into a
+ *  single-child group renders one full-width 100% block, which reads as broken. */
+function branches(node) {
+  const k = (node && (node.items || node.children)) || [];
+  return k.length > 1 || (k.length === 1 && ((k[0].items || k[0].children) || []).length > 1);
+}
+
+function nodeAt() {
+  const d = ds(); if (!d) return null;
+  let node = { name:"all", cost:d.total, items:d.groups }, group = null;
+  if (S.path[0]) {
+    const g = d.groups.find(x => x.name === S.path[0]);
+    if (g) { group = g; node = { name:g.name, cost:g.cost, items:g.items }; }
+    if (S.path[1] && group) {
+      const it = group.items.find(x => x.name === S.path[1]);
+      if (it) node = { name:it.name, cost:it.cost, items:it.children || [] };
+    }
+  }
+  return { node, groupName: group ? group.name : null };
+}
+
+/** Ledger rows from the current root, honouring open state and the query. */
+function ledger() {
+  const at = nodeAt(); if (!at) return { rows:[], recon:0, rootCost:1 };
+  const q = S.query.trim().toLowerCase();
+  const rows = []; let recon = 0;
+  const walk = (list, depth, inherit) => {
+    fold(list, list.reduce((s,n) => s+n.cost, 0) || 1, depth === 0 && !at.groupName).forEach(n => {
+      const g = (depth === 0 && !at.groupName) ? n.name : inherit;
+      const kids = n.items || n.children || null;
+      const key = g + "›" + n.name + "›" + depth;
+      const match = !q || n.name.toLowerCase().includes(q);
+      const kidMatch = kids ? kids.some(k => k.name.toLowerCase().includes(q)
+        || (k.children || []).some(c => c.name.toLowerCase().includes(q))) : false;
+      if (q && !match && !kidMatch) return;
+      const open = q ? (kidMatch || (match && depth === 0))
+                     : (S.open[key] !== undefined ? S.open[key] : depth === 0);
+      if (q) { if (match && !(kids && kids.length && open)) recon += n.cost; }
+      else if (depth === 0) recon += n.cost;
+      rows.push({ node:n, depth, group:g, key, open, hasKids:!!(kids && kids.length) });
+      if (kids && kids.length && open) walk(kids, depth+1, g);
+    });
+  };
+  walk(at.node.items || [], 0, at.groupName);
+  return { rows, recon:+recon.toFixed(2), rootCost:at.node.cost || 1 };
+}
+
+/* The read-vs-write figures used to come from two hand-written lists of shell commands.
+   They now come from the engine, which measures each tool's own call-args/results balance
+   -- so the number is right for tools and commands nobody has enumerated. */
+
+/* ---------- URL state ---------- */
+function readHash() {
+  const h = (location.hash || "").replace(/^#/, ""); if (!h) return;
+  const p = {}; h.split("&").forEach(kv => { const [a,b] = kv.split("="); if (a) p[a] = decodeURIComponent(b||""); });
+  if (p.ttl === "5m" || p.ttl === "1h") S.ttl = p.ttl;
+  if (p.p) S.path = p.p.split(">").filter(Boolean).slice(0,2);
+  if (p.v === "table" || p.v === "panels") S.view = p.v;
+  if (p.q) S.query = p.q;
+  if (p.u === "pct") S.pctOnly = true;
+  if (p.t === "dark" || p.t === "light") document.documentElement.setAttribute("data-theme", p.t);
+}
+function syncUrl() {
+  const parts = [];
+  if (S.ttl !== "1h") parts.push("ttl=" + S.ttl);
+  if (S.path.length) parts.push("p=" + encodeURIComponent(S.path.join(">")));
+  if (S.view !== "panels") parts.push("v=" + S.view);
+  if (S.query) parts.push("q=" + encodeURIComponent(S.query));
+  if (S.pctOnly) parts.push("u=pct");
+  const t = document.documentElement.getAttribute("data-theme"); if (t) parts.push("t=" + t);
+  try { history.replaceState(null, "", parts.length ? "#" + parts.join("&") : location.pathname + location.search); } catch(e){}
+}
+
+/* ---------- pieces ---------- */
+function toolbar() {
+  const cur = document.documentElement.getAttribute("data-theme");
+  const sw = (on, act, arg, label) =>
+    `<button type="button" aria-pressed="${on}" data-act="${act}" data-arg="${arg}">${label}</button>`;
+  return `<div class="toolbar">
+    <span class="tick"></span>
+    <button type="button" class="linkish" data-on="${S.linked?1:0}" data-act="copylink">${
+      S.linked ? "Link copied" : "Copy link to this view"}</button>
+    <button type="button" class="linkish" data-on="${S.copied?1:0}" data-act="copysummary">${
+      S.copied ? "Summary copied" : "Copy summary"}</button>
+    <span class="seg">${sw(!S.pctOnly,"cur","dollars","$")}${sw(S.pctOnly,"cur","pct","%")}</span>
+    <span class="seg">${sw(S.ttl==="1h","ttl","1h","1h TTL")}${sw(S.ttl==="5m","ttl","5m","5m TTL")}</span>
+    <span class="seg">${sw(cur==="light","theme","light","Light")}${sw(!cur,"theme","system","System")}${
+      sw(cur==="dark","theme","dark","Dark")}</span>
+    <span class="seg"><button type="button" data-act="reset">New file</button></span>
+  </div>`;
+}
+
+function mosaic(at) {
+  const d = ds(), rootCost = at.node.cost || 1;
+  const colsSrc = fold(at.node.items || [], rootCost, !at.groupName);
+  const colTotal = colsSrc.reduce((s,n) => s+n.cost, 0) || 1;
+  let run = 0;
+  const html = colsSrc.map(n => {
+    const cumFrom = pctOf(run, rootCost); run += n.cost; const cumTo = pctOf(run, rootCost);
+    const gname = at.groupName || n.name, h = hue(gname), key0 = gname + "›" + n.name;
+    const dim = S.hover && S.hover.indexOf(key0) !== 0;
+    const kids = n.items || n.children;
+    const segsSrc = (kids && kids.length) ? fold(kids, n.cost)
+                                          : [{ name:n.name, cost:n.cost, children:null, self:true }];
+    const segTotal = segsSrc.reduce((s,x) => s+x.cost, 0) || 1;
+    const width = n.cost / colTotal;
+    const segs = segsSrc.map((s,si) => {
+      const share = s.cost / segTotal, pct = share * 100;
+      const k = key0 + "›" + s.name;
+      const active = S.hover === k || S.hover === key0;
+      const carry = s.name.indexOf("re-billed") >= 0;
+      const ramp = Math.max(0.42, 0.96 - si * 0.075);
+      const st = [`flex:${Math.max(share,0.002)}`, `background:${h}`,
+        `opacity:${active ? 1 : (carry ? 1 : ramp)}`,
+        `padding:${pct > 7 ? "4px 6px" : "0"}`,
+        active ? "filter:brightness(1.07)" : "",
+        active ? "box-shadow:inset 0 0 0 2px var(--paper)" : "",
+        (carry && !active) ? "outline:2px dashed var(--paper);outline-offset:-4px" : ""
+      ].filter(Boolean).join(";");
+      return `<button type="button" class="segb" style="${st}" title="${esc(s.name)} · ${esc(M(s.cost))}"
+        data-act="seg" data-col="${esc(n.name)}" data-hkey="${esc(k)}" data-hname="${esc(s.name)}"
+        data-hcost="${s.cost}" data-hunder="${esc(n.name)}" data-hgroup="${esc(gname)}"
+        >${pct > 7 ? `<span class="sl">${esc(s.name)}</span>` : ""}</button>`;
+    }).join("");
+    const cum = (cumFrom < 80 && cumTo >= 80) ? "◂80%" : (width < 0.075 ? "" : cumTo.toFixed(0) + "%");
+    return `<div class="col" data-dim="${dim?1:0}" data-flat="${branches(n)?0:1}" style="flex:${Math.max(width,0.012)}">
+      <div class="colsegs">${segs}</div>
+      <button type="button" class="colhead" style="border-top:2px solid ${h}"
+        data-act="col" data-arg="${esc(n.name)}" data-hkey="${esc(key0)}" data-hname="${esc(n.name)}"
+        data-hcost="${n.cost}" data-hgroup="${esc(gname)}">
+        <span class="cn" style="font-size:${width<0.08?"10.5px":"11.5px"}">${
+          esc((!at.groupName && SHORT.get(n.name)) || n.name)}</span>
+        <span class="cc">${esc(M(n.cost))}</span>
+        <span class="cp"><span>${(width*100).toFixed(1)}%</span><span class="${
+          (cumFrom<80&&cumTo>=80)?"cum80":""}">${cum}</span></span>
+      </button></div>`;
+  }).join("");
+  return `<div class="mosaicwrap"><div class="mosaic">${html}</div></div>`;
+}
+
+function panels(at) {
+  const d = ds(), q = S.query.trim().toLowerCase(), rootCost = at.node.cost || 1;
+  const src = at.groupName ? fold(at.node.items || [], rootCost)
+                           : d.groups.slice().sort((a,b) => b.cost - a.cost);
+  const maxPanel = maxCost(src);
+  const out = src.map(p => {
+    const gname = at.groupName || p.name, h = hue(gname), key = gname + "›" + p.name;
+    const kidsAll = p.items || p.children || [];
+    const kids = fold(kidsAll, p.cost).filter(k => !q || k.name.toLowerCase().includes(q)
+      || p.name.toLowerCase().includes(q));
+    if (q && !kids.length) return "";
+    const maxKid = maxCost(kids);
+    const dim = S.hover && S.hover.indexOf(key) !== 0;
+    const shown = kids.reduce((a,k) => a+k.cost, 0);
+    const foot = !kidsAll.length ? "single line item · no further breakdown"
+      : (Math.abs(shown - p.cost) < 0.01 ? "" : `shown: ${M(shown)} of ${M(p.cost)}`);
+    return `<div class="pan">
+      <div class="pantop">
+        <button type="button" style="border-bottom:2px solid ${h};opacity:${dim?0.55:1}"
+          data-act="panel" data-arg="${esc(p.name)}" data-hkey="${esc(key)}" data-hname="${esc(p.name)}"
+          data-hcost="${p.cost}" data-hgroup="${esc(gname)}">${esc(p.name)}</button>
+        <span class="pc">${esc(M(p.cost))}</span>
+      </div>
+      <div class="panbar">
+        <span class="track"><span style="width:${Math.max(pctOf(p.cost, maxPanel), 0.8)}%;background:${h};opacity:${dim?0.5:1}"></span></span>
+        <span class="pr">${S.pctOnly ? M(p.cost)+" of bill" : "$"+(p.cost/reqs()).toFixed(4)+"/req"}</span>
+      </div>
+      <div class="panitems">${kids.map(k => {
+        const kk = key + "›" + k.name, act = S.hover === kk;
+        return `<div class="pi" data-on="${act?1:0}" data-hkey="${esc(kk)}" data-hname="${esc(k.name)}"
+          data-hcost="${k.cost}" data-hunder="${esc(p.name)}" data-hgroup="${esc(gname)}">
+          <button type="button" data-folded="${k.folded?1:0}" data-act="panel" data-arg="${esc(p.name)}">${esc(k.name)}</button>
+          <span class="tk"><span style="width:${Math.max(pctOf(k.cost, maxKid), 1)}%;background:${h};opacity:${act?1:0.6}"></span></span>
+          <span class="pv">${esc(M(k.cost))}</span></div>`;
+      }).join("")}</div>
+      ${foot ? `<div class="panfoot">${esc(foot)}</div>` : ""}</div>`;
+  }).join("");
+  return `<div class="panels">${out}</div>`;
+}
+
+function ledgerTable(L) {
+  const maxRow = L.rows.length
+    ? maxCost(L.rows.filter(r => r.depth === 0).map(r => r.node)) : 0;
+  const body = L.rows.map(r => {
+    const h = hue(r.group), key = r.group + "›" + r.node.name;
+    const active = S.hover === key || (S.hover || "").indexOf(key + "›") === 0;
+    const pct = r.node.cost / L.rootCost * 100;
+    const chip = `<span class="chip" style="width:${r.depth?6:10}px;height:${r.depth?6:10}px;background:${h};
+      margin-left:${r.depth*16}px;border-radius:${r.depth?"50%":"0"}"></span>`;
+    const nm = `<span class="nm" data-folded="${r.node.folded?1:0}">${esc(r.node.name)}</span>`;
+    return `<tr class="d${r.depth}" data-on="${active?1:0}" data-hkey="${esc(key)}"
+        data-hname="${esc(r.node.name)}" data-hcost="${r.node.cost}" data-hgroup="${esc(r.group)}">
+      <td class="name"><span class="namecell">${chip}${r.hasKids
+        ? `<button type="button" class="tog" aria-expanded="${r.open}" data-act="toggle" data-arg="${esc(r.key)}">
+             <span class="caret">${r.open?"–":"+"}</span>${nm}</button>`
+        : `<span class="tog"><span class="caret"></span>${nm}</span>`}</span></td>
+      <td class="num">${esc(M(r.node.cost))}</td>
+      <td class="pct">${pct.toFixed(pct<1?2:1)}%</td>
+      <td><span class="magbar" style="height:${r.depth?5:9}px;width:${
+        Math.max(pctOf(r.node.cost, maxRow), 0.6)}%;background:${h};opacity:${active?1:0.55}"></span></td>
+      <td class="per">${S.pctOnly ? esc(M(r.node.cost)) : "$"+(r.node.cost/reqs()).toFixed(4)}</td></tr>`;
+  }).join("");
+  return `<div class="tblwrap"><table>
+    <thead><tr><th scope="col" class="l">Line item</th><th scope="col" class="r" style="width:110px">Cost</th>
+      <th scope="col" class="r" style="width:78px">Share</th>
+      <th scope="col" class="l" style="width:230px">Magnitude</th>
+      <th scope="col" class="last" style="width:110px">${S.pctOnly?"Share of bill":"Per request"}</th></tr></thead>
+    <tbody>${body || `<tr><td colspan="5" style="padding:14px 0;color:var(--ink3)">No line item matches “${esc(S.query)}”.</td></tr>`}</tbody>
+    <tfoot><tr><td class="lbl">${S.query?"Matched":"Reconciled"}</td>
+      <td class="v">${esc(M(L.recon))}</td>
+      <td class="p">${(L.recon/L.rootCost*100).toFixed(L.recon/L.rootCost<0.1?2:1)}%</td>
+      <td colspan="2" class="n">${esc(reconNote(L))}</td></tr></tfoot></table></div>`;
+}
+
+function reconNote(L) {
+  const d = ds();
+  if (S.query) return `Filtered view · ${M(L.recon)} across matching line items, shown in their parents' context; parent rows keep their own full totals.`;
+  let s = "Children sum to parent at every level; folded rows keep their full value.";
+  if (!S.path.length && Math.abs(d.total - L.recon) > 0.005)
+    s += " " + (S.pctOnly ? ((d.total-L.recon)/d.total*100).toFixed(2)+"%" : "$"+(d.total-L.recon).toFixed(2))
+      + " of the billed total is unattributed rounding.";
+  return s;
+}
+
+/* ---------- main render ---------- */
+function initReport(data) {
+  DATA = data;
+  S = { ttl:"1h", path:[], open:{}, hover:null, hoverInfo:null, query:"",
+        view:"panels", pctOnly:false, copied:false, linked:false };
+  readHash();
+  wire();
+  render();
+}
+function render() {
+  const d = ds(); if (!d) return;
+  indexGroups();
+  const at = nodeAt(), L = ledger();
+  const I = d.insights;
+  const think = I.thinking, emit = I.proseGen, carry = I.proseCarry;
+  const fixed = I.fixed, reading = I.ingest, writing = I.emit, typing = I.typed;
+  const alt = DATA.datasets[S.ttl === "1h" ? "5m" : "1h"];
+  const P = S.pctOnly;
+  const scope = [`${d.sessions} sessions`, d.days ? `${d.days} days` : null,
+                 `${d.requests.toLocaleString("en-US")} requests`].filter(Boolean).join(" · ");
+
+  document.getElementById("reportView").innerHTML = `
+  ${toolbar()}
+  <section class="card">
+    <span class="br br1"></span><span class="br br2"></span><span class="br br3"></span><span class="br br4"></span>
+    <header class="chead">
+      <div>
+        <div class="eyebrow">Cost attribution · Claude Code · ${esc(scope)}</div>
+        <h1>Where the money went</h1>
+      </div>
+      <div style="text-align:right">
+        <div class="billed">Billed · ${P?"amount hidden · ":""}${S.ttl} cache TTL</div>
+        <div class="total" data-hidden="${P?1:0}">${P ? "$█,███.██" : money(d.total)}</div>
+      </div>
+    </header>
+    <div class="strip">
+      <div><div class="thesis">A <em>carry</em> bill, not a usage bill — every request re-bills the whole context.</div></div>
+      <div>
+        <div class="carryrow"><span class="from">${esc(M(emit))}</span><span class="arrow">→</span>
+          <span class="to">${esc(M(carry))}</span></div>
+        <div class="cap">Written once, carried ${emit>0?(carry/emit).toFixed(1)+"×":"—"}</div>
+      </div>
+      <div>
+        <div class="big">${(d.input/d.total*100).toFixed(1)}% <span class="sm">/</span>
+          <span class="dim">${(d.output/d.total*100).toFixed(1)}%</span></div>
+        <div class="cap">Input vs output · thinking ${(think/d.total*100).toFixed(1)}%</div>
+      </div>
+      <div>
+        <div class="big">${P?((fixed/d.total*100).toFixed(1)+"%"):"$"+(fixed/reqs()).toFixed(3)}
+          <span class="sm">of</span> <span class="dim">${P?"the bill":"$"+(d.total/reqs()).toFixed(3)}</span></div>
+        <div class="cap">${P?`Fixed, paid on all ${d.requests.toLocaleString("en-US")} requests`
+          :`Fixed, every request · ${money(fixed)}`}</div>
+      </div>
+    </div>
+    <div class="mosaichead">
+      <span class="lbl">Every line item · column width = share of bill · block height = share of column</span>
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <button type="button" data-act="root" data-cur="${S.path.length?0:1}">all</button>
+        ${S.path.map((p,i) => `<span class="sep">/</span><button type="button" data-act="crumb"
+          data-arg="${i}" data-cur="${i===S.path.length-1?1:0}">${esc(p)}</button>`).join("")}
+      </nav>
+    </div>
+    ${mosaic(at)}
+    <div class="hoverbar">
+      <span class="sw" style="background:${S.hoverInfo?hue(S.hoverInfo.group):"transparent"}"></span>
+      <span class="txt" data-on="${S.hoverInfo?1:0}">${S.hoverInfo
+        ? esc((S.hoverInfo.under?S.hoverInfo.under+" › ":"") + S.hoverInfo.name + "   " + M(S.hoverInfo.cost)
+            + "   " + (S.hoverInfo.share*100).toFixed(S.hoverInfo.share<0.01?2:1) + "% of "
+            + (S.path.length?S.path[S.path.length-1]:"the bill"))
+        : `Accented block = prose the model wrote once for ${esc(M(emit))}, re-billed as input for ${esc(M(carry))} more. Carry cost tracks survival, not size. Hover any block for its line item.`}</span>
+    </div>
+  </section>
+
+  <section class="bsec">
+    <div class="bhead">
+      <h2>Breakdown</h2>
+      <div class="bctl">
+        <label for="q">Find</label>
+        <input id="q" type="search" value="${esc(S.query)}" placeholder="git diff, thinking, schema…">
+        <span class="seg">
+          <button type="button" aria-pressed="${S.view==="panels"}" data-act="view" data-arg="panels">Panels</button>
+          <button type="button" aria-pressed="${S.view==="table"}" data-act="view" data-arg="table">Table</button>
+        </span>
+      </div>
+    </div>
+    ${S.view === "panels" ? panels(at) : ledgerTable(L)}
+    <div class="reconline"><span>${esc(reconNote(L))}</span>
+      <span>Reconciled: <strong>${esc(M(L.recon))}</strong></span></div>
+  </section>
+
+  <section class="foot">
+    <div>
+      <h3>What to change on Monday</h3>
+      <ul>
+        <li><strong>Cut the intake, not the output.</strong> ${esc(M(reading))} of the bill is content tools pulled <em>into</em> context, against ${esc(M(writing))} of arguments sent out and ${esc(M(typing))} for everything you typed${typing>0?` (${(reading/typing).toFixed(0)}× less)`:""}. Tool output lands in the prefix whole and is re-billed until it falls out — ask for narrower slices.</li>
+        <li><strong>Trim the preamble.</strong> ${esc(M(fixed))} of fixed overhead is the only line you can delete once and stop paying ${d.requests.toLocaleString("en-US")} times.</li>
+        <li><strong>Compact sooner.</strong> Carry cost is linear in how long a result survives, not in how big it looked.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Caveats</h3>
+      <ul class="cav">
+        <li>Cache writes bill at 2× input on a 1h TTL and 1.25× on 5m. Where the transcript
+          records which applied, that is used verbatim; the switch only reprices what it
+          omitted, which is why the two lenses differ by just ${esc(money(Math.abs(DATA.datasets["1h"].total - DATA.datasets["5m"].total)))} here.</li>
+        <li>“Model output” exceeds output-token spend because prose written once is re-billed as input on every later request.</li>
+        <li>Blocks under ${(FOLD_MIN*100).toFixed(1)}% of their parent are folded into a labelled “other”; nothing is dropped. Identity is carried by the table as well as by hue.</li>
+        <li>Totals are exact; the split across line items is estimated from character
+          counts at ${DATA.density ? esc(DATA.density.code.toFixed(2)) + " chars/token for machine text and "
+            + esc(DATA.density.text.toFixed(2)) + " for prose, " + (DATA.densityCalibrated
+              ? "both measured from this dataset" : "defaults, too few samples to measure") : "~4 chars/token"}.</li>
+        <li>Cache-write TTL was recorded for ${DATA.ttlMeasuredShare != null
+          ? esc((DATA.ttlMeasuredShare*100).toFixed(1)) + "%" : "an unknown share"} of written
+          tokens, so the lens below only reprices the remainder.${DATA.models && DATA.models.length
+            ? " Models: " + esc(DATA.models.map(m => m.id).join(", ")) + "." : ""}</li>
+      </ul>
+    </div>
+  </section>`;
+  syncUrl();
+}
+
+/* ---------- events (delegated once) ---------- */
+let wired = false;
+function set(patch) { Object.assign(S, patch); render(); }
+/** Same state transition the UI performs, exposed so the render paths can be driven
+ *  and asserted on outside a browser. */
+function setState(patch) { set(patch); }
+function wire() {
+  if (wired) return; wired = true;
+  const host = document.getElementById("reportView");
+
+  host.addEventListener("click", e => {
+    const el = e.target.closest("[data-act]"); if (!el) return;
+    const act = el.dataset.act, arg = el.dataset.arg;
+    const at = nodeAt();
+    if (act === "ttl") set({ ttl:arg });
+    else if (act === "cur") set({ pctOnly: arg === "pct" });
+    else if (act === "view") set({ view:arg });
+    else if (act === "root") set({ path:[], hover:null, hoverInfo:null });
+    else if (act === "crumb") set({ path:S.path.slice(0, Number(arg)+1), hover:null, hoverInfo:null });
+    else if (act === "theme") {
+      const r = document.documentElement;
+      if (arg === "system") r.removeAttribute("data-theme"); else r.setAttribute("data-theme", arg);
+      render();
+    }
+    else if (act === "toggle") {
+      // Depth-0 rows default to open, so read the current state the same way the
+      // renderer does before inverting it.
+      const cur = S.open[arg] !== undefined ? S.open[arg] : arg.endsWith("\u203a0");
+      set({ open: Object.assign({}, S.open, { [arg]: !cur }) });
+    }
+    else if (act === "col" || act === "panel" || act === "seg") {
+      const target = (act === "seg") ? el.dataset.col : arg;
+      const it = (at.node.items || []).find(x => x.name === target);
+      if (!branches(it)) return;                     // nothing to show one level down
+      if (!at.groupName) set({ path:[target], hover:null, hoverInfo:null });
+      else if (S.path.length === 1) set({ path:[at.groupName, target], hover:null, hoverInfo:null });
+    }
+    else if (act === "copylink") {
+      syncUrl();
+      if (navigator.clipboard) navigator.clipboard.writeText(location.href);
+      set({ linked:true }); setTimeout(() => set({ linked:false }), 1800);
+    }
+    else if (act === "copysummary") {
+      const d = ds(), g = n => d.groups.find(x => x.name === n) || {cost:0,items:[]};
+      const I = d.insights;
+      const think = I.thinking, fixed = I.fixed, typing = I.typed;
+      const top = d.groups[0] || { name:"\u2014", cost:0 };
+      const txt = (S.pctOnly ? `${d.days||"?"} days of Claude Code, itemised:` 
+                  : `${money(d.total)} of Claude Code in ${d.days||"?"} days, itemised:`) + "\n"
+        + `· ${top.name} ${M(top.cost)} — the largest single driver\n`
+        + `· thinking ${M(think)} — ${(think/d.output*100).toFixed(0)}% of output tokens, ${(think/d.total*100).toFixed(1)}% of the bill\n`
+        + `· prompt + schemas ${M(fixed)} fixed, paid on all ${d.requests.toLocaleString("en-US")} requests\n`
+        + `· my typing ${M(typing)} (${(typing/d.total*100).toFixed(1)}%)\n\n`
+        + "Cost is carry cost: every token is re-billed on every request it survives.";
+      if (navigator.clipboard) navigator.clipboard.writeText(txt);
+      set({ copied:true }); setTimeout(() => set({ copied:false }), 1800);
+    }
+    else if (act === "reset") {
+      document.getElementById("reportView").classList.add("hidden");
+      document.getElementById("uploadView").classList.remove("hidden");
+    }
+  });
+
+  host.addEventListener("input", e => {
+    if (e.target.id !== "q") return;
+    const pos = e.target.selectionStart;
+    S.query = e.target.value; render();
+    const q = document.getElementById("q");
+    if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch(err){} }
+  });
+
+  const enter = e => {
+    const el = e.target.closest("[data-hkey]"); if (!el) return;
+    const rootCost = (nodeAt().node.cost) || 1;
+    S.hover = el.dataset.hkey;
+    S.hoverInfo = { name:el.dataset.hname, cost:Number(el.dataset.hcost),
+      under:el.dataset.hunder || null, group:el.dataset.hgroup,
+      share:rootCost > 0 ? Number(el.dataset.hcost) / rootCost : 0 };
+    render();
+  };
+  host.addEventListener("mouseover", e => {
+    const el = e.target.closest("[data-hkey]");
+    if (!el) { if (S.hover) { S.hover = null; S.hoverInfo = null; render(); } return; }
+    if (S.hover !== el.dataset.hkey) enter(e);
+  });
+  host.addEventListener("mouseleave", () => {
+    if (S.hover) { S.hover = null; S.hoverInfo = null; render(); }
+  });
+  window.addEventListener("hashchange", () => { readHash(); render(); });
+}
+
+/* ---- app ---- */
+
+
+const $ = id => document.getElementById(id);
+const say = (html, err) => { const s = $("status"); s.innerHTML = html; s.dataset.err = err ? "1" : "0"; };
+
+async function handle(list) {
+  const all = [...list], files = all.filter(f => f.name.endsWith(".jsonl"));
+  if (!files.length) {
+    say(all.length ? `None of those ${all.length} file(s) are <code>.jsonl</code> transcripts.`
+                   : "No files selected.", true);
+    return;
+  }
+  say(`Reading <b>${files.length}</b> file${files.length>1?"s":""}…`);
+  $("filelist").classList.remove("hidden");
+  $("filelist").textContent = files.slice(0,60).map(f => f.name).join("\n")
+    + (files.length > 60 ? `\n… +${files.length-60} more` : "");
+  let payload;
+  try { payload = await Promise.all(files.map(async f => ({ name:f.name, text:await f.text() }))); }
+  catch (e) { say(`Could not read the files: ${e.message}`, true); return; }
+
+  await run(payload);
+}
+
+async function run(payload, label) {
+  const bytes = payload.reduce((a,b) => a + b.text.length, 0);
+  say(`Analyzing <b>${(bytes/1e6).toFixed(1)} MB</b>${label?` from <b>${label}</b>`:""}…`);
+  await new Promise(r => setTimeout(r, 16));
+  let data;
+  try { data = analyze(payload); }
+  catch (e) { say(`Analysis failed: ${e.message}`, true); console.error(e); return; }
+  if (!data.requests) {
+    say(`Parsed ${payload.length} file(s) but found no priced API requests — are these Claude
+         Code transcripts from <code>~/.claude/projects/</code>?`, true);
+    return;
+  }
+  $("uploadView").classList.add("hidden");
+  $("reportView").classList.remove("hidden");
+  initReport(data);
+  window.scrollTo(0,0);
+}
+
+$("pickFiles").addEventListener("click", () => $("fileInput").click());
+$("pickDir").addEventListener("click", () => $("dirInput").click());
+$("fileInput").addEventListener("change", e => handle(e.target.files));
+$("dirInput").addEventListener("change", e => handle(e.target.files));
+$("uploadView").addEventListener("click", e => {
+  const b = e.target.closest("[data-th]"); if (!b) return;
+  const r = document.documentElement;
+  if (b.dataset.th === "system") r.removeAttribute("data-theme");
+  else r.setAttribute("data-theme", b.dataset.th);
+  [...b.parentElement.children].forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+});
+
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  if (ev === "dragleave" && drop.contains(e.relatedTarget)) return;
+  drop.classList.remove("over"); }));
+drop.addEventListener("drop", async e => {
+  e.preventDefault();
+  const items = e.dataTransfer.items;
+  if (items && items.length && items[0].webkitGetAsEntry) {
+    const out = [];
+    const walk = entry => new Promise(res => {
+      if (entry.isFile) entry.file(f => { out.push(f); res(); });
+      else if (entry.isDirectory) {
+        const rd = entry.createReader();
+        const more = () => rd.readEntries(async ents => {
+          if (!ents.length) return res();
+          await Promise.all(ents.map(walk)); more();
+        }, () => res());
+        more();
+      } else res();
+    });
+    await Promise.all([...items].map(i => i.webkitGetAsEntry()).filter(Boolean).map(walk));
+    handle(out);
+  } else handle(e.dataTransfer.files);
+});
+
+</script>
+</body>
+</html>
