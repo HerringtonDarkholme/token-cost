@@ -229,7 +229,7 @@ export function Report({ data, onReset }: {
     <ReportContext.Provider value={ctx}>
       <div className="shell" onMouseLeave={() => setHover(null)}>
         <Toolbar onReset={onReset} />
-        <section className="card">
+        <section className="card" data-chart={state.chart}>
           <span className="br br1" /><span className="br br2" />
           <span className="br br3" /><span className="br br4" />
           <header className="chead">

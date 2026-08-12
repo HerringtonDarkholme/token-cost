@@ -62,7 +62,9 @@ sunburst answers the other question — how deep the money goes — by putting t
 itself on screen, one ring per level. Both are laid out from `model.ts`, both hover from the
 one store, and both mark the re-billed-prose block, so the toggle changes the picture and
 nothing else. A hovered arc lights its own ancestors back to the centre, which is the one
-thing the mosaic cannot show.
+thing the mosaic cannot show. The card carries a fixed ratio per chart — 16:9 for the
+mosaic, 4:3 for the sunburst — because the card is the part people screenshot, and a disc
+in a wide band comes out small.
 
 The dev server binds `127.0.0.1` deliberately. Do not put transcripts, symlinks to
 `~/.claude`, or an index of them inside this folder: anything under a served directory is

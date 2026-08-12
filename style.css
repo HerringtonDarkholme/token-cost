@@ -37,8 +37,13 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
 .seg button{padding:5px 11px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;
   white-space:nowrap;border:0;cursor:pointer;background:transparent;color:var(--ink2)}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+/* Fixed ratios because the card is the thing people screenshot: 16/9 suits the mosaic,
+   which is a wide band, and a disc in a wide band comes out small, so the sunburst gets
+   4/3 instead. Either way the frame is a shape that posts well rather than whatever height
+   the content happened to want. */
 .card{position:relative;aspect-ratio:16/9;min-height:600px;display:flex;flex-direction:column;
   border:1px solid var(--ink);background:var(--panel);padding:20px 22px 16px}
+.card[data-chart="sun"]{aspect-ratio:4/3}
 .br{position:absolute;width:10px;height:10px}
 .br1{top:5px;left:5px;border-top:2px solid var(--accent);border-left:2px solid var(--accent)}
 .br2{top:5px;right:5px;border-top:2px solid var(--accent);border-right:2px solid var(--accent)}
@@ -124,9 +129,9 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
 /* The sunburst stands where the mosaic does, so it takes the same slot: fill what the card
    has left, and let the disc take its size from the height rather than the width -- a
    circle that overflows its row is worse than one that leaves margin beside the legend. */
-.sun{flex:1;min-height:0;display:flex;align-items:center;gap:28px;
+.sun{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:32px;
   border-top:1px solid var(--hair);padding-top:12px}
-.sunchart{position:relative;flex:0 0 auto;height:100%;aspect-ratio:1}
+.sunchart{position:relative;flex:0 0 auto;height:100%;aspect-ratio:1;container-type:size}
 .sunchart svg{display:block;width:100%;height:100%}
 .sunarc{stroke:var(--paper);stroke-width:.5;stroke-linejoin:round;cursor:pointer;transition:opacity .13s}
 .sunarc[data-on="1"]{stroke:var(--ink);stroke-width:1}
@@ -136,12 +141,18 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
 .suncore>button{cursor:pointer}
 .suncore>button:hover .v{color:var(--accent)}
-.suncore .k{max-width:92%;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.suncore .v{font-family:var(--mono);font-size:clamp(15px,2.3vw,23px);font-weight:600;letter-spacing:-.025em}
-.suncore .s{max-width:90%;font-size:10.5px;line-height:1.35;color:var(--ink2);overflow:hidden;text-wrap:balance}
+/* The hole's type is sized off the chart, not the viewport: the disc takes its size from
+   whatever the card has left, so a readout fixed in px is either lost in it or spilling out
+   of it. Each rule keeps a px fallback first for anything without container queries. */
+.suncore .k{max-width:92%;font-family:var(--mono);font-size:9.5px;font-size:clamp(9px,1.9cqw,15px);
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.suncore .v{font-family:var(--mono);font-size:clamp(15px,2.3vw,23px);font-size:clamp(15px,5.6cqw,38px);
+  font-weight:600;letter-spacing:-.025em;white-space:nowrap}
+.suncore .s{max-width:90%;font-size:10.5px;font-size:clamp(10px,2.1cqw,16px);line-height:1.35;
+  color:var(--ink2);overflow:hidden;text-wrap:balance}
 .suncore .s .dim{color:var(--ink3)}
-.sunlegend{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px;
+.sunlegend{flex:1 1 auto;min-width:0;max-width:600px;display:flex;flex-direction:column;gap:1px;
   max-height:100%;overflow-y:auto}
 .legrow{display:grid;grid-template-columns:9px minmax(72px,auto) 1fr auto;gap:10px;align-items:baseline;
   padding:5px 7px 5px 0;border-bottom:1px solid var(--hair);transition:opacity .13s}
