@@ -20,6 +20,7 @@ node_modules/
 dist/
 .vite/
 *.log
+*.tsbuildinfo
 
 # OS / editor
 .DS_Store

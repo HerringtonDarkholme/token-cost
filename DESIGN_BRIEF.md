@@ -21,9 +21,9 @@ the upload, not for a sample.** Nothing ships with numbers baked in.
 
 ## 2. The data is whatever they upload
 
-`analyze()` in `engine.js` turns raw files into a strict tree: groups → items → children,
+`analyze()` in `engine.ts` turns raw files into a strict tree: groups → items → children,
 where children always sum to their parent. Shell tools drill program → subcommand; file
-tools drill by extension. The nine groups are fixed in `GROUPS` (`engine.js`), and are roles
+tools drill by extension. The nine groups are fixed in `GROUPS` (`engine.ts`), and are roles
 in the request cycle rather than categories of thing:
 
 `Shell commands` · `Tools · content read in` · `Tools · content written out` ·
@@ -70,7 +70,7 @@ figures, which belong to no dataset the page will ever see again.
 
 ## 4. Hard constraints — non-negotiable
 
-- **One file.** The build (`pnpm build`, configured in `vite.config.js`) bundles and inlines
+- **One file.** The build (`pnpm build`, configured in `vite.config.ts`) bundles and inlines
   everything into `cost-report.html` so it opens by double-click. It emits a classic inline
   script rather than `type="module"`, because module scripts load under rules a `file://`
   page cannot rely on. No CDN scripts, no external stylesheets,
@@ -138,7 +138,7 @@ carry-cost mechanism in body copy nobody reads.
 
 ## 7. Acceptance checks — verify before declaring done
 
-Run these against `node test/render.test.mjs`, which exercises every view state on a
+Run these against `node test/render.test.ts`, which exercises every view state on a
 synthetic dataset. Don't eyeball them:
 
 1. **Every displayed level reconciles.** Rendered children sum to their parent, at every
@@ -158,3 +158,5 @@ synthetic dataset. Don't eyeball them:
 8. **The build stays self-contained** — `pnpm build` fails loudly if the output carries a
    `<script src>`, a stylesheet link, an absolute URL, a CSS `@import`, or a
    `type="module"` script, because each of those breaks or leaks under `file://`.
+9. **`pnpm typecheck` is clean.** Neither Vite nor Node checks types — both only erase
+   them — so a wrong type ships silently unless this is run. `pnpm check` runs all three.

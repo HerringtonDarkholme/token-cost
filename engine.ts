@@ -23,7 +23,74 @@
  *   allocate()  -- full walk: build the per-key cost accumulators.
  *   price()     -- O(keys), so any TTL assumption or rate card is free to re-apply.
  *   buildTree() -- decides direction splits and grouping from the measured costs.
+ *
+ * ON THE TYPES. Transcript records are untrusted JSON from a schema that evolves without
+ * asking us. So the record shapes below are open interfaces of optional fields, not closed
+ * discriminated unions: rule 1 says an unfamiliar block type must still be counted, and a
+ * union would force a cast at exactly the places that handle the unfamiliar case. The
+ * strictness that pays off here is on the shapes this file OWNS -- buckets, trees,
+ * datasets -- which are exact.
  */
+
+/* ------------------------------------------------------------------- data in --
+ * What the caller hands us, and the transcript shapes we read out of it.
+ */
+
+/** One uploaded transcript: a filename and its raw JSONL text. */
+export interface RawFile {
+  name: string;
+  text: string;
+}
+
+export interface ImageSource {
+  type?: string;
+  media_type?: string;
+  data?: string;
+}
+
+/** A content block. Every field is optional on purpose -- see "ON THE TYPES" above. */
+export interface ContentBlock {
+  type?: string;
+  text?: string;
+  thinking?: string;
+  data?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  content?: unknown;
+  tool_use_id?: string;
+  source?: ImageSource;
+}
+
+export interface CacheCreation {
+  ephemeral_1h_input_tokens?: number;
+  ephemeral_5m_input_tokens?: number;
+}
+
+export interface Usage {
+  input_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  output_tokens?: number;
+  cache_creation?: CacheCreation | null;
+}
+
+export interface Message {
+  role?: string;
+  model?: string;
+  usage?: Usage;
+  content?: unknown;
+}
+
+/** One JSONL line. `isCompactSummary`, `isMeta` and `isSidechain` are real schema fields. */
+export interface TranscriptRecord {
+  message?: Message;
+  timestamp?: string;
+  sessionId?: string;
+  isCompactSummary?: boolean;
+  isMeta?: boolean;
+  isSidechain?: boolean;
+}
 
 /* ------------------------------------------------------------------ pricing --
  * A rate card, not a model whitelist. Keys are matched exactly, then by longest
@@ -31,7 +98,11 @@
  * rather than dropped. Rates are $ per 1M tokens, [input, output].
  * Override or extend at runtime with setRates() -- no source edit required.
  */
-export const RATES = {
+
+/** $ per 1M tokens, as [input, output]. */
+export type Rate = [input: number, output: number];
+
+export const RATES: Record<string, Rate> = {
   "claude-fable-5":    [10, 50],
   "claude-mythos-5":   [10, 50],
   "claude-opus-5":     [5, 25],
@@ -47,21 +118,26 @@ export const RATES = {
   "claude-2":          [8, 24],
 };
 /* Last resort before giving up: the tier word implies the current rate for that tier. */
-const TIERS = [[/\bopus\b|opus/, [5, 25]], [/sonnet/, [3, 15]], [/haiku/, [1, 5]],
-               [/fable|mythos/, [10, 50]]];
+const TIERS: Array<[RegExp, Rate]> = [
+  [/\bopus\b|opus/, [5, 25]], [/sonnet/, [3, 15]], [/haiku/, [1, 5]],
+  [/fable|mythos/, [10, 50]],
+];
+
+/** Which cache-write multiplier a TTL implies. */
+export type TtlAssumption = "1h" | "5m";
 
 export const CACHE_READ_MULT = 0.1;
-export const CACHE_WRITE_MULT = { "1h": 2.0, "5m": 1.25 };
+export const CACHE_WRITE_MULT: Record<TtlAssumption, number> = { "1h": 2.0, "5m": 1.25 };
 
-export function setRates(partial) { Object.assign(RATES, partial); }
+export function setRates(partial: Record<string, Rate>): void { Object.assign(RATES, partial); }
 
 /** Strip the decorations cloud vendors and release dates add, so one card serves all. */
-export function normalizeModel(id) {
+export function normalizeModel(id: unknown): string {
   let m = String(id || "").toLowerCase().trim();
   m = m.replace(/\[[^\]]*\]/g, "");                 // context-window suffix: [1m]
   m = m.replace(/^publishers\/anthropic\/models\//, "");  // Vertex AI
   // Bedrock stacks these: "us.anthropic.claude-…" is a region prefix on a vendor prefix.
-  for (let prev = null; prev !== m; ) {
+  for (let prev: string | null = null; prev !== m; ) {
     prev = m;
     m = m.replace(/^(anthropic|us|eu|apac|global|gov)\./, "");
   }
@@ -72,16 +148,23 @@ export function normalizeModel(id) {
   return m.replace(/-+$/, "");
 }
 
-/** @returns {{rate:[number,number]|null, basis:string, id:string}} -- never throws,
- *  never returns undefined. `basis` explains the match so the UI can show its work. */
-export function resolveRate(model) {
+/** The outcome of pricing a model id. `basis` explains the match so the UI can show its
+ *  work; `rate` is null when nothing matched. Never throws, never returns undefined. */
+export interface RateResolution {
+  rate: Rate | null;
+  basis: string;
+  id: string;
+}
+
+export function resolveRate(model: unknown): RateResolution {
   const raw = String(model || "");
   if (!raw) return { rate: null, basis: "missing", id: raw };
   // Claude Code writes <synthetic> for records it produced locally with no API call.
   if (raw.startsWith("<")) return { rate: null, basis: "synthetic", id: raw };
   const id = normalizeModel(raw);
-  if (RATES[id]) return { rate: RATES[id], basis: "exact", id };
-  let best = null;
+  const exact = RATES[id];
+  if (exact) return { rate: exact, basis: "exact", id };
+  let best: string | null = null;
   for (const k of Object.keys(RATES)) {
     if (id.startsWith(k) && (!best || k.length > best.length)) best = k;
   }
@@ -110,8 +193,10 @@ const NO_WORK = new Set(["echo","printf","true","false",":","test","[","read","w
 
 /** Split a shell string on top-level | || && ; and newlines, honouring quotes,
  *  parens/brackets/braces, and skipping heredoc bodies entirely. */
-export function splitSegments(cmd) {
-  const segs = []; let buf = "", i = 0, quote = null, depth = 0, pending = null;
+export function splitSegments(cmd: string): string[] {
+  const segs: string[] = [];
+  let buf = "", i = 0, depth = 0;
+  let quote: string | null = null, pending: string | null = null;
   const n = cmd.length;
   while (i < n) {
     const c = cmd[i];
@@ -129,7 +214,7 @@ export function splitSegments(cmd) {
     if (cmd.startsWith("<<", i) && cmd[i + 2] !== "<") {
       let j = i + 2; if (cmd[j] === "-") j++;
       while (j < n && /\s/.test(cmd[j])) j++;
-      let q = null; if (cmd[j] === "'" || cmd[j] === '"') { q = cmd[j]; j++; }
+      let q: string | null = null; if (cmd[j] === "'" || cmd[j] === '"') { q = cmd[j]; j++; }
       let tag = "";
       while (j < n && (/[\w-]/.test(cmd[j]) || (q && cmd[j] !== q))) { tag += cmd[j]; j++; }
       if (q && cmd[j] === q) j++;
@@ -162,16 +247,21 @@ export function splitSegments(cmd) {
 
 /** Could this word be a subcommand verb? A bare lowercase-ish token -- not a flag,
  *  path, filename, number, URL or variable. Whether it IS one is decided by scan(). */
-function isVerbShaped(w) {
+function isVerbShaped(w: string): boolean {
   return !!w && w.length <= 24 && /^[a-z][a-z0-9]*([-_:][a-z0-9]+)*$/.test(w)
       && !/^\d/.test(w) && !KEYWORDS.has(w);
 }
 
-/** Resolve one pipeline segment.
- *  @returns {{prog:string, verb:string|null, rank:number}|null}
- *  rank orders candidates for labelling a whole invocation: 0 = external command
+/** One resolved pipeline segment.
+ *  `rank` orders candidates for labelling a whole invocation: 0 = external command
  *  (real work), 1 = builtin that emits but does no work, 2 = state-only builtin. */
-export function resolveSegment(seg) {
+export interface Segment {
+  prog: string;
+  verb: string | null;
+  rank: number;
+}
+
+export function resolveSegment(seg: string): Segment | null {
   const words = seg.replace(/[()]/g, " ").split(/\s+/).filter(Boolean);
   if (!words.length || words[0].startsWith("#")) return null;   // comment line
   let idx = 0, wrapped = false;
@@ -188,10 +278,11 @@ export function resolveSegment(seg) {
     break;
   }
   if (idx >= words.length) return null;
-  let prog = words[idx].split("/").pop().replace(/^[$(]+/, "").replace(/^["']|["']$/g, "");
+  const prog = (words[idx].split("/").pop() || "")
+    .replace(/^[$(]+/, "").replace(/^["']|["']$/g, "");
   if (!prog || prog.startsWith("-") || prog.startsWith("$")) return null;
   const rank = STATE_ONLY.has(prog) ? 2 : NO_WORK.has(prog) ? 1 : 0;
-  let verb = null;
+  let verb: string | null = null;
   for (const w of words.slice(idx + 1)) {
     if (w.startsWith("-")) continue;                          // flags are not verbs
     if (isVerbShaped(w)) verb = w;
@@ -202,14 +293,19 @@ export function resolveSegment(seg) {
 
 /** Every (program, candidate-verb) pair a Bash invocation contains -- the raw material
  *  scan() aggregates to learn which programs actually dispatch subcommands. */
-export function shellCandidates(cmd) {
-  return splitSegments(cmd).map(resolveSegment).filter(Boolean);
+export function shellCandidates(cmd: string): Segment[] {
+  return splitSegments(cmd)
+    .map(resolveSegment)
+    .filter((s): s is Segment => s !== null);
 }
 
 /** Label an invocation: pick the segment doing real work, then apply the learned
  *  vocabulary to decide whether its second token is a subcommand.
- *  @param {Set<string>} dispatchers programs scan() observed dispatching subcommands */
-export function labelShell(cmd, dispatchers) {
+ *  @param dispatchers programs scan() observed dispatching subcommands */
+export function labelShell(
+  cmd: string,
+  dispatchers?: Set<string> | null,
+): { prog: string; verb: string | null } {
   const cands = shellCandidates(cmd);
   if (!cands.length) return { prog: "(no command)", verb: null };
   let pick = cands[0];
@@ -241,7 +337,23 @@ export function labelShell(cmd, dispatchers) {
  * single density when there is not enough of one class to identify both.
  */
 const CPT_FALLBACK = 4.0, CPT_MIN = 1.5, CPT_MAX = 12.0;
-const clampCpt = v => Math.min(CPT_MAX, Math.max(CPT_MIN, v));
+const clampCpt = (v: number): number => Math.min(CPT_MAX, Math.max(CPT_MIN, v));
+
+/** Chars-per-token, per content class, plus how it was arrived at. */
+export interface Density {
+  code: number;
+  text: number;
+  basis: "least-squares" | "pooled" | "default";
+  pooled: number;
+  relSE?: [number, number] | null;
+}
+
+/** Cross-product accumulators for the two-class least-squares fit. */
+interface Accum {
+  cc: number; ct: number; tt: number;
+  cy: number; ty: number; yy: number;
+  n: number; code: number; text: number; tok: number;
+}
 
 /** Least squares for userTokens = code*a + text*b, returned as densities (chars/token).
  *
@@ -258,11 +370,11 @@ const clampCpt = v => Math.min(CPT_MAX, Math.max(CPT_MIN, v));
  *  in some corpora; encoding a prior about that would just be another hardcoded opinion.
  */
 const MAX_REL_SE = 0.25;
-function solveDensities(S) {
+function solveDensities(S: Accum): Density | null {
   const { cc, ct, tt, cy, ty, yy, n, code, text, tok } = S;
   if (n < 20 || tok <= 0) return null;
   const pooled = clampCpt((code + text) / tok);
-  const fallback = { code: pooled, text: pooled, basis: "pooled", pooled, relSE: null };
+  const fallback: Density = { code: pooled, text: pooled, basis: "pooled", pooled, relSE: null };
   const det = cc * tt - ct * ct;
   if (!(det > 0)) return fallback;
 
@@ -273,7 +385,7 @@ function solveDensities(S) {
   if (!(rss >= 0) || n <= 2) return fallback;
   const s2 = rss / (n - 2);
   const seA = Math.sqrt(s2 * tt / det), seB = Math.sqrt(s2 * cc / det);
-  const relSE = [seA / a, seB / b];
+  const relSE: [number, number] = [seA / a, seB / b];
   if (relSE[0] > MAX_REL_SE || relSE[1] > MAX_REL_SE) return fallback;
   return { code: clampCpt(1 / a), text: clampCpt(1 / b),
            basis: "least-squares", pooled, relSE };
@@ -282,27 +394,29 @@ function solveDensities(S) {
 /** Characters of billable text in a content block. Images are excluded here and
  *  sized separately -- they bill by pixel dimensions, so their base64 length is
  *  meaningless (counting it once inflated a run by 40%). */
-export function charsOf(block) {
+export function charsOf(block: unknown): number {
   if (typeof block === "string") return block.length;
-  if (Array.isArray(block)) return block.reduce((n, b) => n + charsOf(b), 0);
+  if (Array.isArray(block)) return block.reduce<number>((n, b) => n + charsOf(b), 0);
   if (!block || typeof block !== "object") return 0;
-  switch (block.type) {
-    case "text":        return (block.text || "").length;
-    case "thinking":    return (block.thinking || "").length;
-    case "redacted_thinking": return (block.data || "").length;
-    case "tool_use":    return JSON.stringify(block.input || {}).length;
-    case "tool_result": return charsOf(block.content);
+  const b = block as ContentBlock;
+  switch (b.type) {
+    case "text":        return (b.text || "").length;
+    case "thinking":    return (b.thinking || "").length;
+    case "redacted_thinking": return (b.data || "").length;
+    case "tool_use":    return JSON.stringify(b.input || {}).length;
+    case "tool_result": return charsOf(b.content);
     case "image":       return 0;
     case "document":    return 0;
     default:            return JSON.stringify(block).length;
   }
 }
-function textOf(block) {
+function textOf(block: unknown): string {
   if (typeof block === "string") return block;
   if (Array.isArray(block)) return block.map(textOf).join("");
   if (!block || typeof block !== "object") return "";
-  if (block.type === "text") return block.text || "";
-  if (block.type === "tool_result") return textOf(block.content);
+  const b = block as ContentBlock;
+  if (b.type === "text") return b.text || "";
+  if (b.type === "tool_result") return textOf(b.content);
   return "";
 }
 
@@ -310,7 +424,7 @@ function textOf(block) {
  * long edges at 1568px, so a decoded header beats any flat constant. Only the first few
  * KB are decoded; unparseable or absent data falls back to a mid-size estimate. */
 const IMAGE_FALLBACK = 1500, IMAGE_CAP = 1600;
-function b64Bytes(data, limit) {
+function b64Bytes(data: unknown, limit: number): Uint8Array | null {
   try {
     const clean = String(data).replace(/^data:[^,]*,/, "").replace(/[^A-Za-z0-9+/=]/g, "");
     const slice = clean.slice(0, Math.ceil(limit / 3) * 4);
@@ -321,12 +435,17 @@ function b64Bytes(data, limit) {
     return out;
   } catch { return null; }
 }
-export function imageDims(b) {
+
+/** Pixel dimensions decoded from an image header. */
+export interface ImageDims { w: number; h: number }
+
+export function imageDims(b: ContentBlock | null | undefined): ImageDims | null {
   const src = (b && b.source) || {};
   if (src.type === "url" || !src.data) return null;
   const B = b64Bytes(src.data, 65536);
   if (!B || B.length < 24) return null;
-  const be16 = i => (B[i] << 8) | B[i + 1], be32 = i => (B[i] << 24 | B[i + 1] << 16 | B[i + 2] << 8 | B[i + 3]) >>> 0;
+  const be16 = (i: number) => (B[i] << 8) | B[i + 1];
+  const be32 = (i: number) => (B[i] << 24 | B[i + 1] << 16 | B[i + 2] << 8 | B[i + 3]) >>> 0;
   if (B[0] === 0x89 && B[1] === 0x50) return { w: be32(16), h: be32(20) };            // PNG IHDR
   if (B[0] === 0x47 && B[1] === 0x49) return { w: B[6] | B[7] << 8, h: B[8] | B[9] << 8 }; // GIF
   if (B[0] === 0xFF && B[1] === 0xD8) {                                               // JPEG: find SOFn
@@ -342,14 +461,14 @@ export function imageDims(b) {
     return null;
   }
   if (B[8] === 0x57 && B[9] === 0x45 && B[10] === 0x42 && B[11] === 0x50) {            // WEBP
-    const le16 = i => B[i] | B[i + 1] << 8;
+    const le16 = (i: number) => B[i] | B[i + 1] << 8;
     if (B[15] === 0x58) return { w: (B[24] | B[25] << 8 | B[26] << 16) + 1, h: (B[27] | B[28] << 8 | B[29] << 16) + 1 };
     if (B[15] === 0x20) return { w: le16(26) & 0x3fff, h: le16(28) & 0x3fff };
     return null;
   }
   return null;
 }
-function imageTokens(b) {
+function imageTokens(b: ContentBlock): number {
   const d = imageDims(b);
   if (!d || !d.w || !d.h || d.w > 20000 || d.h > 20000) return IMAGE_FALLBACK;
   const scale = Math.min(1, 1568 / Math.max(d.w, d.h));       // long edge is clamped
@@ -359,10 +478,23 @@ function imageTokens(b) {
 /* -------------------------------------------------------------------- records --
  * A bucket is a record, and its key is derived from the record. Nothing downstream
  * parses a label by character offset.
- *   role: preamble | harness | typed | assistant | tool | image
- *   dir : call | result   (tools only)
  */
-const keyOf = r => [r.role, r.tool || "", r.dir || "", r.sub || "", r.kind || ""].join(" ");
+
+/** Where a piece of content sits in the request cycle. */
+export type Role = "preamble" | "harness" | "typed" | "assistant" | "tool" | "image";
+
+/** A cost bucket, as a record. Its key is derived from it by keyOf(). */
+export interface Bucket {
+  role: Role;
+  tool?: string;
+  dir?: "call" | "result";
+  sub?: string | null;
+  kind?: string;
+  shell?: boolean;
+}
+
+const keyOf = (r: Bucket): string =>
+  [r.role, r.tool || "", r.dir || "", r.sub || "", r.kind || ""].join(" ");
 
 /** Harness-injected user content, identified structurally where the schema allows and
  *  by its own wrapper tag otherwise -- so an unfamiliar tag becomes its own row instead
@@ -370,20 +502,27 @@ const keyOf = r => [r.role, r.tool || "", r.dir || "", r.sub || "", r.kind || ""
 const TAG_SPAN = /<([a-z][a-z0-9_-]*)>([\s\S]*?)<\/\1>/gi;
 const TAG_OPEN = /^\s*<([a-z][a-z0-9_-]*)>/i;
 
+/** One span of a user block, attributed to whoever actually produced it. */
+export interface UserSpan {
+  role: "harness" | "typed";
+  sub: string | null;
+  chars: number;
+}
+
 /** Split one user block into harness-injected spans and whatever is left, which is what
- *  the human actually typed. Returns [{role, sub, chars}].
+ *  the human actually typed.
  *
  *  Injected content is not always the whole block: a harness routinely appends reminders
  *  after a typed message, so matching only a tag at position 0 charges those characters to
  *  the human. Tag names are read out of the text rather than compared against a list, so a
  *  wrapper this build has never seen still gets its own row. */
-export function classifyUserBlock(text, rec) {
+export function classifyUserBlock(text: string, rec?: TranscriptRecord): UserSpan[] {
   if (rec && rec.isCompactSummary === true)
     return [{ role: "harness", sub: "compaction summary", chars: text.length }];
-  const out = [];
+  const out: UserSpan[] = [];
   let covered = 0;
   TAG_SPAN.lastIndex = 0;
-  for (let m; (m = TAG_SPAN.exec(text)); ) {
+  for (let m: RegExpExecArray | null; (m = TAG_SPAN.exec(text)); ) {
     out.push({ role: "harness", sub: "<" + m[1].toLowerCase() + ">", chars: m[0].length });
     covered += m[0].length;
   }
@@ -404,17 +543,23 @@ export function classifyUserBlock(text, rec) {
  *    - a path-ish string       -> the file extension
  *  Returns {sub, shell} where shell marks command-running tools. */
 const PATH_FIELDS = ["file_path", "filePath", "path", "notebook_path", "notebookPath", "file"];
-function subKeyOf(input, dispatchers) {
+function subKeyOf(
+  input: unknown,
+  dispatchers?: Set<string> | null,
+): { sub: string | null; shell: boolean } {
   if (!input || typeof input !== "object") return { sub: null, shell: false };
+  const rec = input as Record<string, unknown>;
   for (const f of ["command", "cmd", "script", "shell_command"]) {
-    if (typeof input[f] === "string" && input[f].trim()) {
-      const { prog, verb } = labelShell(input[f], dispatchers);
+    const v = rec[f];
+    if (typeof v === "string" && v.trim()) {
+      const { prog, verb } = labelShell(v, dispatchers);
       return { sub: verb ? prog + " " + verb : prog, shell: true };
     }
   }
   for (const f of PATH_FIELDS) {
-    if (typeof input[f] === "string" && input[f].trim()) {
-      const base = input[f].split(/[\\/]/).pop() || "";
+    const v = rec[f];
+    if (typeof v === "string" && v.trim()) {
+      const base = v.split(/[\\/]/).pop() || "";
       const dot = base.lastIndexOf(".");
       const ext = dot > 0 ? base.slice(dot).toLowerCase() : "(no extension)";
       return { sub: ext.length <= 12 ? "*" + ext : "(other)", shell: false };
@@ -425,7 +570,7 @@ function subKeyOf(input, dispatchers) {
 
 /** Display name for a tool. MCP's `mcp__<server>__<tool>` is a protocol convention,
  *  so it is parsed generically -- no gateway-specific prefix is stripped by name. */
-export function toolDisplay(tool) {
+export function toolDisplay(tool: string): string {
   if (!tool.startsWith("mcp__")) return tool;
   const p = tool.split("__").filter(Boolean);
   return p.length >= 3 ? `${p[1]} · ${p.slice(2).join("__")}` : tool;
@@ -457,8 +602,19 @@ const SESSION_RE = /"sessionId"\s*:\s*"([^"]+)"/;
  */
 const DISPATCH_MIN_CALLS = 5, DISPATCH_MIN_COVERAGE = 0.6, DISPATCH_MAX_RATIO = 0.5;
 
-export function scan(files) {
-  const seen = new Set(), kept = [];
+/** What pass 1 learned: the files worth reading, and the constants pass 2 needs. */
+export interface Scanned {
+  files: RawFile[];
+  duplicatesDropped: number;
+  badLines: number;
+  dispatchers: Set<string>;
+  density: Density;
+  densitySamples: number;
+  densityCalibrated: boolean;
+}
+
+export function scan(files: RawFile[]): Scanned {
+  const seen = new Set<string>(), kept: RawFile[] = [];
   let duplicatesDropped = 0;
   for (const f of files) {
     const m = SESSION_RE.exec(f.text || "");
@@ -467,21 +623,24 @@ export function scan(files) {
     seen.add(id); kept.push(f);
   }
 
-  const verbs = new Map();      // prog -> {calls, withVerb, set:Set<verb>}
+  // prog -> {calls, withVerb, set:Set<verb>}
+  const verbs = new Map<string, { calls: number; withVerb: number; set: Set<string> }>();
   // Accumulators for the two-class least-squares fit described above.
-  const S = { cc: 0, ct: 0, tt: 0, cy: 0, ty: 0, yy: 0, n: 0, code: 0, text: 0, tok: 0 };
+  const S: Accum = { cc: 0, ct: 0, tt: 0, cy: 0, ty: 0, yy: 0, n: 0, code: 0, text: 0, tok: 0 };
   let badLines = 0;
 
   for (const f of kept) {
-    let prevTokens = null, prevOut = 0, codeChars = 0, textChars = 0, dirty = false;
+    let prevTokens: number | null = null, prevOut = 0, codeChars = 0, textChars = 0, dirty = false;
     for (const line of f.text.split("\n")) {
       const s = line.trim(); if (!s) continue;
-      let rec; try { rec = JSON.parse(s); } catch { badLines++; continue; }
+      let rec: TranscriptRecord;
+      try { rec = JSON.parse(s) as TranscriptRecord; } catch { badLines++; continue; }
       const msg = rec && rec.message;
       if (!msg || typeof msg !== "object") continue;
-      let content = msg.content;
-      if (typeof content === "string") content = [{ type: "text", text: content }];
-      if (!Array.isArray(content)) content = [];
+      let content: ContentBlock[];
+      if (typeof msg.content === "string") content = [{ type: "text", text: msg.content }];
+      else if (Array.isArray(msg.content)) content = msg.content as ContentBlock[];
+      else content = [];
 
       if (msg.role === "assistant") {
         const u = msg.usage || {};
@@ -510,11 +669,12 @@ export function scan(files) {
           if (b.type === "tool_use") {
             const inp = b.input || {};
             for (const fld of ["command", "cmd", "script", "shell_command"]) {
-              if (typeof inp[fld] !== "string") continue;
-              for (const c of shellCandidates(inp[fld])) {
+              const cmd = inp[fld];
+              if (typeof cmd !== "string") continue;
+              for (const c of shellCandidates(cmd)) {
                 if (c.rank !== 0) continue;              // builtins never dispatch
-                if (!verbs.has(c.prog)) verbs.set(c.prog, { calls: 0, withVerb: 0, set: new Set() });
-                const e = verbs.get(c.prog);
+                let e = verbs.get(c.prog);
+                if (!e) { e = { calls: 0, withVerb: 0, set: new Set() }; verbs.set(c.prog, e); }
                 e.calls++;
                 if (c.verb) { e.withVerb++; e.set.add(c.verb); }
               }
@@ -536,7 +696,7 @@ export function scan(files) {
     }
   }
 
-  const dispatchers = new Set();
+  const dispatchers = new Set<string>();
   for (const [prog, e] of verbs) {
     if (e.calls < DISPATCH_MIN_CALLS || e.set.size < 2) continue;
     if (e.withVerb / e.calls < DISPATCH_MIN_COVERAGE) continue;
@@ -556,18 +716,55 @@ export function scan(files) {
  * is assumed for cache writes whose TTL the transcript did not record. So re-pricing
  * costs O(keys), not another walk.
  */
-export function allocate(scanned) {
+
+/** Per-bucket cost accumulators. `f` is TTL-invariant, `v` scales with the assumption. */
+export interface AccEntry {
+  rec: Bucket;
+  f: number;
+  v: number;
+  out: number;
+}
+
+export interface ModelSighting {
+  n: number;
+  basis: string;
+  rate: Rate | null;
+}
+
+export interface TtlTokens {
+  "1h": number;
+  "5m": number;
+  unknown: number;
+}
+
+export interface Allocation {
+  acc: Map<string, AccEntry>;
+  billed: { f: number; v: number; out: number };
+  requests: number;
+  sessions: number;
+  sidechainRequests: number;
+  models: Map<string, ModelSighting>;
+  unpriced: Map<string, number>;
+  ttl: TtlTokens;
+  days: number | null;
+  spanFrom: number | null;
+  spanTo: number | null;
+  firstCtx: number[];
+}
+
+export function allocate(scanned: Scanned): Allocation {
   const { files, dispatchers, density } = scanned;
   const CODE = density.code, TEXT = density.text;   // chars per token, by content class
-  const acc = new Map();                 // key -> {rec, f, v, out}
-  const recOf = new Map([[PRE_KEY, PRE_REC]]);   // key -> its record, so nothing re-parses keys
-  const addCtx = (ctx, rec, tokens) => {
+  const acc = new Map<string, AccEntry>();
+  // key -> its record, so nothing re-parses keys
+  const recOf = new Map<string, Bucket>([[PRE_KEY, PRE_REC]]);
+  const addCtx = (ctx: Map<string, number>, rec: Bucket, tokens: number): void => {
     if (!(tokens > 0)) return;
     const k = keyOf(rec);
     if (!recOf.has(k)) recOf.set(k, rec);
     ctx.set(k, (ctx.get(k) || 0) + tokens);
   };
-  const bump = (rec, f, v, out) => {
+  const bump = (rec: Bucket, f: number, v: number, out: number): void => {
     const k = keyOf(rec);
     let e = acc.get(k);
     if (!e) { e = { rec, f: 0, v: 0, out: 0 }; acc.set(k, e); }
@@ -575,30 +772,33 @@ export function allocate(scanned) {
   };
 
   const billed = { f: 0, v: 0, out: 0 };
-  const models = new Map();              // raw id -> {n, basis, rate}
-  const unpriced = new Map();            // raw id -> requests skipped from pricing
-  const ttl = { "1h": 0, "5m": 0, unknown: 0 };
+  const models = new Map<string, ModelSighting>();   // raw id -> {n, basis, rate}
+  const unpriced = new Map<string, number>();        // raw id -> requests skipped from pricing
+  const ttl: TtlTokens = { "1h": 0, "5m": 0, unknown: 0 };
   let requests = 0, sessions = 0, sidechainRequests = 0;
-  let tMin = null, tMax = null;
-  const firstCtx = [];
+  let tMin: number | null = null, tMax: number | null = null;
+  const firstCtx: number[] = [];
 
   for (const file of files) {
-    const ctx = new Map();               // key -> estimated tokens in context
-    const toolOf = new Map();            // tool_use id -> {tool, sub}
-    let preamble = null, sawRequest = false;
+    const ctx = new Map<string, number>();   // key -> estimated tokens in context
+    // tool_use id -> {tool, sub}
+    const toolOf = new Map<string, { tool: string; sub: string | null; shell: boolean }>();
+    let preamble: number | null = null, sawRequest = false;
 
     for (const line of file.text.split("\n")) {
       const s = line.trim(); if (!s) continue;
-      let rec; try { rec = JSON.parse(s); } catch { continue; }
+      let rec: TranscriptRecord;
+      try { rec = JSON.parse(s) as TranscriptRecord; } catch { continue; }
       if (typeof rec.timestamp === "string") {
         const t = Date.parse(rec.timestamp);
         if (!isNaN(t)) { if (tMin === null || t < tMin) tMin = t; if (tMax === null || t > tMax) tMax = t; }
       }
       const msg = rec.message;
       if (!msg || typeof msg !== "object") continue;
-      let content = msg.content;
-      if (typeof content === "string") content = [{ type: "text", text: content }];
-      if (!Array.isArray(content)) content = [];
+      let content: ContentBlock[];
+      if (typeof msg.content === "string") content = [{ type: "text", text: msg.content }];
+      else if (Array.isArray(msg.content)) content = msg.content as ContentBlock[];
+      else content = [];
 
       if (msg.role === "assistant") {
         const u = msg.usage || {};
@@ -645,7 +845,7 @@ export function allocate(scanned) {
           let mine = 0; for (const v of ctx.values()) mine += v;
           if (preamble === null) preamble = Math.max(0, ctxTokens - mine);
           const body = Math.max(0, ctxTokens - preamble);
-          const shares = [];
+          const shares: Array<[string, number]> = [];
           let denom = 0;
           if (mine > 0) {
             const k = body / mine;
@@ -674,7 +874,8 @@ export function allocate(scanned) {
             bump({ role: "assistant", kind: "tool-args" },  0, 0, outCost * args / d2);
           }
         } else if (ctxTokens && basis !== "synthetic") {
-          unpriced.set(msg.model || "(no model field)", (unpriced.get(msg.model || "(no model field)") || 0) + 1);
+          const id = msg.model || "(no model field)";
+          unpriced.set(id, (unpriced.get(id) || 0) + 1);
         }
 
         // This assistant message now becomes part of the context for later requests.
@@ -696,7 +897,8 @@ export function allocate(scanned) {
         for (const b of content) {
           const bt = (b && typeof b === "object") ? b.type : "text";
           if (bt === "tool_result") {
-            const t = toolOf.get(b.tool_use_id) || { tool: "(unmatched tool result)", sub: null, shell: false };
+            const t = (b.tool_use_id ? toolOf.get(b.tool_use_id) : undefined)
+              || { tool: "(unmatched tool result)", sub: null, shell: false };
             addCtx(ctx, { role: "tool", tool: t.tool, dir: "result", sub: t.sub, shell: t.shell },
                    charsOf(b) / CODE);
           } else if (bt === "image") {
@@ -718,15 +920,29 @@ export function allocate(scanned) {
            days, spanFrom: tMin, spanTo: tMax, firstCtx };
 }
 
-const PRE_REC = { role: "preamble" };
+const PRE_REC: Bucket = { role: "preamble" };
 const PRE_KEY = keyOf(PRE_REC);
 
 /* ---------------------------------------------------------------------- price --
  * Apply a rate for the cache writes whose TTL was not recorded. O(keys).
  */
-export function price(alloc, ttlAssumption = "1h") {
+
+export interface PricedRow {
+  rec: Bucket;
+  cost: number;
+  isOutput: boolean;
+}
+
+export interface Priced {
+  rows: PricedRow[];
+  input: number;
+  output: number;
+  total: number;
+}
+
+export function price(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"): Priced {
   const mult = CACHE_WRITE_MULT[ttlAssumption] ?? CACHE_WRITE_MULT["1h"];
-  const rows = [];
+  const rows: PricedRow[] = [];
   for (const e of alloc.acc.values()) {
     const c = e.f + e.v * mult + e.out;
     if (c > 0) rows.push({ rec: e.rec, cost: c, isOutput: e.out > 0 && e.f === 0 && e.v === 0 });
@@ -742,7 +958,20 @@ export function price(alloc, ttlAssumption = "1h") {
  * transcript has. Membership is then derived from measured cost, so a tool, command,
  * harness tag or MCP server this file has never heard of still lands correctly.
  */
-export const GROUPS = [
+
+/** The nine stable group identities. Views key their palette off these, so they are a
+ *  contract: a group keeps its hue when the reader drills in or switches lens. */
+export type GroupId =
+  | "shell" | "ingest" | "emit" | "twoway" | "output"
+  | "preamble" | "harness" | "media" | "typed";
+
+export interface GroupDef {
+  id: GroupId;
+  name: string;
+  short: string;
+}
+
+export const GROUPS: GroupDef[] = [
   { id: "shell",    name: "Shell commands",              short: "Shell" },
   { id: "ingest",   name: "Tools · content read in",     short: "Read in" },
   { id: "emit",     name: "Tools · content written out", short: "Written out" },
@@ -760,19 +989,67 @@ const SPLIT_MIN_SHARE = 0.12;
 /** Above this share of a tool's cost in one direction, that direction defines its role. */
 const DOMINANT = 0.7;
 
-const round = v => Math.round(v * 100) / 100;
-const sumBy = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
+const round = (v: number): number => Math.round(v * 100) / 100;
+const sumBy = <T,>(arr: T[], f: (x: T) => number): number => arr.reduce((s, x) => s + f(x), 0);
 
-export function buildTree(alloc, ttlAssumption = "1h") {
+/* The tree the views render. Children always sum to their parent, at every level. */
+
+export interface TreeChild {
+  name: string;
+  cost: number;
+}
+
+export interface TreeItem {
+  name: string;
+  cost: number;
+  children: TreeChild[] | null;
+}
+
+export interface TreeGroup {
+  id: GroupId;
+  name: string;
+  short: string;
+  cost: number;
+  items: TreeItem[];
+}
+
+/** Figures the views quote, measured here so no view needs a hand-written list of
+ *  "commands that read" versus "commands that write". */
+export interface Insights {
+  fixed: number;
+  harness: number;
+  thinking: number;
+  proseGen: number;
+  proseCarry: number;
+  ingest: number;
+  emit: number;
+  mcp: number;
+  typed: number;
+}
+
+/** One fully priced view of the corpus, under one TTL assumption. */
+export interface Dataset {
+  total: number;
+  input: number;
+  output: number;
+  requests: number;
+  sessions: number;
+  days: number | null;
+  groups: TreeGroup[];
+  accounted: number;
+  insights: Insights;
+}
+
+export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"): Dataset {
   const priced = price(alloc, ttlAssumption);
 
   /* A two-level accumulator: group -> item -> optional child. Every branch below feeds
    * the same structure, so no group needs bespoke assembly code. */
-  const bucket = new Map();
-  const put = (gid, item, child, cost) => {
+  const bucket = new Map<GroupId, Map<string, { cost: number; kids: Map<string, number> }>>();
+  const put = (gid: GroupId, item: string, child: string | null, cost: number): void => {
     if (!(cost > 0)) return;
-    if (!bucket.has(gid)) bucket.set(gid, new Map());
-    const items = bucket.get(gid);
+    let items = bucket.get(gid);
+    if (!items) { items = new Map(); bucket.set(gid, items); }
     let e = items.get(item);
     if (!e) { e = { cost: 0, kids: new Map() }; items.set(item, e); }
     e.cost += cost;
@@ -780,12 +1057,14 @@ export function buildTree(alloc, ttlAssumption = "1h") {
   };
 
   // 1. Fold tool rows into per-tool direction and sub-key totals; place the rest by role.
-  const tools = new Map();     // tool -> {call, result, shell, subs:Map(sub -> cost)}
+  // tool -> {call, result, shell, subs:Map(sub -> cost)}
+  const tools = new Map<string, { call: number; result: number; shell: boolean; subs: Map<string, number> }>();
   for (const { rec, cost } of priced.rows) {
     switch (rec.role) {
       case "tool": {
-        let t = tools.get(rec.tool);
-        if (!t) { t = { call: 0, result: 0, shell: false, subs: new Map() }; tools.set(rec.tool, t); }
+        const name = rec.tool || "(unnamed tool)";
+        let t = tools.get(name);
+        if (!t) { t = { call: 0, result: 0, shell: false, subs: new Map() }; tools.set(name, t); }
         if (rec.shell) t.shell = true;
         t[rec.dir === "call" ? "call" : "result"] += cost;
         if (rec.sub) t.subs.set(rec.sub, (t.subs.get(rec.sub) || 0) + cost);
@@ -796,7 +1075,11 @@ export function buildTree(alloc, ttlAssumption = "1h") {
       case "typed":     put("typed", "your typed messages", null, cost); break;
       case "image":     put("media", rec.kind === "document" ? "attached documents"
                                                             : "images / screenshots", null, cost); break;
-      case "assistant": put("output", OUT_NAMES[rec.kind] || rec.kind, null, cost); break;
+      case "assistant": {
+        const kind = rec.kind || "";
+        put("output", OUT_NAMES[kind] || kind || "(output)", null, cost);
+        break;
+      }
       default:          put("twoway", "(unclassified)", null, cost);
     }
   }
@@ -807,7 +1090,7 @@ export function buildTree(alloc, ttlAssumption = "1h") {
     const total = t.call + t.result;
     if (total <= 0) continue;
     const resultShare = t.result / total;
-    const gid = t.shell ? "shell"
+    const gid: GroupId = t.shell ? "shell"
               : resultShare >= DOMINANT ? "ingest"
               : resultShare <= 1 - DOMINANT ? "emit" : "twoway";
     const disp = toolDisplay(tool);
@@ -836,12 +1119,12 @@ export function buildTree(alloc, ttlAssumption = "1h") {
   }
 
   // 3. Emit the tree in the declared group order, largest first within each level.
-  const groups = [];
+  const groups: TreeGroup[] = [];
   for (const def of GROUPS) {
     const items = bucket.get(def.id);
     if (!items || !items.size) continue;
-    const list = [...items].map(([name, e]) => {
-      const kids = [...e.kids].map(([n, c]) => ({ name: n, cost: round(c) }))
+    const list: TreeItem[] = [...items].map(([name, e]) => {
+      const kids: TreeChild[] = [...e.kids].map(([n, c]) => ({ name: n, cost: round(c) }))
         .sort((a, b) => b.cost - a.cost);
       return { name, cost: round(e.cost), children: kids.length > 1 ? kids : null };
     }).sort((a, b) => b.cost - a.cost);
@@ -852,9 +1135,9 @@ export function buildTree(alloc, ttlAssumption = "1h") {
 
   // 4. Insights, measured -- so the views layer never needs a hand-written list of
   //    "commands that read" versus "commands that write".
-  const gcost = id => (groups.find(g => g.id === id) || { cost: 0 }).cost;
-  const outItems = (groups.find(g => g.id === "output") || { items: [] }).items;
-  const oc = n => (outItems.find(i => i.name === n) || { cost: 0 }).cost;
+  const gcost = (id: GroupId): number => (groups.find(g => g.id === id) || { cost: 0 }).cost;
+  const outItems = (groups.find(g => g.id === "output") || { items: [] as TreeItem[] }).items;
+  const oc = (n: string): number => (outItems.find(i => i.name === n) || { cost: 0 }).cost;
   const all = [...tools.values()];
   const ingest = sumBy(all, t => t.result);
   const emit = sumBy(all, t => t.call);
@@ -875,7 +1158,7 @@ export function buildTree(alloc, ttlAssumption = "1h") {
   };
 }
 
-const OUT_NAMES = {
+const OUT_NAMES: Record<string, string> = {
   thinking: "thinking",
   prose: "assistant prose (generated)",
   "tool-args": "tool-call arguments",
@@ -887,16 +1170,53 @@ const OUT_NAMES = {
  * One scan, one allocation, then a priced tree per TTL assumption -- and the
  * assumption only affects the cache writes whose TTL the transcript omitted.
  */
-export function analyze(rawFiles, opts = {}) {
+
+export interface ModelReport {
+  id: string;
+  requests: number;
+  basis: string;
+  rate: Rate | null;
+}
+
+/** Reserved for callers that want to parameterise a run. Rates are overridden through
+ *  setRates(), so there is nothing to pass here yet; the parameter exists so adding one
+ *  later is not a breaking change. */
+export interface AnalyzeOptions {}
+
+/** Everything the report needs: one dataset per TTL lens, plus how it was derived. */
+export interface Analysis {
+  datasets: Record<TtlAssumption, Dataset>;
+  requests: number;
+  sessions: number;
+  days: number | null;
+  spanFrom: number | null;
+  spanTo: number | null;
+  filesUsed: number;
+  duplicatesDropped: number;
+  badLines: number;
+  models: ModelReport[];
+  unpriced: Record<string, number>;
+  density: Density;
+  densityCalibrated: boolean;
+  densitySamples: number;
+  dispatchers: string[];
+  ttlTokens: TtlTokens;
+  ttlMeasuredShare: number;
+  preambleRange: [number, number] | null;
+  warnings: string[];
+  groupDefs: GroupDef[];
+}
+
+export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analysis {
   const scanned = scan(rawFiles);
   if (!scanned.files.length) throw new Error("no readable transcript files");
   const alloc = allocate(scanned);
 
-  const datasets = {};
-  for (const t of ["1h", "5m"]) datasets[t] = buildTree(alloc, t);
+  const datasets = {} as Record<TtlAssumption, Dataset>;
+  for (const t of ["1h", "5m"] as const) datasets[t] = buildTree(alloc, t);
 
   const wTotal = alloc.ttl["1h"] + alloc.ttl["5m"] + alloc.ttl.unknown;
-  const warnings = [];
+  const warnings: string[] = [];
   if (alloc.unpriced.size) {
     const n = [...alloc.unpriced.values()].reduce((a, b) => a + b, 0);
     warnings.push(`${n.toLocaleString("en-US")} request(s) used a model with no known rate `

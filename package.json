@@ -9,12 +9,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "test": "pnpm run test:engine && pnpm run test:render",
-    "test:engine": "node test/engine.test.mjs",
-    "test:render": "node test/render.test.mjs",
-    "check": "pnpm run build && pnpm run test"
+    "test:engine": "node test/engine.test.ts",
+    "test:render": "node test/render.test.ts",
+    "check": "pnpm run typecheck && pnpm run build && pnpm run test"
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vite-plugin-singlefile": "^2.3.3"
   },

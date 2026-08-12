@@ -1,0 +1,36 @@
+{
+  /* Type-checking only. Vite (Rolldown/esbuild) does the transpiling for the browser, and
+     Node 24 strips types directly for the test suites -- so `tsc` never emits here, it
+     only judges. `pnpm typecheck` is the gate. */
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Nothing that Node's type stripper cannot erase: no enums, no namespaces, no
+       parameter properties. This is what keeps `node test/engine.test.ts` working with
+       no build step and no test-runner dependency -- the property that lets the suites
+       take a real transcript directory as an argument. */
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    /* Relative imports carry their real `.ts` extension. Node's stripper does no
+       extension resolution, so `./engine` would not resolve there; `./engine.ts` is the
+       one specifier both Node and Vite accept. */
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    "skipLibCheck": true
+  },
+  "include": ["*.ts", "test/**/*.ts"]
+}

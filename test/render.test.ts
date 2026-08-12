@@ -1,44 +1,67 @@
 /* Exercise the real view code against a DOM shim, across every reachable state. */
 import fs from "node:fs";
 import path from "node:path";
+import type { RawFile } from "../engine.ts";
+import type { ViewState } from "../views.ts";
 
-const els = new Map();
-const mkEl = id => {
-  const e = { id, innerHTML: "", value: "", dataset: {}, children: [],
-    classList: { add(){}, remove(){}, contains: () => false },
-    addEventListener(){}, setAttribute(){}, removeAttribute(){}, getAttribute: () => null,
-    closest: () => null, focus(){}, scrollIntoView(){} };
-  return e;
-};
+interface ShimEl {
+  id: string;
+  innerHTML: string;
+  value: string;
+  dataset: Record<string, string>;
+  children: ShimEl[];
+  classList: { add(): void; remove(): void; contains(): boolean };
+  addEventListener(): void;
+  setAttribute(): void;
+  removeAttribute(): void;
+  getAttribute(): string | null;
+  closest(): ShimEl | null;
+  focus(): void;
+  scrollIntoView(): void;
+}
+
+const els = new Map<string, ShimEl>();
+const mkEl = (id: string): ShimEl => ({
+  id, innerHTML: "", value: "", dataset: {}, children: [],
+  classList: { add() {}, remove() {}, contains: () => false },
+  addEventListener() {}, setAttribute() {}, removeAttribute() {}, getAttribute: () => null,
+  closest: () => null, focus() {}, scrollIntoView() {},
+});
 const doc = {
-  getElementById(id) { if (!els.has(id)) els.set(id, mkEl(id)); return els.get(id); },
+  getElementById(id: string): ShimEl { if (!els.has(id)) els.set(id, mkEl(id)); return els.get(id)!; },
   documentElement: mkEl("html"),
   querySelector: () => null, querySelectorAll: () => [],
-  addEventListener(){}, createElement: mkEl, body: mkEl("body"),
+  addEventListener() {}, createElement: mkEl, body: mkEl("body"),
 };
-globalThis.document = doc;
-globalThis.window = { scrollTo(){}, addEventListener(){}, matchMedia: () => ({ matches:false, addEventListener(){} }),
-  location: { hash: "", href: "http://x/", search: "" }, history: { replaceState(){} },
-  navigator: { clipboard: { writeText: async () => {} } }, getComputedStyle: () => ({}) };
-globalThis.location = window.location;
-globalThis.history = window.history;
-try { Object.defineProperty(globalThis, "navigator", { value: window.navigator, configurable: true }); } catch {}
-globalThis.requestAnimationFrame = f => f();
-globalThis.setTimeout = (f) => { f(); return 0; };
+const win = {
+  scrollTo() {}, addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }),
+  location: { hash: "", href: "http://x/", search: "" }, history: { replaceState() {} },
+  navigator: { clipboard: { writeText: async () => {} } }, getComputedStyle: () => ({}),
+};
 
-const E = await import("../engine.js");
-const V = await import("../views.js");
+/* The shim is deliberately a stand-in, not a Document -- these casts are the seam. */
+const g = globalThis as unknown as Record<string, unknown>;
+g.document = doc;
+g.window = win;
+g.location = win.location;
+g.history = win.history;
+try { Object.defineProperty(globalThis, "navigator", { value: win.navigator, configurable: true }); } catch { /* already locked */ }
+g.requestAnimationFrame = (f: () => void) => { f(); return 0; };
+g.setTimeout = (f: () => void) => { f(); return 0; };
+
+const E = await import("../engine.ts");
+const V = await import("../views.ts");
 
 /* A transcript directory may be passed as an argument; otherwise the suite builds its own
    synthetic dataset, so the render paths are covered without touching anyone's files. */
 const dir = process.argv[2];
-let files;
+let files: RawFile[];
 if (dir) {
   files = fs.readdirSync(dir).filter(f => f.endsWith(".jsonl"))
     .map(f => ({ name: f, text: fs.readFileSync(path.join(dir, f), "utf8") }));
 } else {
-  const L = [];
-  const progs = [["git", ["diff", "log", "status", "commit"]], ["docker", ["build", "run", "ps"]]];
+  const L: string[] = [];
+  const progs: Array<[string, string[]]> = [["git", ["diff", "log", "status", "commit"]], ["docker", ["build", "run", "ps"]]];
   for (let k = 0; k < 30; k++) {
     const [prog, verbs] = progs[k % progs.length];
     L.push(JSON.stringify({ sessionId: "s", timestamp: "2026-05-01T00:00:00Z", message: {
@@ -67,10 +90,10 @@ if (dir) {
 
 const data = E.analyze(files);
 let fails = 0;
-const view = () => doc.getElementById("reportView").innerHTML;
-const check = (label) => {
+const view = (): string => doc.getElementById("reportView").innerHTML;
+const check = (label: string): void => {
   const h = view();
-  const bad = [];
+  const bad: string[] = [];
   if (!h || h.length < 500) bad.push("empty render");
   for (const t of ["undefined", "NaN", "var(undefined)", "[object Object]", "$NaN"])
     if (h.includes(t)) bad.push(`contains ${t}`);
@@ -92,36 +115,33 @@ const check = (label) => {
     while ((i = h.indexOf("NaN", i + 1)) !== -1)
       console.log("      NaN CONTEXT: …" + h.slice(Math.max(0, i - 160), i + 40).replace(/\s+/g, " ") + "…");
   }
-  console.log(`${bad.length ? "FAIL" : "ok  "} ${label}${bad.length ? "  -> " + bad.join(", ") : ` (${(h.length/1024).toFixed(0)} KB)`}`);
+  console.log(`${bad.length ? "FAIL" : "ok  "} ${label}${bad.length ? "  -> " + bad.join(", ") : ` (${(h.length / 1024).toFixed(0)} KB)`}`);
 };
 
 V.initReport(data);
 check("root · panels · 1h");
 
-const S = V.__state || null;
-// Drive state through the exported setters if present, else re-init with hash.
-const states = [
-  ["table view",            { view: "table" }],
-  ["amounts hidden",        { pctOnly: true }],
-  ["5m TTL lens",           { ttl: "5m" }],
-  ["query hit",             { query: "git" }],
-  ["query miss",            { query: "zzzzzznope" }],
+/* Each state is driven in, checked, then explicitly reverted -- the revert is spelled out
+   rather than derived from the patch, so the type checker sees a real ViewState both ways. */
+const states: Array<[string, Partial<ViewState>, Partial<ViewState>]> = [
+  ["table view",     { view: "table" },        { view: "panels" }],
+  ["amounts hidden", { pctOnly: true },        { pctOnly: false }],
+  ["5m TTL lens",    { ttl: "5m" },            { ttl: "1h" }],
+  ["query hit",      { query: "git" },         { query: "" }],
+  ["query miss",     { query: "zzzzzznope" },  { query: "" }],
 ];
-for (const [label, patch] of states) {
-  V.setState ? V.setState(patch) : null;
-  if (!V.setState) { console.log(`skip ${label} (no setState export)`); continue; }
+for (const [label, patch, revert] of states) {
+  V.setState(patch);
   check(label);
-  V.setState(Object.fromEntries(Object.keys(patch).map(k => [k,
-    k === "view" ? "panels" : k === "ttl" ? "1h" : k === "query" ? "" : false])));
+  V.setState(revert);
 }
 // drill down into each top-level group, then one level deeper
 const d1 = data.datasets["1h"];
-for (const g of d1.groups) {
-  if (!V.setState) break;
-  V.setState({ path: [g.name] });
-  check(`drilled → ${g.name}`);
-  const kid = (g.items || []).find(i => i.children && i.children.length > 1);
-  if (kid) { V.setState({ path: [g.name, kid.name] }); check(`drilled → ${g.name} › ${kid.name}`); }
+for (const g2 of d1.groups) {
+  V.setState({ path: [g2.name] });
+  check(`drilled → ${g2.name}`);
+  const kid = (g2.items || []).find(i => i.children && i.children.length > 1);
+  if (kid) { V.setState({ path: [g2.name, kid.name] }); check(`drilled → ${g2.name} › ${kid.name}`); }
   V.setState({ path: [] });
 }
 console.log(fails ? `\n${fails} RENDER FAILURE(S)` : "\nall render states clean");

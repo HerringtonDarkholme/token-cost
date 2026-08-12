@@ -16,14 +16,15 @@ transcripts.**
 
 ## Developing
 
-The source is `index.html` plus ES modules, so it needs a dev server — `file://` blocks
-module imports. Vite provides one, with hot reload:
+The source is TypeScript (`index.html` plus ES modules), so it needs a dev server —
+`file://` blocks module imports. Vite provides one, with hot reload:
 
 ```sh
 pnpm install
 pnpm dev              # http://127.0.0.1:8000
+pnpm typecheck        # tsc --noEmit, the only thing that judges types
 pnpm build            # bundle + inline everything back into cost-report.html
-pnpm check            # build, then run both test suites
+pnpm check            # typecheck, build, then both test suites
 ```
 
 `pnpm build` is what regenerates the committed `cost-report.html`. It bundles to a single
@@ -31,6 +32,14 @@ classic (non-module) inline script, because a `type="module"` script is fetched 
 rules that a `file://` page cannot rely on. The build then asserts the result is genuinely
 self-contained — no `<script src>`, no stylesheet link, no absolute URL, no CSS `@import` —
 and fails rather than ship a page that would reach the network when opened.
+
+Nothing type-checks as a side effect of bundling: Vite and Node both *erase* types rather
+than verify them, so `pnpm typecheck` is the only step that will tell you a type is wrong.
+`tsconfig.json` sets `erasableSyntaxOnly`, which bans the constructs Node's stripper cannot
+handle (enums, namespaces, parameter properties) — that is what keeps the test suites
+runnable as plain scripts. Relative imports carry their real `.ts` extension for the same
+reason: Node does no extension guessing, so `./engine.ts` is the one specifier both it and
+Vite accept.
 
 The dev server binds `127.0.0.1` deliberately. Do not put transcripts, symlinks to
 `~/.claude`, or an index of them inside this folder: anything under a served directory is
@@ -43,12 +52,13 @@ pnpm test                            # both suites
 pnpm test:engine                     # synthetic corpus: unknown model, tool, command, tag
 pnpm test:render                     # every view state, on a synthetic dataset
 
-node test/engine.test.mjs <dir>      # optionally also check a real transcript directory
-node test/render.test.mjs <dir>
+node test/engine.test.ts <dir>       # optionally also check a real transcript directory
+node test/render.test.ts <dir>
 ```
 
 They are plain Node scripts with no test-runner dependency, which is what lets you point
-them at a real transcript directory as an argument.
+them at a real transcript directory as an argument. Node runs the TypeScript directly by
+stripping the types — there is no build step and no runner between you and the assertion.
 
 The synthetic suite is the one that matters: it feeds the engine a model id, an MCP tool, a
 shell program, a file type and a harness tag that appear nowhere in the source, and asserts
@@ -137,10 +147,12 @@ file tool under any name gets the same treatment.
 |---|---|
 | `cost-report.html` | standalone build — open directly; regenerate with `pnpm build` |
 | `index.html` | source page and Vite entry (needs the dev server) |
-| `engine.js` | attribution engine: JSONL → cost tree |
-| `views.js` | linked views + ledger table; takes group identity, labels and insights from the engine |
+| `main.ts` | upload screen: picker, folder drop, hand-off to the engine |
+| `engine.ts` | attribution engine: JSONL → cost tree |
+| `views.ts` | linked views + ledger table; takes group identity, labels and insights from the engine |
 | `style.css` | tokens and layout |
-| `vite.config.js` | build: bundles and inlines the above into `cost-report.html`, and asserts it is self-contained |
+| `vite.config.ts` | build: bundles and inlines the above into `cost-report.html`, and asserts it is self-contained |
+| `tsconfig.json` | type-checking only — `noEmit`; Vite and Node do the erasing |
 | `DESIGN_BRIEF.md` | design constraints and acceptance checks for the report UI |
 | `scripts/*.py` | superseded originals — see the note above |
 

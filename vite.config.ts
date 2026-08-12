@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -19,7 +19,7 @@ const STANDALONE = "cost-report.html";
  *    so a stray external reference fails the build instead of silently shipping a page
  *    that leaks a request the moment someone opens it.
  */
-function standalone() {
+function standalone(): Plugin {
   return {
     name: "standalone-html",
     enforce: "post",
@@ -36,7 +36,7 @@ function standalone() {
       if (!fs.existsSync(built)) throw new Error(`build produced no ${built}`);
       const html = fs.readFileSync(built, "utf8");
 
-      const offenders = [
+      const offenders: Array<[RegExp, string]> = [
         [/<script[^>]*\ssrc=/i, "an external <script src>"],
         [/<link[^>]*\srel=["']?stylesheet/i, "an external <link rel=stylesheet>"],
         [/\stype=["']module["']/i, 'a type="module" script (blocked risk under file://)'],
