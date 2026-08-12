@@ -50,20 +50,26 @@ function expectClean(): void {
   for (const el of container.querySelectorAll<HTMLElement>("[style]"))
     expect(el.getAttribute("style")).not.toMatch(/var\(\s*(undefined|--undefined)/);
 
-  // Wide content scrolls in its own container, so the body never scrolls sideways.
-  expect(container.querySelector(".mosaicwrap")).not.toBeNull();
+  /* The card always holds a chart, and whichever one it is keeps its own overflow: the
+     mosaic scrolls sideways in its own box, the sunburst scales to the space it is given.
+     Either way the body never scrolls sideways. */
+  expect(container.querySelector(".mosaicwrap, .sun")).not.toBeNull();
 }
 
 describe("view states", () => {
   const states: Array<[string, Partial<ViewState>]> = [
     ["root · panels · 1h", {}],
+    ["sunburst chart", { chart: "sun" }],
     ["table view", { view: "table" }],
     ["amounts hidden", { pctOnly: true }],
+    ["amounts hidden · sunburst", { chart: "sun", pctOnly: true }],
     ["amounts hidden · table", { view: "table", pctOnly: true }],
     ["5m TTL lens", { ttl: "5m" }],
     ["query hit · panels", { query: "git" }],
+    ["query hit · sunburst", { chart: "sun", query: "git" }],
     ["query hit · table", { view: "table", query: "git" }],
     ["query miss · panels", { query: "zzzzzznope" }],
+    ["query miss · sunburst", { chart: "sun", query: "zzzzzznope" }],
     ["query miss · table", { view: "table", query: "zzzzzznope" }],
   ];
   for (const [label, patch] of states)
@@ -109,6 +115,38 @@ describe("interaction", () => {
     click(byLabel("button", "Table"));
     expect(getState().view).toBe("table");
     expect(container.querySelector("table")).not.toBeNull();
+  });
+
+  it("the chart toggle swaps the card's chart, and only that", () => {
+    const total = container.querySelector(".total")?.textContent;
+    click(byLabel("button", "Sunburst"));
+    expect(getState().chart).toBe("sun");
+    expect(container.querySelector(".mosaic")).toBeNull();
+    expect(container.querySelector("svg .sunarc")).not.toBeNull();
+    // Same tree, same money: swapping the picture must not move a number.
+    expect(container.querySelector(".total")?.textContent).toBe(total);
+    click(byLabel("button", "Mosaic"));
+    expect(getState().chart).toBe("mosaic");
+    expect(container.querySelector(".mosaic")).not.toBeNull();
+  });
+
+  it("the sunburst reads from the same hover store, and its legend drills", () => {
+    show({ chart: "sun" });
+    const g = d.groups.find(x => (x.items || []).length > 1) || d.groups[0];
+    act(() => {
+      setHover({ key: `${g.name}›${g.name}`, name: g.name, cost: g.cost, under: null, group: g.name });
+    });
+    // The hovered branch lights up -- and only it.
+    const lit = container.querySelectorAll('path.sunarc[data-on="1"]');
+    expect(lit.length).toBeGreaterThan(0);
+    expect(lit.length).toBeLessThan(container.querySelectorAll("path.sunarc").length);
+    // Arcs carry no labels, so the hole is the readout.
+    expect(container.querySelector(".suncore .s")?.textContent).toContain(g.name);
+    expect(container.querySelector(".suncore .v")?.textContent).toMatch(/^\$[\d,.]+$/);
+
+    click(byLabel(".legrow button", g.name));
+    expect(getState().path).toEqual([g.name]);
+    expectClean();
   });
 
   it("hiding amounts masks the total", () => {

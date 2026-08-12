@@ -71,6 +71,7 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
 .crumbs button{background:none;border:0;padding:2px 0;cursor:pointer;color:var(--ink2);border-bottom:1px solid var(--rule)}
 .crumbs button[data-cur="1"]{color:var(--ink);border-bottom-color:var(--ink)}
 .crumbs .sep{color:var(--ink3)}
+.mosaicctl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end}
 .mosaicwrap{flex:1;min-height:0;overflow-x:auto;border-top:1px solid var(--hair)}
 .mosaic{display:flex;height:100%;min-width:860px}
 .col{display:flex;flex-direction:column;min-width:62px;border-right:1px solid var(--hair);transition:filter .16s}
@@ -120,6 +121,41 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
 .pi .tk>span{display:block;height:4px}
 .pi .pv{font-family:var(--mono);font-size:11.5px;width:72px;text-align:right;color:var(--ink2)}
 .panfoot{margin-top:8px;font-family:var(--mono);font-size:10.5px;color:var(--ink3)}
+/* The sunburst stands where the mosaic does, so it takes the same slot: fill what the card
+   has left, and let the disc take its size from the height rather than the width -- a
+   circle that overflows its row is worse than one that leaves margin beside the legend. */
+.sun{flex:1;min-height:0;display:flex;align-items:center;gap:28px;
+  border-top:1px solid var(--hair);padding-top:12px}
+.sunchart{position:relative;flex:0 0 auto;height:100%;aspect-ratio:1}
+.sunchart svg{display:block;width:100%;height:100%}
+.sunarc{stroke:var(--paper);stroke-width:.5;stroke-linejoin:round;cursor:pointer;transition:opacity .13s}
+.sunarc[data-on="1"]{stroke:var(--ink);stroke-width:1}
+.suncarry{fill:none;pointer-events:none;stroke:var(--paper);stroke-width:.9;stroke-dasharray:2.2 1.8}
+.suncore{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.suncore>*{pointer-events:auto;width:36%;aspect-ratio:1;border:0;border-radius:50%;background:none;padding:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}
+.suncore>button{cursor:pointer}
+.suncore>button:hover .v{color:var(--accent)}
+.suncore .k{max-width:92%;font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.suncore .v{font-family:var(--mono);font-size:clamp(15px,2.3vw,23px);font-weight:600;letter-spacing:-.025em}
+.suncore .s{max-width:90%;font-size:10.5px;line-height:1.35;color:var(--ink2);overflow:hidden;text-wrap:balance}
+.suncore .s .dim{color:var(--ink3)}
+.sunlegend{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px;
+  max-height:100%;overflow-y:auto}
+.legrow{display:grid;grid-template-columns:9px minmax(72px,auto) 1fr auto;gap:10px;align-items:baseline;
+  padding:5px 7px 5px 0;border-bottom:1px solid var(--hair);transition:opacity .13s}
+.legrow[data-on="1"]{background:var(--sunk)}
+.legrow[data-dim="1"]{opacity:.4}
+.legrow .sw{width:9px;height:9px;align-self:center}
+.legrow button{background:none;border:0;padding:0;cursor:pointer;font-size:13.5px;font-weight:600;text-align:left;
+  border-bottom:1px solid transparent;white-space:nowrap}
+.legrow button:hover{border-bottom-color:var(--ink)}
+.legrow button[data-folded="1"]{color:var(--ink3);font-style:italic;font-weight:400}
+.legrow .note{min-width:0;font-family:var(--mono);font-size:10.5px;color:var(--ink3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legrow .val{font-family:var(--mono);font-size:12.5px;font-weight:600}
+.sunempty{padding:22px 0;font-size:13px;color:var(--ink3)}
 .tblwrap{overflow-x:auto}
 table{width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px}
 thead tr{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
@@ -161,6 +197,9 @@ tfoot .n{padding-left:8px;padding-right:0;font-size:12px;color:var(--ink3)}
   .strip>div,.strip>div:first-child,.strip>div:last-child{padding:11px 12px;border-right:0;border-bottom:1px solid var(--hair)}
   .foot{grid-template-columns:1fr}
   .card{aspect-ratio:auto}
+  .sun{flex-direction:column;gap:16px}
+  .sunchart{height:auto;width:100%;max-width:400px;margin:0 auto}
+  .sunlegend{width:100%;max-height:none}
 }
 .drop{border:1.5px dashed var(--rule);background:var(--panel);padding:clamp(26px,5vw,54px) 26px;
   text-align:center;transition:border-color .15s,background .15s}

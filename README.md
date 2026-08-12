@@ -48,12 +48,21 @@ directory with nothing in between. The `.tsx` files only draw.
 
 The second split is hover. It lives in its own store slice rather than in `ViewState`,
 because it changes on every block the pointer crosses while nothing about the shareable
-view depends on it. The mosaic, the panels and the table each read the hovered key once and
-hand each column, panel and row two primitives — whether anything is hovered, and the
-hovered key if it falls inside *that* one — so those components are `memo`'d on values that
-change for the block entered and the block left, not for all of them. Highlighting still
-comes from one store, so the views cannot disagree about what is hovered; it just no longer
-re-renders the header, the strip, the footnotes and the whole ledger to move a highlight.
+view depends on it. The mosaic, the sunburst, the panels and the table each read the hovered
+key once and hand each column, sector, panel and row two primitives — whether anything is
+hovered, and the hovered key if it falls inside *that* one — so those components are
+`memo`'d on values that change for the block entered and the block left, not for all of
+them. Highlighting still comes from one store, so the views cannot disagree about what is
+hovered; it just no longer re-renders the header, the strip, the footnotes and the whole
+ledger to move a highlight.
+
+The card's chart has two forms of the same tree, and the mosaic is the one that leads: area
+on a common baseline is the honest comparison, and the thesis is written against it. The
+sunburst answers the other question — how deep the money goes — by putting the drill-down
+itself on screen, one ring per level. Both are laid out from `model.ts`, both hover from the
+one store, and both mark the re-billed-prose block, so the toggle changes the picture and
+nothing else. A hovered arc lights its own ancestors back to the centre, which is the one
+thing the mosaic cannot show.
 
 The dev server binds `127.0.0.1` deliberately. Do not put transcripts, symlinks to
 `~/.claude`, or an index of them inside this folder: anything under a served directory is
@@ -168,14 +177,15 @@ file tool under any name gets the same treatment.
 | `cost-report.html` | standalone build — open directly; regenerate with `pnpm build` |
 | `index.html` | document shell and Vite entry (needs the dev server) |
 | `engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
-| `model.ts` | view model: folding, drill-down, the ledger walk, the palette. No React, no DOM |
+| `model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette. No React, no DOM |
 | `store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
 | `context.ts` | the one context the report's components read: dataset, state, palette, formatters |
 | `main.tsx` | entry: mounts `<App>` |
 | `App.tsx` | upload screen until an analysis exists, report after; owns the theme attribute |
 | `Upload.tsx` | picker, folder drop, hand-off to the engine |
 | `Report.tsx` | header, thesis strip, breakdown section, footnotes |
-| `Mosaic.tsx` | the primary view — column width = share of bill — and the hover readout |
+| `Mosaic.tsx` | the primary chart — column width = share of bill — and the hover readout |
+| `Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |
 | `Panels.tsx` | the same data ranked and labelled instead of packed |
 | `Ledger.tsx` | the table, where identity does not rest on colour |
 | `Toolbar.tsx` | TTL lens, `$`/`%`, theme, copy link, copy summary |

@@ -18,6 +18,7 @@ import { hashFor, readHash, setHover, setState, useViewState, type ViewState } f
 import { Toolbar } from "./Toolbar.tsx";
 import { HoverBar, Mosaic } from "./Mosaic.tsx";
 import { Panels } from "./Panels.tsx";
+import { Sunburst } from "./Sunburst.tsx";
 import { LedgerTable, useReconNote } from "./Ledger.tsx";
 
 /** The hash is the shareable view. Writing it is best-effort because `replaceState` can
@@ -248,11 +249,21 @@ export function Report({ data, onReset }: {
           <Strip />
           <div className="mosaichead">
             <span className="lbl">
-              Every line item · column width = share of bill · block height = share of column
+              {state.chart === "sun"
+                ? "Every line item · arc = share of the ring inside it · each ring one level deeper"
+                : "Every line item · column width = share of bill · block height = share of column"}
             </span>
-            <Crumbs />
+            <div className="mosaicctl">
+              <Crumbs />
+              <span className="seg">
+                <button type="button" aria-pressed={state.chart === "mosaic"}
+                  onClick={() => setState({ chart: "mosaic" })}>Mosaic</button>
+                <button type="button" aria-pressed={state.chart === "sun"}
+                  onClick={() => setState({ chart: "sun" })}>Sunburst</button>
+              </span>
+            </div>
           </div>
-          <Mosaic />
+          {state.chart === "sun" ? <Sunburst /> : <Mosaic />}
           <HoverBar />
         </section>
         <Breakdown L={L} />

@@ -29,6 +29,8 @@ export interface ViewState {
   /** Ledger disclosure, keyed by row. Absent means "the default for that depth". */
   open: Record<string, boolean>;
   query: string;
+  /** Which chart the card draws. Both read the same tree; one packs it, one wraps it. */
+  chart: "mosaic" | "sun";
   view: "panels" | "table";
   /** Amounts hidden for screen-sharing: shares of the bill instead of dollars. */
   pctOnly: boolean;
@@ -36,7 +38,7 @@ export interface ViewState {
 }
 
 const INITIAL: ViewState = {
-  ttl: "1h", path: [], open: {}, query: "", view: "panels",
+  ttl: "1h", path: [], open: {}, query: "", chart: "mosaic", view: "panels",
   pctOnly: false, theme: "system",
 };
 
@@ -101,7 +103,7 @@ export function resetState(): void {
 }
 
 /* ---------- URL state ----------
-   The hash is the whole shareable view: TTL lens, drill path, chart-or-table, query,
+   The hash is the whole shareable view: TTL lens, drill path, which chart, panels-or-table, query,
    whether amounts are hidden, and the theme. `history.replaceState` can throw on a
    `file://` page, which is the normal way this is opened, so writing is best-effort. */
 
@@ -116,6 +118,7 @@ export function readHash(hash: string): Partial<ViewState> {
   const out: Partial<ViewState> = {};
   if (p.ttl === "5m" || p.ttl === "1h") out.ttl = p.ttl;
   if (p.p) out.path = p.p.split(">").filter(Boolean).slice(0, 2);
+  if (p.c === "sun" || p.c === "mosaic") out.chart = p.c;
   if (p.v === "table" || p.v === "panels") out.view = p.v;
   if (p.q) out.query = p.q;
   if (p.u === "pct") out.pctOnly = true;
@@ -127,6 +130,7 @@ export function hashFor(s: ViewState): string {
   const parts: string[] = [];
   if (s.ttl !== "1h") parts.push("ttl=" + s.ttl);
   if (s.path.length) parts.push("p=" + encodeURIComponent(s.path.join(">")));
+  if (s.chart !== "mosaic") parts.push("c=" + s.chart);
   if (s.view !== "panels") parts.push("v=" + s.view);
   if (s.query) parts.push("q=" + encodeURIComponent(s.query));
   if (s.pctOnly) parts.push("u=pct");

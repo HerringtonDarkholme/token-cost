@@ -114,6 +114,99 @@ export function focusOf(d: Dataset, path: string[]): Focus {
   return { node, groupName: group ? group.name : null };
 }
 
+/* ---------- sunburst ---------- */
+
+/** One node's slice of the circle. Angles are degrees clockwise from twelve o'clock, so a
+ *  component has only to turn them into a path -- where the rings sit and how thick they are
+ *  is a layout decision and stays out of here. */
+export interface SunArc {
+  key: string;
+  name: string;
+  cost: number;
+  /** 0 is the innermost ring. */
+  ring: number;
+  a0: number;
+  a1: number;
+  under: string | null;
+}
+
+/** An innermost sector and everything beneath it. Grouped this way because a branch is also
+ *  the unit of re-render: hovering an arc changes the highlight of its own branch and no
+ *  other, which is the same bargain the mosaic's columns make. */
+export interface SunBranch {
+  key: string;
+  name: string;
+  group: string;
+  cost: number;
+  /** Line items under this sector *before* folding, so the legend can say how many there
+   *  really are rather than how many survived the fold. */
+  items: number;
+  /** True for the synthetic tail row: it stands for many line items, and saying it has none
+   *  underneath would read as "this is one thing" when it is the opposite. */
+  folded: boolean;
+  arcs: SunArc[];
+}
+
+export const SUN_RINGS = 3;
+
+/** A sector thinner than this many degrees is not subdivided. Its children would be
+ *  sub-pixel hairlines: impossible to see, worse to point at. Nothing is dropped -- the
+ *  sector still carries their cost, and the table still lists them. */
+export const SUN_MIN_SPLIT = 4;
+
+/** Each node's share of the sweep it sits in. Every row can legitimately round to $0.00 on
+ *  a small dataset, and dividing by that sum would draw an empty circle where there are
+ *  real line items -- so a level that costs nothing measurable is split evenly instead. It
+ *  is the same bargain as the mosaic's floor on column width: a $0.00 line item is still a
+ *  line item, and the reader has to be able to see it to click into it. */
+function shareIn(list: CostNode[]): (cost: number) => number {
+  const total = list.reduce((s, n) => s + n.cost, 0);
+  return total > 0 ? (c => c / total) : (() => 1 / (list.length || 1));
+}
+
+/** Lay the focused subtree out as nested rings. Each ring exactly tiles the one inside it,
+ *  which is the property that makes the picture readable as shares: an arc's sweep is its
+ *  share of the whole circle, at every depth. */
+export function sunburst(focus: Focus, rings: number = SUN_RINGS): SunBranch[] {
+  const top = fold(focus.node.items || [], focus.node.cost || 1, !focus.groupName);
+  const share = shareIn(top);
+  const out: SunBranch[] = [];
+  let at = 0;
+
+  for (const n of top) {
+    /* Colour is the group's, at every depth -- the whole branch is one hue getting lighter
+       outward, so a ring reads as "more detail about this" and not as new information. */
+    const group = focus.groupName || n.name;
+    const arcs: SunArc[] = [];
+
+    const walk = (node: CostNode, ring: number, a0: number, span: number,
+                  key: string, under: string | null): void => {
+      arcs.push({ key, name: node.name, cost: node.cost, ring, a0, a1: a0 + span, under });
+      if (ring + 1 >= rings || span < SUN_MIN_SPLIT) return;
+      const kids = fold(node.items || node.children || [], node.cost);
+      if (!kids.length) return;
+      /* Scaled by what the children actually sum to, so the ring fills its parent's sweep
+         even where rounding leaves the two a cent apart. */
+      const kidShare = shareIn(kids);
+      let a = a0;
+      for (const k of kids) {
+        const s = kidShare(k.cost) * span;
+        walk(k, ring + 1, a, s, key + "›" + k.name, node.name);
+        a += s;
+      }
+    };
+
+    const span = share(n.cost) * 360;
+    walk(n, 0, at, span, group + "›" + n.name, null);
+    at += span;
+    out.push({
+      key: group + "›" + n.name, name: n.name, group, cost: n.cost,
+      items: (n.items || n.children || []).length, folded: !!n.folded, arcs,
+    });
+  }
+  return out;
+}
+
 /* ---------- ledger ---------- */
 
 export interface LedgerRow {

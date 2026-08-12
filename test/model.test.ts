@@ -9,7 +9,9 @@
 */
 
 import { analyze, type Dataset } from "../engine.ts";
-import { fold, focusOf, ledger, palette, rowIsOpen, type CostNode } from "../model.ts";
+import {
+  fold, focusOf, ledger, palette, rowIsOpen, sunburst, SUN_RINGS, type CostNode,
+} from "../model.ts";
 import { corpus } from "./fixture.ts";
 
 let fails = 0;
@@ -92,9 +94,46 @@ for (const ttl of ["1h", "5m"] as const) {
   ok(d.groups.every(g => /^var\(--c[1-8]\)$|^var\(--cn\)$/.test(pal.hue(g.name))),
      "every group gets a palette token, a 9th takes the neutral");
   ok(pal.hue("something never seen") === "var(--cn)", "an unknown group is neutral, not undefined");
+
+  /* 7. The sunburst's geometry is the arithmetic, not a decoration of it: a sweep has to be
+        the node's share of the circle, and a ring has to tile the ring inside it exactly.
+        A gap or an overlap would be a claim about money that no other view makes. */
+  let sunOk = true, arcs = 0;
+  const closeDeg = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6;
+  for (const path of paths) {
+    const at = focusOf(d, path);
+    const tree = sunburst(at);
+    if (!tree.length) continue;
+    const total = tree.reduce((s, b) => s + b.cost, 0);
+    let cursor = 0;
+    for (const b of tree) {
+      const root = b.arcs[0];
+      /* Ring 0 is laid end to end around the whole circle, in order, with no gaps -- and a
+         level that rounds to nothing anywhere is split evenly rather than drawn away. */
+      if (!closeDeg(root.a0, cursor)) sunOk = false;
+      if (!closeDeg(root.a1 - root.a0, total > 0 ? b.cost / total * 360 : 360 / tree.length))
+        sunOk = false;
+      cursor = root.a1;
+
+      const seen = new Set<string>();
+      for (const a of b.arcs) {
+        arcs++;
+        if (a.ring >= SUN_RINGS || seen.has(a.key)) sunOk = false;   // keys are React keys too
+        seen.add(a.key);
+        const kids = b.arcs.filter(k => k.ring === a.ring + 1
+          && k.key.startsWith(a.key + "›") && !k.key.slice(a.key.length + 1).includes("›"));
+        if (!kids.length) continue;
+        if (!closeDeg(kids[0].a0, a.a0) || !closeDeg(kids[kids.length - 1].a1, a.a1)) sunOk = false;
+        for (let i = 1; i < kids.length; i++)
+          if (!closeDeg(kids[i].a0, kids[i - 1].a1)) sunOk = false;
+      }
+    }
+    if (!closeDeg(cursor, 360)) sunOk = false;
+  }
+  ok(sunOk, `sunburst rings tile exactly and sweep with cost (${arcs} arcs over ${paths.length} paths)`);
 }
 
-/* 7. Disclosure defaults: top level open, deeper levels closed, explicit state wins. */
+/* 8. Disclosure defaults: top level open, deeper levels closed, explicit state wins. */
 ok(rowIsOpen({}, "k›0", 0) === true, "top-level rows default open");
 ok(rowIsOpen({}, "k›1", 1) === false, "deeper rows default closed");
 ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle overrides the default");
