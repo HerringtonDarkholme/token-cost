@@ -154,14 +154,30 @@ file tool under any name gets the same treatment.
 | `vite.config.ts` | build: bundles and inlines the above into `cost-report.html`, and asserts it is self-contained |
 | `tsconfig.json` | type-checking only — `noEmit`; Vite and Node do the erasing |
 | `DESIGN_BRIEF.md` | design constraints and acceptance checks for the report UI |
-| `scripts/*.py` | superseded originals — see the note above |
 
-### The older CLI scripts
+### Reading the numbers from a terminal
 
-`scripts/*.py` are the original command-line tools this started as. **They are not equivalent
-to the engine any more** — they carry the hardcoded model list, tool names, command lists and
-fixed 4-chars-per-token assumption that the JS engine replaced, and they will disagree with
-it. Kept for reference, not for use.
+There is no CLI, but there doesn't need to be one: Node runs the engine's TypeScript directly,
+so a few lines get you any view of the data you want.
+
+```sh
+node --input-type=module -e '
+  import { readdirSync, readFileSync } from "node:fs";
+  import { join } from "node:path";
+  import { analyze } from "./engine.ts";
+  const dir = process.argv[1];
+  const files = readdirSync(dir).filter(f => f.endsWith(".jsonl"))
+    .map(name => ({ name, text: readFileSync(join(dir, name), "utf8") }));
+  for (const g of analyze(files).datasets["1h"].groups)
+    console.log(g.name.padEnd(34), "$" + g.cost.toFixed(2).padStart(8));
+' ~/.claude/projects/<project>
+```
+
+This project began as a set of Python CLI scripts; they were removed once the engine
+outgrew them. They read the same exact totals out of `usage`, but split them using a
+hardcoded command list and a flat 4-chars-per-token estimate, so their per-row numbers
+disagree with the engine's — measurably, not theoretically. `git show c624680:scripts/` has
+them if you want to look.
 
 ## Caveats
 

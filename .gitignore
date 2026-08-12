@@ -8,12 +8,6 @@ transcripts/
 report_data.json
 *.report.json
 
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-
 # Node / Vite. cost-report.html is deliberately NOT ignored: it is the deliverable, the
 # thing a reader downloads and double-clicks. dist/ is only the build's staging area.
 node_modules/
