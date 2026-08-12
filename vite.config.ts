@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -88,7 +89,10 @@ function standalone(): Plugin {
 export default defineConfig({
   root,
   base: "./",
-  plugins: [react(), viteSingleFile(), standalone()],
+  /* React Compiler memoises the components for us. It pulls in `react/compiler-runtime`,
+     which bundles like any other import -- `standalone()` below asserts that nothing
+     external survives, so a runtime that failed to inline would fail the build. */
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), viteSingleFile(), standalone()],
   build: {
     target: "es2022",
     cssCodeSplit: false,

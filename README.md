@@ -55,6 +55,18 @@ change for the block entered and the block left, not for all of them. Highlighti
 comes from one store, so the views cannot disagree about what is hovered; it just no longer
 re-renders the header, the strip, the footnotes and the whole ledger to move a highlight.
 
+[React Compiler](https://react.dev/learn/react-compiler) is enabled, in both the build and
+the render suite. It memoises inside every component, which is why there is little value in
+adding more `useMemo` by hand — but note what it does *not* do: it cannot change what a
+component subscribes to, so the hover split above is still what keeps a pointer sweep cheap.
+It also compiles a component or skips it silently, and two ordinary-looking things make it
+skip: a conditional inside a `try` block, and a callback that reassigns a variable it closed
+over (an accumulator inside a `.map`). Both appear in this codebase's history, rewritten in
+`useUrlSync` and `Mosaic` so that every component in the page compiles. If you are changing
+a hot component, it is worth confirming it still does — pass a `logger` to
+`reactCompilerPreset()` in `vite.config.ts` and the build will name every function it
+compiled or refused.
+
 The dev server binds `127.0.0.1` deliberately. Do not put transcripts, symlinks to
 `~/.claude`, or an index of them inside this folder: anything under a served directory is
 fetchable by any page that can reach localhost while the server runs.
@@ -181,7 +193,7 @@ file tool under any name gets the same treatment.
 | `Toolbar.tsx` | TTL lens, `$`/`%`, theme, copy link, copy summary |
 | `style.css` | tokens and layout |
 | `vite.config.ts` | build: bundles and inlines everything into `cost-report.html`, and asserts it is self-contained |
-| `vitest.config.ts` | the render suite only — deliberately without the build plugins, so tests can never write the deliverable |
+| `vitest.config.ts` | the render suite only — deliberately without the build plugins, so tests can never write the deliverable, but *with* the compiler so it asserts the code that ships |
 | `tsconfig.json` | type-checking only — `noEmit`; Vite and Node do the erasing |
 | `DESIGN_BRIEF.md` | design constraints and acceptance checks for the report UI |
 
