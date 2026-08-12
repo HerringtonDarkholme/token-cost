@@ -29,12 +29,8 @@ import { LedgerTable, useReconNote } from "./Ledger.tsx";
 function useUrlSync(state: ViewState): void {
   const hash = hashFor(state);
   useEffect(() => {
-    /* The URL is built before the `try`, not inside it: React Compiler declines to compile a
-       function whose try block contains a conditional, and this hook is not worth opting out
-       of compilation for. */
-    const url = hash || location.pathname + location.search;
     try {
-      history.replaceState(null, "", url);
+      history.replaceState(null, "", hash || location.pathname + location.search);
     } catch { /* file:// can refuse */ }
   }, [hash]);
 

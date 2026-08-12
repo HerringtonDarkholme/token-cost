@@ -99,34 +99,25 @@ export function Mosaic(): React.JSX.Element {
   const rootCost = focus.node.cost || 1;
 
   /* Memoised so the folded nodes keep their identity when only the hover moved -- otherwise
-     every column would get a fresh `node` prop and the memo above would never hit.
-     The running total is accumulated here in a plain loop rather than inside the JSX `map`:
-     a callback that reassigns a variable it closed over is the one thing React Compiler will
-     not compile, and the mosaic is the component that can least afford to be skipped. */
-  const cols = useMemo(() => {
-    const list = fold(focus.node.items || [], rootCost, !focus.groupName);
-    const total = list.reduce((s, n) => s + n.cost, 0) || 1;
-    const out: Array<{ node: CostNode; gname: string; key: string;
-                       cumFrom: number; cumTo: number; width: number }> = [];
-    let run = 0;
-    for (const n of list) {
-      const cumFrom = pctOf(run, rootCost);
-      run += n.cost;
-      const gname = focus.groupName || n.name;
-      out.push({ node: n, gname, key: gname + "›" + n.name,
-                 cumFrom, cumTo: pctOf(run, rootCost), width: n.cost / total });
-    }
-    return out;
-  }, [focus, rootCost]);
+     every column would get a fresh `node` prop and the memo above would never hit. */
+  const cols = useMemo(
+    () => fold(focus.node.items || [], rootCost, !focus.groupName), [focus, rootCost]);
+  const colTotal = cols.reduce((s, n) => s + n.cost, 0) || 1;
 
+  let run = 0;
   return (
     <div className="mosaicwrap">
       <div className="mosaic">
-        {cols.map(c => (
-          <Column key={c.node.name} node={c.node} gname={c.gname}
-            cumFrom={c.cumFrom} cumTo={c.cumTo} width={c.width}
-            hit={hk && hk.startsWith(c.key) ? hk : null} anyHover={!!hk} />
-        ))}
+        {cols.map(n => {
+          const cumFrom = pctOf(run, rootCost);
+          run += n.cost;
+          const key = (focus.groupName || n.name) + "›" + n.name;
+          return (
+            <Column key={n.name} node={n} gname={focus.groupName || n.name}
+              cumFrom={cumFrom} cumTo={pctOf(run, rootCost)} width={n.cost / colTotal}
+              hit={hk && hk.startsWith(key) ? hk : null} anyHover={!!hk} />
+          );
+        })}
       </div>
     </div>
   );
