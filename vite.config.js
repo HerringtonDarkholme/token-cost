@@ -64,8 +64,11 @@ export default defineConfig({
     target: "es2022",
     cssCodeSplit: false,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
-    rollupOptions: {
-      output: { format: "iife", inlineDynamicImports: true },
+    // Vite 8 bundles with Rolldown; `rollupOptions` still works but is deprecated.
+    // singlefile already forces `codeSplitting: false`, which subsumes
+    // `inlineDynamicImports` -- setting both makes Rolldown warn.
+    rolldownOptions: {
+      output: { format: "iife" },
     },
   },
   server: { host: "127.0.0.1", port: 8000 },
