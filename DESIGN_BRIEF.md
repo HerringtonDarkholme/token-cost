@@ -70,8 +70,10 @@ figures, which belong to no dataset the page will ever see again.
 
 ## 4. Hard constraints — non-negotiable
 
-- **One file.** The build (`build.py`) inlines `engine.js`, `views.js` and `style.css` into
-  `cost-report.html` so it opens by double-click. No CDN scripts, no external stylesheets,
+- **One file.** The build (`pnpm build`, configured in `vite.config.js`) bundles and inlines
+  everything into `cost-report.html` so it opens by double-click. It emits a classic inline
+  script rather than `type="module"`, because module scripts load under rules a `file://`
+  page cannot rely on. No CDN scripts, no external stylesheets,
   **no webfont URLs**, no remote images, no `fetch`. Inline everything. A non-system typeface
   must be a `@font-face` data URI or it doesn't ship — do not link a font and hope, it fails
   silently to a fallback.
@@ -153,5 +155,6 @@ synthetic dataset. Don't eyeball them:
    reasoning about it.
 7. **Degenerate uploads render.** A single session, a group with one line item, and a run
    with an unpriced model each produce a sane page.
-8. **The build has no ESM leftovers** — `python3 build.py` fails loudly on `import`/`export`
-   reaching the output, because those break under `file://`.
+8. **The build stays self-contained** — `pnpm build` fails loudly if the output carries a
+   `<script src>`, a stylesheet link, an absolute URL, a CSS `@import`, or a
+   `type="module"` script, because each of those breaks or leaks under `file://`.

@@ -1,0 +1,24 @@
+{
+  "name": "claude-cost-report",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Trace Claude Code session spend to whatever put the tokens in context",
+  "packageManager": "pnpm@10.8.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "pnpm run test:engine && pnpm run test:render",
+    "test:engine": "node test/engine.test.mjs",
+    "test:render": "node test/render.test.mjs",
+    "check": "pnpm run build && pnpm run test"
+  },
+  "devDependencies": {
+    "vite": "^7.1.5",
+    "vite-plugin-singlefile": "^2.3.0"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

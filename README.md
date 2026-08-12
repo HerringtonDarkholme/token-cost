@@ -14,27 +14,41 @@ request with your data. It reads only the files you hand it through the picker o
 it has no filesystem access of its own, and **nothing here points at or serves your
 transcripts.**
 
-To work on the source (`index.html` + separate modules) you need a server, because
-`file://` blocks ES-module imports:
+## Developing
+
+The source is `index.html` plus ES modules, so it needs a dev server — `file://` blocks
+module imports. Vite provides one, with hot reload:
 
 ```sh
-python3 -m http.server 8000 --bind 127.0.0.1   # serves only this folder's app files
-open http://localhost:8000/
-python3 build.py                               # re-inline into cost-report.html after edits
+pnpm install
+pnpm dev              # http://127.0.0.1:8000
+pnpm build            # bundle + inline everything back into cost-report.html
+pnpm check            # build, then run both test suites
 ```
 
-Keep it that way: do not put transcripts, symlinks to `~/.claude`, or an index of them
-inside this folder. Anything under a served directory is fetchable by any page that can
-reach localhost while the server runs.
+`pnpm build` is what regenerates the committed `cost-report.html`. It bundles to a single
+classic (non-module) inline script, because a `type="module"` script is fetched under module
+rules that a `file://` page cannot rely on. The build then asserts the result is genuinely
+self-contained — no `<script src>`, no stylesheet link, no absolute URL, no CSS `@import` —
+and fails rather than ship a page that would reach the network when opened.
+
+The dev server binds `127.0.0.1` deliberately. Do not put transcripts, symlinks to
+`~/.claude`, or an index of them inside this folder: anything under a served directory is
+fetchable by any page that can reach localhost while the server runs.
 
 ## Tests
 
 ```sh
-node test/engine.test.mjs            # synthetic corpus: unknown model, tool, command, tag
-node test/render.test.mjs            # every view state, on a synthetic dataset
+pnpm test                            # both suites
+pnpm test:engine                     # synthetic corpus: unknown model, tool, command, tag
+pnpm test:render                     # every view state, on a synthetic dataset
+
 node test/engine.test.mjs <dir>      # optionally also check a real transcript directory
 node test/render.test.mjs <dir>
 ```
+
+They are plain Node scripts with no test-runner dependency, which is what lets you point
+them at a real transcript directory as an argument.
 
 The synthetic suite is the one that matters: it feeds the engine a model id, an MCP tool, a
 shell program, a file type and a harness tag that appear nowhere in the source, and asserts
@@ -121,12 +135,12 @@ file tool under any name gets the same treatment.
 
 | file | what it is |
 |---|---|
-| `cost-report.html` | standalone build — open directly |
-| `index.html` | source page (needs a server) |
+| `cost-report.html` | standalone build — open directly; regenerate with `pnpm build` |
+| `index.html` | source page and Vite entry (needs the dev server) |
 | `engine.js` | attribution engine: JSONL → cost tree |
 | `views.js` | linked views + ledger table; takes group identity, labels and insights from the engine |
 | `style.css` | tokens and layout |
-| `build.py` | inlines the above into `cost-report.html` |
+| `vite.config.js` | build: bundles and inlines the above into `cost-report.html`, and asserts it is self-contained |
 | `DESIGN_BRIEF.md` | design constraints and acceptance checks for the report UI |
 | `scripts/*.py` | superseded originals — see the note above |
 
