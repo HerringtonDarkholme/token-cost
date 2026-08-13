@@ -16,6 +16,9 @@ import { corpus } from "./fixture.ts";
 const data = analyze(corpus(process.env.TRANSCRIPT_DIR));
 const d = data.datasets["1h"];
 
+/** A stable identity, so the report is not handed a fresh callback per render. */
+const noop = (): void => {};
+
 let container: HTMLElement;
 let root: Root;
 
@@ -24,7 +27,7 @@ beforeAll(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => { root.render(<Report data={data} onReset={() => {}} />); });
+  act(() => { root.render(<Report data={data} onReset={noop} />); });
 });
 
 afterAll(() => { act(() => { root.unmount(); }); });

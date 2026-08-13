@@ -12,6 +12,12 @@ const THEMES: ReadonlyArray<readonly [ThemeChoice, string]> =
 
 const TTLS: ReadonlyArray<readonly [TtlAssumption, string]> = [["1h", "1h"], ["5m", "5m"]];
 
+/* The switches hand these down rather than closing over a fresh arrow each render. Nothing
+   here needs a component's scope -- a pick is a write to the store, which is a module away --
+   so they are written once, and the two theme switches are the same function. */
+const pickTtl = (ttl: TtlAssumption): void => setState({ ttl });
+const pickTheme = (theme: ThemeChoice): void => setState({ theme });
+
 /** The eye every brokerage app puts over its balance. Stroked in `currentColor` so it
  *  inverts with the button rather than needing a second colour for the pressed state. */
 function Eye({ off }: { off: boolean }): React.JSX.Element {
@@ -58,8 +64,8 @@ export function Toolbar({ onReset }: { onReset: () => void }): React.JSX.Element
       <span className="seg">
         <MaskToggle on={state.pctOnly} />
       </span>
-      <Seg label="TTL" options={TTLS} value={state.ttl} onPick={ttl => setState({ ttl })} />
-      <Seg options={THEMES} value={state.theme} onPick={theme => setState({ theme })} />
+      <Seg label="TTL" options={TTLS} value={state.ttl} onPick={pickTtl} />
+      <Seg options={THEMES} value={state.theme} onPick={pickTheme} />
       <span className="seg">
         <button type="button" onClick={onReset}>New file</button>
       </span>
@@ -73,7 +79,7 @@ export function ThemeBar({ theme }: { theme: ThemeChoice }): React.JSX.Element {
   return (
     <div className="toolbar">
       <span className="tick" />
-      <Seg options={THEMES} value={theme} onPick={t => setState({ theme: t })} />
+      <Seg options={THEMES} value={theme} onPick={pickTheme} />
     </div>
   );
 }

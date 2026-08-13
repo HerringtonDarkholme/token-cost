@@ -49,6 +49,11 @@ const VIEWS: ReadonlyArray<readonly [ViewState["view"], string]> =
 const CHARTS: ReadonlyArray<readonly [ViewState["chart"], string]> =
   [["mosaic", "Mosaic"], ["sun", "Sunburst"]];
 
+/* Written once rather than closed over per render: a pick is a write to the store, which is a
+   module away, so neither switch needs anything from the component around it. */
+const pickView = (view: ViewState["view"]): void => setState({ view });
+const pickChart = (chart: ViewState["chart"]): void => setState({ chart });
+
 /** How long a digit pop-in runs, read off the stylesheet so the two cannot drift: the last
  *  two characters ride one and two stagger offsets behind the rest of the figure. */
 function popMs(): number {
@@ -85,7 +90,12 @@ function PopNumber({ value, className }: {
   return (
     <span key={beat}
       className={`t-digit-group${beat ? " is-animating" : ""}${className ? " " + className : ""}`}>
+      {/* Keyed by position on purpose, which is the one case an index key is the right key:
+          these are the columns of a figure, not a list of things. "$1,204.55" becoming
+          "$989.10" should re-letter the spans that are already there rather than match
+          characters up by name, and the stagger below is a position too. */}
       {chars.map((ch, i) => (
+        // oxlint-disable-next-line react/no-array-index-key
         <span key={i} className="t-digit"
           data-stagger={i === chars.length - 2 ? 1 : i === chars.length - 1 ? 2 : undefined}>{ch}</span>
       ))}
@@ -189,7 +199,7 @@ function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
           <label htmlFor="q">Find</label>
           <input id="q" type="search" value={state.query} placeholder="git diff, thinking, schema…"
                  onChange={e => setState({ query: e.target.value })} />
-          <Seg options={VIEWS} value={state.view} onPick={view => setState({ view })} />
+          <Seg options={VIEWS} value={state.view} onPick={pickView} />
         </div>
       </div>
       <Reveal key={state.view}>
@@ -339,7 +349,7 @@ export function Report({ data, onReset }: {
               breadcrumb, which addresses one block inside it. */}
           <div className="cardfoot">
             <HoverBar />
-            <Seg options={CHARTS} value={state.chart} onPick={chart => setState({ chart })} nosnap />
+            <Seg options={CHARTS} value={state.chart} onPick={pickChart} nosnap />
           </div>
         </section>
         <Breakdown L={L} />

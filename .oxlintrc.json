@@ -1,0 +1,78 @@
+{
+  // oxlint. Comments are part of this format, and are used: a rule turned off without its
+  // reason written down is a rule somebody turns back on in six months and then argues with.
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "react-perf", "jsx-a11y", "promise"],
+
+  // "is it wrong", "is it probably wrong", "is it slow". Not pedantic/style/restriction --
+  // this codebase has a deliberate voice and those categories mostly argue with it.
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": { "browser": true, "es2024": true },
+  // `dist` and `cost-report.html` are build output; `.agents` is a vendored skill.
+  "ignorePatterns": ["dist", ".agents", "cost-report.html"],
+
+  "rules": {
+    // Vite compiles JSX with the automatic runtime, so React is never in scope by name.
+    "react/react-in-jsx-scope": "off",
+
+    // react-perf is about handing a *component* something new on every render, which is what
+    // defeats a memoised child. Two carve-outs, and only these two:
+    //
+    // `style` on a DOM element is not that. Every one here encodes the data -- a hue, a
+    // percentage width, a bar height -- so it has to be rebuilt when the data changes, and
+    // React diffs style objects by value anyway. Hoisting them would mean memoising per row
+    // and per block in order to hand the same object to a `<span>` that never compares it.
+    "react-perf/jsx-no-new-object-as-prop": ["error", { "nativeAllowList": ["style"] }],
+    // Same reasoning for `onClick={() => …}` on a button. A handler passed to a *component* is
+    // still caught, and those are hoisted rather than silenced -- see `pickTtl` and friends.
+    "react-perf/jsx-no-new-function-as-prop": ["error", { "nativeAllowList": "all" }],
+
+    // The list is the plugin's own default plus `td`. A table data cell is not a control, and
+    // the magnitude column's cell holds a bar whose value is already the two columns to its
+    // left; there is no label to give it that would not be a third reading of one number.
+    "jsx-a11y/control-has-associated-label": ["error", {
+      "ignoreElements": [
+        "audio", "canvas", "embed", "input", "textarea", "tr", "video",
+        "td"
+      ]
+    }],
+    // Wants `<img>` instead of `<svg role="img">`. The sunburst cannot be an `<img>` -- it is
+    // inline SVG whose arcs are the hover targets -- and `role="img"` with an `aria-label` is
+    // the documented way to give a chart like that an accessible name.
+    "jsx-a11y/prefer-tag-over-role": "off",
+
+    // Every `.sort()` in the engine is on an array built one expression earlier
+    // (`[...map].map(…).sort(…)`), so there is nothing to copy and nothing to mutate.
+    "unicorn/no-array-sort": "off",
+    // `img.onload`/`onerror` inside a `new Promise` is the image-decode idiom, and the promise
+    // settles once -- the second-handler problem the rule guards against cannot arise.
+    "unicorn/prefer-add-event-listener": "off",
+    // Misreads the shell parser's `while (j < n && (… || (q && cmd[j] !== q)))`: `q` is a guard
+    // on a comparison against `cmd[j]`, and `j` moves.
+    "eslint/no-unmodified-loop-condition": "off"
+  },
+
+  "overrides": [
+    {
+      "files": ["test/**", "**/*.test.ts", "**/*.test.tsx"],
+      "plugins": ["vitest"],
+      "rules": {
+        // The suite's shared invariants live in `expectClean`, which is where most of its
+        // assertions are; a test that calls it is not a test without assertions.
+        "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expectClean"] }],
+        // The view-state and drill-down suites name each case from the data they walk, so the
+        // titles are variables and template strings rather than literals.
+        "vitest/valid-title": "off",
+        // Drilling asserts on a second level only where the corpus has one, which is a
+        // property of somebody's transcripts rather than of the code.
+        "vitest/no-conditional-expect": "off",
+        // `click` and `pointerTo` are deliberately scoped to the suite that dispatches events.
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

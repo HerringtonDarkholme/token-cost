@@ -4,7 +4,7 @@
    owned by this boundary -- "New file" is just dropping it, which unmounts the report and
    takes its DOM with it, instead of hiding one div and showing another. */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Analysis } from "./engine.ts";
 import { readHash, resetState, setState, useViewState } from "./store.ts";
 import { Report } from "./Report.tsx";
@@ -30,7 +30,11 @@ export function App(): React.JSX.Element {
      view, drilled into shell commands" arrives that way rather than snapping into it. */
   useEffect(() => { setState(readHash(location.hash)); }, []);
 
+  /* One function for the life of the app rather than a fresh one per render: dropping the
+     analysis is the same act every time, and `setData` is already stable. */
+  const reset = useCallback(() => { setData(null); resetState(); }, []);
+
   return data
-    ? <Report data={data} onReset={() => { setData(null); resetState(); }} />
+    ? <Report data={data} onReset={reset} />
     : <Upload onData={setData} />;
 }

@@ -11,6 +11,12 @@ round trip to undo.
 
 ## Before you commit
 
-`pnpm check` — typecheck, build, then all three suites. The build asserts the page is
+`pnpm check` — lint, typecheck, build, then all three suites. The build asserts the page is
 self-contained, so a change that reaches the network fails here rather than in someone's
 browser.
+
+The lint is oxlint, and it is a gate rather than advice: `.oxlintrc.json` is expected to stay
+at zero findings. Every rule it turns off carries the reason in a comment beside it, so if a
+new finding is a false positive, silence it the same way — with the argument written down, or
+at the one site with `// oxlint-disable-next-line <rule>` and a comment saying why. Reaching
+for `-A` on the command line to get a commit out is not the move.

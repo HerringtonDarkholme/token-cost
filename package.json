@@ -7,6 +7,7 @@
   "packageManager": "pnpm@10.8.0",
   "scripts": {
     "dev": "vite",
+    "lint": "oxlint",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -14,7 +15,7 @@
     "test:engine": "node test/engine.test.ts",
     "test:model": "node test/model.test.ts",
     "test:render": "vitest run",
-    "check": "pnpm run typecheck && pnpm run build && pnpm run test"
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -22,6 +23,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
     "happy-dom": "^20.11.2",
+    "oxlint": "^1.78.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vite-plugin-singlefile": "^2.3.3",
