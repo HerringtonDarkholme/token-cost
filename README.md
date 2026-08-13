@@ -19,6 +19,13 @@ request with your data. It reads only the files you hand it through the picker o
 it has no filesystem access of its own, and **nothing here points at or serves your
 transcripts.**
 
+The one thing that ever leaves is what you choose to post. *Share to X* renders the card to
+your clipboard and opens a composer with a caption already written — one of six, drawn at
+random. A caption quotes figures, and at most the names of widely known programs (`git`,
+`sed`, `cat`): never a command you ran, a file path, or an MCP server, since those are named
+after your employer as often as not. Covering the amounts with the eye covers them in the
+caption too. Nothing is posted until you press the button in X's own composer.
+
 ## Developing
 
 The source is React 19 and TypeScript, so it needs a dev server — `file://` blocks module
@@ -209,7 +216,7 @@ file tool under any name gets the same treatment.
 | `index.html` | document shell and Vite entry (needs the dev server) |
 | `vercel.json` | the deploy: `pnpm build`, serve `dist/` |
 | `engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
-| `model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette. No React, no DOM |
+| `model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
 | `store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
 | `context.ts` | the one context the report's components read: dataset, state, palette, formatters |
 | `main.tsx` | entry: mounts `<App>` |
@@ -221,7 +228,7 @@ file tool under any name gets the same treatment.
 | `Panels.tsx` | the same data ranked and labelled instead of packed |
 | `Ledger.tsx` | the table, where identity does not rest on colour |
 | `Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X |
-| `Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with the caption written |
+| `Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with a caption written |
 | `snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |
 | `style.css` | tokens and layout |
 | `vite.config.ts` | build: bundles and inlines everything into `cost-report.html`, and asserts it is self-contained |

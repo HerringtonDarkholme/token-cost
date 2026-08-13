@@ -4,7 +4,8 @@
    use it -- and they differ only in what happens after. "Copy chart" ends there, which is
    what a reader wants when the destination is a doc, a deck, a Slack thread, or an X post
    they would rather write themselves. "Share chart on X" goes on to open the composer with
-   a caption already written.
+   a caption already written -- one of several, drawn at random per share, so that a timeline
+   seeing this page more than once is not reading the same sentence again.
 
    The composer at x.com/intent/post takes text and nothing else. There is no parameter that
    attaches an image and nothing in the page can reach into it to add one, which is exactly

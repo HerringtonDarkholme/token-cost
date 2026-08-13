@@ -300,39 +300,267 @@ const SAID: Partial<Record<GroupId, string>> = {
   typed: "the part I actually typed",
 };
 
-/** The caption that travels with the shared image.
+/** Programs a caption is allowed to name out loud.
  *
- *  What is actually being posted is one developer's own working week -- what their tools
- *  pulled in, what the model thought about, what they typed -- so the caption reads as
- *  theirs and ends by asking to see everyone else's. The picture is the evidence and
- *  carries the figures; the text gets one number worth stopping on, the claim that number
- *  supports, and the invitation.
- *
- *  `home` is where a reader can run their own, and is dropped when there is nowhere to
- *  point -- a page opened from disk has no address anyone else can use, and an invitation
- *  with no link is just a boast.
- *
- *  The masked lens is honoured for the same reason the header honours it: a reader who
- *  covered the dollars to share a screen has said they do not want the total published. */
-export function postText(d: Dataset, pctOnly: boolean, home?: string | null): string {
-  const top = d.groups[0];
-  const heading = top ? (SAID[top.id] || top.name.toLowerCase()) : "—";
-  const said = heading.length > 44 ? heading.slice(0, 43).trimEnd() + "…" : heading;
-  const scope = d.days ? `${d.days} day${d.days === 1 ? "" : "s"}`
-                       : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`;
+ *  This is not a classifier, and it is not the list-of-things-one-author-uses that the
+ *  engine refuses to keep: nothing is grouped, priced or drilled by it, and a program's
+ *  absence costs it nothing but a mention. It answers a question the engine never has to
+ *  ask -- which names are safe to *publish*. An item name comes from the reader's own shell
+ *  history, so it can be an internal CLI, a client's tool, or a deploy script with a
+ *  hostname in it, and a caption that quotes one hands it to everyone who reads the post.
+ *  These give nothing away. Anything else still counts, still charts, and is simply never
+ *  said by name. */
+export const PUBLIC_PROGS = new Set([
+  "awk", "bash", "cargo", "cat", "cp", "curl", "diff", "docker", "du", "echo", "find", "gh",
+  "git", "go", "grep", "head", "jq", "kubectl", "ls", "make", "mkdir", "mv", "node", "npm",
+  "pnpm", "psql", "python", "python3", "rg", "rm", "rsync", "ruby", "rustc", "sed", "sh",
+  "sort", "ssh", "tail", "tar", "terraform", "touch", "tr", "uniq", "wc", "which", "xargs",
+  "yarn", "zsh",
+]);
 
-  const lines = [
-    pctOnly ? `Itemised ${scope} of my Claude Code bill.`
-            : `Itemised my Claude Code bill: ${money(d.total)} over ${scope}.`,
-    `Biggest line: ${said}, ${pctOf(top ? top.cost : 0, d.total).toFixed(0)}% of it.`,
-    "You don't pay for what the model writes — you pay rent on your context.",
-  ];
-  if (home) lines.push(`Show me yours: ${home}`);
+/** Tools a caption may name out loud, for the same reason and with a sharper edge: an MCP
+ *  tool is displayed as `server · tool`, and the server is the reader's own -- often the
+ *  employer's name, or a product that has not shipped. These are the harness's own tools,
+ *  which every reader already has. A split row keeps its ` · results` / ` · call args`
+ *  suffix when it is said, but is vouched for by the tool underneath it. */
+export const PUBLIC_TOOLS = new Set([
+  "Agent", "Bash", "BashOutput", "Edit", "ExitPlanMode", "Glob", "Grep", "KillShell",
+  "MultiEdit", "NotebookEdit", "NotebookRead", "Read", "SlashCommand", "Task", "TodoWrite",
+  "WebFetch", "WebSearch", "Write",
+]);
 
-  /* Over the ceiling, the line to lose is the middle one: it is the only claim the image
-     already makes on its own. Truncating instead would eat the link, which is the one part
-     of the post that has to survive intact. */
-  const out = lines.join("\n\n");
-  if (postLength(out) <= POST_MAX) return out;
-  return [lines[0], lines[2], ...lines.slice(3)].join("\n\n");
+/** What a leaf is vouched for by, ignoring the direction suffix the engine adds when a tool
+ *  earns two rows. Shell items are program names; everything else in a tool-shaped group is
+ *  a tool display name. */
+export const vouched = (gid: GroupId, name: string): boolean =>
+  gid === "shell" ? PUBLIC_PROGS.has(name)
+                  : PUBLIC_TOOLS.has(name.replace(/ · (results|call args)$/, ""));
+
+/** A share said the way a caption needs it. The figures worth posting here are often well
+ *  under one percent -- "0% of it was me typing" is not the joke -- so a small share keeps a
+ *  decimal that a large one has no use for. */
+const share = (cost: number, total: number): string => {
+  const p = pctOf(cost, total);
+  return (p > 0 && p < 1 ? p.toFixed(1) : p.toFixed(0)) + "%";
+};
+
+/** What every caption draws on, gathered once so the variants below are only sentences.
+ *
+ *  `amt` and `outOf` are the masked lens in one place: a reader who covered the dollars to
+ *  share their screen has said they do not want the total published, and a variant that
+ *  had to remember that itself would eventually forget. */
+interface Facts {
+  d: Dataset;
+  masked: boolean;
+  scope: string;
+  /** Nameable leaves from the tool-shaped groups, biggest first. Vouched, and item names
+   *  only -- never a child, which for a shell row is the full command line the reader ran. */
+  tools: CostNode[];
+  /** The shell half of the same list: programs, biggest first. */
+  progs: CostNode[];
+  typed: CostNode | null;
+  /** How many times the model's prose was re-billed as input for every dollar spent
+   *  generating it. 0 when there is no prose either side to compare. */
+  carry: number;
+  amt: (cost: number) => string;
+  outOf: (cost: number) => string;
+  /** Whether a figure survives being formatted. Both lenses round, and a real line item can
+   *  round to `$0.00` or `0%` on a single session -- which is true, and says nothing. A
+   *  caption built on one reads as broken rather than as cheap, so the variants that would
+   *  quote it stand aside instead. Asked of the formatted string rather than of a threshold,
+   *  so it cannot drift away from whatever `amt` actually prints. */
+  sayable: (cost: number) => boolean;
+}
+
+function factsOf(d: Dataset, pctOnly: boolean): Facts {
+  const amt = (cost: number): string => pctOnly ? share(cost, d.total) : money(cost);
+  const sayable = (cost: number): boolean => /[1-9]/.test(amt(cost));
+
+  const leaves = (...ids: GroupId[]): CostNode[] =>
+    d.groups.filter(g => ids.includes(g.id))
+      .flatMap(g => (g.items as CostNode[]).filter(n => vouched(g.id, n.name)))
+      .filter(n => sayable(n.cost))
+      .sort((a, b) => b.cost - a.cost);
+
+  const { proseGen, proseCarry } = d.insights;
+  return {
+    d,
+    masked: pctOnly,
+    scope: d.days ? `${d.days} day${d.days === 1 ? "" : "s"}`
+                  : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`,
+    tools: leaves("shell", "ingest", "emit", "twoway"),
+    progs: leaves("shell"),
+    typed: d.groups.find(g => g.id === "typed") as CostNode | undefined || null,
+    carry: proseGen > 0 && proseCarry > 0 ? proseCarry / proseGen : 0,
+    amt,
+    sayable,
+    outOf: (cost) => pctOnly ? `${share(cost, d.total)} of it`
+                             : `${money(cost)} of ${money(d.total)}`,
+  };
+}
+
+/** One caption: the body, and the verb that introduces the link.
+ *
+ *  `lines` is ordered by what has to survive. The first is the hook, which is what X shows
+ *  before the fold and is never cut; anything after it is dropped from the end until the
+ *  post fits, because a trailing claim is the one part the image already makes on its own.
+ *  The link is never a candidate -- an invitation that got truncated is just a boast. */
+interface Draft {
+  lines: string[];
+  cta: string;
+}
+
+/** The variants, each returning null when the data cannot support it honestly rather than
+ *  printing a hole. They open with a question because a question gets answered: a reply
+ *  costs the reader nothing and carries a post further than a like does.
+ *
+ *  What is being posted either way is one developer's own working week -- what their tools
+ *  pulled in, what the model thought about, what they typed. The picture is the evidence
+ *  and carries the figures; the text gets the one number worth stopping on and the ask. */
+const VARIANTS: ((f: Facts) => Draft | null)[] = [
+  /* A. The tool question. Viable whenever anything tool-shaped cost money, which is every
+        transcript that ran a single command -- so this is the general case, and it names a
+        leaf rather than a group because "shell commands, 32%" is a category and "git, $334"
+        is a punchline. */
+  (f) => {
+    const [a, b] = f.tools;
+    if (!a) return null;
+    /* Covered, the scope has nowhere good to sit: "12% of it over 31 days" reads as a rate
+       rather than as a share of one bill, and the image carries the span anyway. */
+    const mine = f.masked ? `Mine's ${a.name}, at ${f.amt(a.cost)} of the bill.`
+                          : `Mine's ${a.name}, at ${f.outOf(a.cost)} over ${f.scope}.`;
+    return {
+      lines: [
+        "What's the most expensive tool on your Claude Code bill?",
+        b ? `${mine} Second was ${b.name}, at ${f.amt(b.cost)}.` : mine,
+      ],
+      cta: "Find yours",
+    };
+  },
+
+  /* B. The commands nobody prices. The escalation is the joke, so it wants two names at
+        least; with one it is just a number, which variant A already tells better. */
+  (f) => {
+    if (f.progs.length < 2) return null;
+    const [a, ...rest] = f.progs.slice(0, 3);
+    return {
+      lines: [
+        `Guess what ${a.name} costs you in Claude Code.`,
+        (f.masked ? `Mine was ${f.amt(a.cost)} of my bill. `
+                  : `Mine was ${f.amt(a.cost)} over ${f.scope}. `)
+          + rest.map(n => `${n.name} was ${f.amt(n.cost)}.`).join(" "),
+        "Every command's output sits in your context and gets re-billed on every turn after it.",
+      ],
+      cta: "Yours",
+    };
+  },
+
+  /* C. The agent framing, and the one that is always viable: it asks nothing of the shape
+        of the tree, so there is never a dataset with no caption to pick. */
+  (f) => ({
+    lines: [
+      "What's your AI agent actually costing you?",
+      `Mine: ${f.masked || !f.sayable(f.d.total) ? "" : `${money(f.d.total)} over `}`
+        + `${f.scope} and ${count(f.d.requests)} requests.`
+        + (f.typed && /[1-9]/.test(share(f.typed.cost, f.d.total))
+            ? ` I typed ${share(f.typed.cost, f.d.total)} of it.` : ""),
+    ],
+    cta: "Itemise yours",
+  }),
+
+  /* D. The self-own. It needs the reader's typing to actually be the small number -- on a
+        transcript where they did most of the talking the line is true but no longer funny,
+        and a joke that lands wrong reads as a lie about the chart underneath it. */
+  (f) => {
+    if (!f.typed || !f.sayable(f.typed.cost) || pctOf(f.typed.cost, f.d.total) >= 5) return null;
+    return {
+      lines: [
+        "Quick — what's the biggest line on your Claude Code bill?",
+        `It isn't what you type. That was ${f.outOf(f.typed.cost)}.`,
+        "The rest is rent on context you never see.",
+      ],
+      cta: "See yours",
+    };
+  },
+
+  /* E. Generation against carry, which is this page's whole thesis in one ratio. Below 2×
+        there is no reframe to offer, so it stands aside for one of the others. */
+  (f) => {
+    if (f.carry < 2) return null;
+    const { proseGen, proseCarry } = f.d.insights;
+    const times = `${f.carry.toFixed(0)}×`;
+    return {
+      lines: [
+        "Which costs more in Claude Code: what the model writes, or what it re-reads?",
+        f.masked || !f.sayable(proseGen)
+          ? `Mine: re-reading its own prose cost ${times} what writing it did.`
+          : `Mine: ${money(proseGen)} to write. ${money(proseCarry)} to re-read the same `
+            + `prose on later turns. ${times}.`,
+      ],
+      cta: "Check yours",
+    };
+  },
+
+  /* F. The receipt: a statement where the others ask, so the rotation is not five questions
+        in a trench coat. It is the only one that names a group rather than a leaf, which
+        makes it the answer for a transcript that ran no tools at all -- and the number leads,
+        because a digit in the first column survives every preview crop X applies. */
+  (f) => {
+    const top = f.d.groups[0];
+    if (!top || !(f.d.total > 0)) return null;
+    const heading = SAID[top.id] || top.name.toLowerCase();
+    const said = heading.length > 44 ? heading.slice(0, 43).trimEnd() + "…" : heading;
+    return {
+      lines: [
+        f.masked || !f.sayable(f.d.total)
+          ? `Itemised ${f.scope} of my Claude Code bill.`
+          : `${money(f.d.total)} of Claude Code over ${f.scope}, itemised.`,
+        `Biggest line: ${said}, ${share(top.cost, f.d.total)} of it.`,
+        "You don't pay for what the model writes — you pay rent on your context.",
+      ],
+      cta: "Show me yours",
+    };
+  },
+];
+
+/** A draft as the composer will receive it, trimmed to fit.
+ *
+ *  `home` is where a reader can run their own, and is dropped when there is nowhere to point
+ *  -- a page opened from disk has an address that means nothing to anyone else, so it gets
+ *  no link rather than a dead one, and the call to action goes with it. */
+function assemble(draft: Draft, home?: string | null): string {
+  const link = home ? [`${draft.cta}: ${home}`] : [];
+  for (let keep = draft.lines.length; keep > 1; keep--) {
+    const out = [...draft.lines.slice(0, keep), ...link].join("\n\n");
+    if (postLength(out) <= POST_MAX) return out;
+  }
+  /* Nothing left to drop: the hook itself is over the ceiling, which takes a leaf name long
+     enough that no sentence built around it would have fitted. Cut the name, not the link. */
+  const [hook] = draft.lines;
+  const room = POST_MAX - (link.length ? postLength(link[0]) + 2 : 0);
+  return [hook.slice(0, Math.max(0, room - 1)).trimEnd() + "…", ...link].join("\n\n");
+}
+
+/** Every caption this dataset can honestly carry, in a stable order. Exported so the tests
+ *  can hold all of them to the ceiling and to the mask, rather than whichever one a random
+ *  draw happened to return. */
+export function postVariants(d: Dataset, pctOnly: boolean, home?: string | null): string[] {
+  const f = factsOf(d, pctOnly);
+  return VARIANTS.map(v => v(f)).filter((x): x is Draft => x !== null)
+    .map(draft => assemble(draft, home));
+}
+
+/** The caption that travels with the shared image, drawn at random from the ones this
+ *  dataset supports.
+ *
+ *  Random because the post is meant to spread, and a timeline that has seen the same
+ *  sentence four times stops reading it -- the variant is the difference between a format
+ *  and a template. `pick` is a fraction of the way through the list, taken as an argument so
+ *  that this file stays as testable as the rest of it: nothing else here needs a seed, and a
+ *  function that reaches for `Math.random` on its own cannot be asserted about. */
+export function postText(d: Dataset, pctOnly: boolean, home?: string | null,
+                         pick: number = Math.random()): string {
+  const all = postVariants(d, pctOnly, home);
+  const i = Math.min(all.length - 1, Math.max(0, Math.floor(pick * all.length)));
+  return all[i];
 }

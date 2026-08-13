@@ -15,12 +15,18 @@ export function readDir(dir: string): RawFile[] {
 }
 
 /** A corpus with enough shape to reach every view: several groups, shell programs that
- *  take subcommands, files of more than one extension, a harness tag, and typed text. */
+ *  take subcommands, files of more than one extension, a harness tag, and typed text.
+ *
+ *  `acme-deploy` and the `acmeinternal` MCP server are here to stand for the names a caption
+ *  must never say out loud -- an in-house CLI and a server named after somebody's employer.
+ *  They are also the most expensive things in the corpus, so a caption that names leaves by
+ *  cost alone reaches for one of them first, and the suite catches it. */
 export function synthetic(): RawFile[] {
   const L: string[] = [];
   const progs: Array<[string, string[]]> = [
     ["git", ["diff", "log", "status", "commit"]],
     ["docker", ["build", "run", "ps"]],
+    ["acme-deploy", ["push", "rollback", "status"]],
   ];
   for (let k = 0; k < 30; k++) {
     const [prog, verbs] = progs[k % progs.length];
@@ -32,7 +38,8 @@ export function synthetic(): RawFile[] {
                 { type: "tool_use", id: "b" + k, name: "Bash",
                   input: { command: `${prog} ${verbs[k % verbs.length]} --flag` } }] } }));
     L.push(JSON.stringify({ sessionId: "s", message: { role: "user", content: [
-      { type: "tool_result", tool_use_id: "b" + k, content: "output line ".repeat(400) }] } }));
+      { type: "tool_result", tool_use_id: "b" + k,
+        content: "output line ".repeat(prog === "acme-deploy" ? 1100 : 400) }] } }));
     L.push(JSON.stringify({ sessionId: "s", timestamp: "2026-05-01T00:00:00Z", message: {
       role: "assistant", model: "claude-opus-5", usage: { input_tokens: 4,
         cache_read_input_tokens: 12000 + k * 800, cache_creation_input_tokens: 300, output_tokens: 200,
@@ -41,6 +48,14 @@ export function synthetic(): RawFile[] {
                   input: { file_path: `/a/b${k}.${["ts", "py", "md"][k % 3]}` } }] } }));
     L.push(JSON.stringify({ sessionId: "s", message: { role: "user", content: [
       { type: "tool_result", tool_use_id: "r" + k, content: "source ".repeat(600) }] } }));
+    L.push(JSON.stringify({ sessionId: "s", timestamp: "2026-05-01T00:00:00Z", message: {
+      role: "assistant", model: "claude-opus-5", usage: { input_tokens: 4,
+        cache_read_input_tokens: 15000 + k * 800, cache_creation_input_tokens: 300, output_tokens: 120,
+        cache_creation: { ephemeral_1h_input_tokens: 300, ephemeral_5m_input_tokens: 0 } },
+      content: [{ type: "tool_use", id: "m" + k, name: "mcp__acmeinternal__fetch_ledger",
+                  input: { query: `entry ${k}` } }] } }));
+    L.push(JSON.stringify({ sessionId: "s", message: { role: "user", content: [
+      { type: "tool_result", tool_use_id: "m" + k, content: "ledger row ".repeat(1400) }] } }));
     L.push(JSON.stringify({ sessionId: "s", message: { role: "user", content: [
       { type: "text", text: "<system-reminder>reminder body ".repeat(20) + "</system-reminder>" },
       { type: "text", text: "carry on please" }] } }));

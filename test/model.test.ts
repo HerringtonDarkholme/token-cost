@@ -10,8 +10,8 @@
 
 import { analyze, type Dataset } from "../engine.ts";
 import {
-  fold, focusOf, kidsOf, ledger, palette, postLength, postText, POST_MAX, rowIsOpen, sunburst,
-  SUN_RINGS, type CostNode,
+  fold, focusOf, kidsOf, ledger, palette, postLength, postText, postVariants, POST_MAX,
+  rowIsOpen, sunburst, SUN_RINGS, vouched, type CostNode,
 } from "../model.ts";
 import { corpus } from "./fixture.ts";
 
@@ -170,20 +170,43 @@ ok(rowIsOpen({}, "k›0", 0) === true, "top-level rows default open");
 ok(rowIsOpen({}, "k›1", 1) === false, "deeper rows default closed");
 ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle overrides the default");
 
-/* 9. The caption that goes out with the shared image: it has to fit a post, and it has to
-      keep the reader's covered amounts covered -- publishing a total someone hid to share
-      their screen would be the worst kind of leak this page could have. */
+/* 9. The captions that go out with the shared image. One is drawn at random per share, so
+      every claim below is made about all of them: a variant that only sometimes fits, or
+      only sometimes honours the mask, is a bug that only sometimes shows up. Publishing a
+      total someone covered to share their screen would be the worst leak this page has. */
 {
   const dd = data.datasets["1h"];
   const home = "https://a-fairly-long-deployment-name.example.vercel.app/";
-  const open = postText(dd, false, home), masked = postText(dd, true, home);
-  ok(postLength(open) <= POST_MAX && postLength(masked) <= POST_MAX,
-     `the caption fits a post (${postLength(open)}/${postLength(masked)} of ${POST_MAX})`);
-  ok(!/undefined|NaN/.test(open + masked), "the caption has no formatting holes");
-  ok(!masked.includes("$"), "covering the amounts keeps money out of the caption");
-  ok(open.endsWith(home), "the invitation survives whatever else has to be cut");
-  ok(!postText(dd, false).includes("Show me yours"),
+  const open = postVariants(dd, false, home), masked = postVariants(dd, true, home);
+  const both = [...open, ...masked];
+
+  ok(open.length > 0 && masked.length > 0,
+     `every dataset yields a caption (${open.length} open / ${masked.length} masked)`);
+  ok(both.every(s => postLength(s) <= POST_MAX),
+     `every caption fits a post (longest ${Math.max(...both.map(postLength))} of ${POST_MAX})`);
+  ok(!both.some(s => /undefined|NaN|\$0\.00|\b0(\.0)?%/.test(s)),
+     "no caption has a hole, or quotes a figure that rounded away to nothing");
+  ok(!masked.some(s => s.includes("$")), "covering the amounts keeps money out of every caption");
+  ok(open.every(s => s.endsWith(home)), "the invitation survives whatever else has to be cut");
+  ok(!postVariants(dd, false).some(s => /yours|https?:/i.test(s)),
      "with nowhere to point, the invitation is dropped rather than left dangling");
+
+  /* A caption may name a leaf, and a leaf name is the reader's own shell history: an
+     internal CLI or a deploy script with a hostname in it. Only the programs the allowlist
+     vouches for may be said out loud -- everything else charts, counts, and stays unnamed.
+     The allowlist itself is the subject here, so the assertion reads it rather than
+     restating it; a copy would only drift and start vouching for the wrong thing. */
+  const unvouched = dd.groups
+    .filter(g => ["shell", "ingest", "emit", "twoway"].includes(g.id))
+    .flatMap(g => g.items.filter(i => !vouched(g.id, i.name)));
+  ok(unvouched.length > 0, `the corpus contains names that may not be posted (${unvouched.length})`);
+  ok(!unvouched.some(i => both.some(s => s.includes(i.name))),
+     `an in-house CLI or MCP server is charted but never posted (${unvouched.map(i => i.name).join(", ")})`);
+
+  /* The draw only ever lands on a caption that was built, for any fraction including the
+     endpoints -- an out-of-range index here would ship `undefined` into the composer. */
+  ok([0, 0.25, 0.5, 0.999, 1].every(p => open.includes(postText(dd, false, home, p))),
+     "the random draw always lands on one of the built captions");
 }
 
 console.log(fails ? `\n${fails} MODEL FAILURE(S)` : "\nmodel clean");
