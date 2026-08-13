@@ -167,23 +167,37 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
         void onDrop(e)
       }}
     >
+      {/* Three bands, standing where the report's three stand: the lede on the strip's line, the
+          invitation on the picture's, the privacy note on the rule that closes the card. */}
       <p className="lede">
         Drop in your Claude Code transcripts to itemise every dollar down to the subcommand. Billing
         is per request and each request re-bills the whole context, so what you get back is{" "}
         <strong>carry cost</strong> — what each source cost across every request it survived in, not
         its face value.
       </p>
-      <h2>
-        Drop <code>.jsonl</code> transcripts here
-      </h2>
-      <p>Or pick a whole project folder. Multiple files are combined into one report.</p>
-      <div className="picks">
-        <button className="btn primary" type="button" onClick={() => filePicker.current?.click()}>
-          Choose files
-        </button>
-        <button className="btn" type="button" onClick={() => dirPicker.current?.click()}>
-          Choose folder
-        </button>
+      <div className="invite">
+        <h2>
+          Drop <code>.jsonl</code> transcripts here
+        </h2>
+        <p>Or pick a whole project folder. Multiple files are combined into one report.</p>
+        <div className="picks">
+          <button className="btn primary" type="button" onClick={() => filePicker.current?.click()}>
+            Choose files
+          </button>
+          <button className="btn" type="button" onClick={() => dirPicker.current?.click()}>
+            Choose folder
+          </button>
+        </div>
+        <div className="status" data-err={status?.err ? "1" : "0"}>
+          {status?.node}
+        </div>
+        {names ? (
+          <div className="filelist">
+            {names.map((n) => (
+              <div key={n}>{n}</div>
+            ))}
+          </div>
+        ) : null}
       </div>
       <input
         ref={filePicker}
@@ -207,73 +221,69 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
         }}
       />
       <p className="privacy">Parsed in this page · nothing is uploaded</p>
-      <div className="status" data-err={status?.err ? "1" : "0"}>
-        {status?.node}
-      </div>
-      {names ? (
-        <div className="filelist">
-          {names.map((n) => (
-            <div key={n}>{n}</div>
-          ))}
-        </div>
-      ) : null}
     </div>
   )
 }
 
-/** The help that stands under the empty card, where the breakdown stands under a full one.
- *  It is the one block with no counterpart in the report, which is why it is here rather than
- *  something the report's own footnotes grow out of. */
+/** The help that stands under the empty card, where the breakdown and the footnotes stand under
+ *  a full one -- so it holds the same ground: two columns on the same rule, across the width of
+ *  the shell. It is the one block with no counterpart in the report, which is why it is here
+ *  rather than something the report's own footnotes grow out of. */
 export function Where(): React.JSX.Element {
   return (
     <div className="where">
-      <p className="whead">
-        <strong>Where your transcripts live</strong>
-      </p>
-      <p>
-        One <code>.jsonl</code> file per session, in one folder per project, under
-        <code>~/.claude/projects/</code>.
-      </p>
-
-      <p className="whead">
-        <strong>Getting there — the folder is hidden</strong>
-      </p>
-      <p>
-        <code>.claude</code> starts with a dot, so file pickers hide it by default. It is still
-        reachable; you just have to ask for it by name.
-      </p>
-      <ul className="steps">
-        <li>
-          <b>macOS</b> — click <em>Choose folder</em> above, then in the Finder dialog press{" "}
-          <kbd>⇧</kbd>
-          <kbd>⌘</kbd>
-          <kbd>G</kbd>, paste <code>~/.claude/projects</code>, hit <kbd>return</kbd>, and pick a
-          project folder.
-          <span className="alt">
+      <div>
+        <p className="whead">
+          <strong>Where your transcripts live</strong>
+        </p>
+        <p>
+          One <code>.jsonl</code> file per session, in one folder per project, under{" "}
+          <code>~/.claude/projects/</code>.
+        </p>
+        <p className="whead">
+          <strong>Prefer the terminal?</strong>
+        </p>
+        <p>
+          Open the folder in your file manager, then drag a project onto the card above:{" "}
+          <code>open ~/.claude/projects</code>
+        </p>
+        <p>
+          Largest projects first: <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
+        </p>
+      </div>
+      <div>
+        <p className="whead">
+          <strong>Getting there — the folder is hidden</strong>
+        </p>
+        <p>
+          <code>.claude</code> starts with a dot, so file pickers hide it by default. It is still
+          reachable; you just have to ask for it by name.
+        </p>
+        <ul className="steps">
+          <li>
+            <b>macOS</b> — click <em>Choose folder</em> above, then in the Finder dialog press{" "}
             <kbd>⇧</kbd>
             <kbd>⌘</kbd>
-            <kbd>.</kbd> also toggles hidden files into view, in the dialog and in Finder.
-          </span>
-        </li>
-        <li>
-          <b>Windows</b> — type <code>%USERPROFILE%\.claude\projects</code> into the dialog&apos;s{" "}
-          <em>File name</em> box and press <kbd>Enter</kbd>.
-        </li>
-        <li>
-          <b>Linux</b> — press <kbd>Ctrl</kbd>
-          <kbd>L</kbd> in the GTK dialog and type <code>~/.claude/projects</code>, or{" "}
-          <kbd>Ctrl</kbd>
-          <kbd>H</kbd> to show hidden files.
-        </li>
-      </ul>
-      <p>
-        Prefer the terminal? Open the folder in your file manager, then drag a project onto the card
-        above:
-      </p>
-      <p>
-        <code>open ~/.claude/projects</code> &nbsp;·&nbsp; largest projects first:{" "}
-        <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
-      </p>
+            <kbd>G</kbd>, paste <code>~/.claude/projects</code>, hit <kbd>return</kbd>, and pick a
+            project folder.
+            <span className="alt">
+              <kbd>⇧</kbd>
+              <kbd>⌘</kbd>
+              <kbd>.</kbd> also toggles hidden files into view, in the dialog and in Finder.
+            </span>
+          </li>
+          <li>
+            <b>Windows</b> — type <code>%USERPROFILE%\.claude\projects</code> into the dialog&apos;s{" "}
+            <em>File name</em> box and press <kbd>Enter</kbd>.
+          </li>
+          <li>
+            <b>Linux</b> — press <kbd>Ctrl</kbd>
+            <kbd>L</kbd> in the GTK dialog and type <code>~/.claude/projects</code>, or{" "}
+            <kbd>Ctrl</kbd>
+            <kbd>H</kbd> to show hidden files.
+          </li>
+        </ul>
+      </div>
     </div>
   )
 }

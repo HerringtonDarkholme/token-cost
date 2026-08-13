@@ -118,10 +118,18 @@ button {
   height: 9px;
   background: repeating-linear-gradient(to right, var(--rule) 0 1px, transparent 1px 9px);
 }
+/* An action rather than a lens, so it is words on the paper with a rule under them rather than
+   a button in a box.
+
+   The padding is symmetric about the text on purpose, and that is the whole of why the row
+   lines up: the rule and its 2px of clearance sit *below* the words, so a box with nothing
+   above them centres 1.5px high -- and the boxed controls beside it, whose own padding is even,
+   centre their words exactly on the row's middle. Two boxes that are symmetric about their text
+   put their text in the same place; one that is not cannot. */
 .linkish {
   background: none;
   border: 0;
-  padding: 0 0 2px;
+  padding: 3px 0 2px;
   cursor: pointer;
   font-family: var(--mono);
   font-size: 10.5px;
@@ -216,8 +224,14 @@ button {
    which is a wide band, and a disc in a wide band comes out small, so the sunburst gets
    4/3 instead. Either way the frame is a shape that posts well rather than whatever height
    the content happened to want. */
+/* `width` is pinned rather than left to `auto`, and that is load-bearing: a ratio plus a floor
+   resolves in either direction, so a card whose height is being held at 600px by `min-height`
+   will happily work *back* to a width of 600 × 16/9 = 1067px and hang out of a narrower column.
+   Between the 820px breakpoint and about 1090px, that is every window. A definite width leaves
+   the ratio only one thing left to compute. */
 .card {
   position: relative;
+  width: 100%;
   aspect-ratio: 16/9;
   min-height: 600px;
   display: flex;
@@ -230,17 +244,14 @@ button {
   aspect-ratio: 4/3;
 }
 /* The empty face. The frame is the drop target itself, so the invitation is this border going
-   dashed rather than a second box drawn inside the first.
-
-   A letterbox rather than the report's own 16/9, for two reasons that turn out to be the same
-   one: a frame sized for a chart, holding two sentences and two buttons, is two thirds empty --
-   and a card that *grows* into the report says something a card that merely refills does not.
-   `aspect-ratio` interpolates, so the growth is the tween. See `.t-resize`.
+   dashed rather than a second box drawn inside the first -- and the shape is the report's own
+   shape, so dropping a file changes what is in the box without changing the box at all.
+   A letterbox was tried here, on the theory that a frame sized for a chart is too tall to hold
+   two sentences and two buttons; the answer is to use the height (see `.dropzone`) rather than
+   to take it away, because the frame not moving is the strongest thing the turn has.
    A border *style* does not interpolate, but that swap lands in the beat when the card is
    empty, with the outgoing contents gone and the incoming ones not yet arrived. */
 .card[data-face="empty"] {
-  aspect-ratio: 24/9;
-  min-height: 380px;
   border-style: dashed;
 }
 /* Lit from the zone inside it, because the frame the reader is aiming at is the frame that
@@ -1118,29 +1129,46 @@ tfoot .n {
     max-height: none;
   }
 }
-/* The empty face's contents, centred in the whole interior of the card: the frame is the drop
+/* The empty face's contents, filling the whole interior of the card: the frame is the drop
    target, so the target has to be the frame's inside rather than a panel sitting in the middle
-   of it. `flex: 1` is the same claim the chart makes on the same space. */
+   of it. `flex: 1` is the same claim the chart makes on the same space.
+
+   And the same three bands the report puts in it, which is the point: the lede stands where the
+   thesis strip stands, the invitation stands where the picture stands, and the privacy line
+   stands on the rule where the chart switch stands. A frame this tall centring one small cluster
+   is a frame that looks empty; the same height read as a layout does not. */
 .dropzone {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
+  justify-content: space-between;
+  gap: 20px;
   text-align: center;
-  padding: 16px 0;
+  padding: 18px 0 0;
   transition: background var(--duration-quick) var(--ease-out);
 }
 .dropzone[data-over="1"] {
   background: var(--accent-soft);
 }
+/* The middle band takes the slack, so the invitation sits on the card's centre line whatever
+   the window has done to the two bands around it. */
+.invite {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+}
 .dropzone h2 {
-  font-size: 21px;
+  font-size: clamp(21px, 2.4vw, 27px);
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.018em;
 }
 .dropzone p {
   color: var(--ink2);
@@ -1173,14 +1201,19 @@ tfoot .n {
   color: var(--paper);
   border-color: var(--ink);
 }
+/* On a rule across the foot of the card, where the report draws one under its chart: the same
+   band, so the two faces close the same way. */
 .privacy {
   display: flex;
   gap: 9px;
-  align-items: flex-start;
+  align-items: center;
   font-size: 11.5px;
   color: var(--ink3);
   justify-content: center;
   font-family: var(--mono);
+  width: 100%;
+  border-top: 1px solid var(--hair);
+  padding: 10px 0;
 }
 .status {
   font-size: 13px;
@@ -1204,16 +1237,28 @@ tfoot .n {
   padding: 8px 10px;
   background: var(--panel);
 }
+/* Two columns on the same rule the report's footnotes sit on, and the full width of the shell:
+   this is what stands under the empty card, so it holds the same ground the breakdown and the
+   footnotes hold under a full one. A single measure-wide column left the page half empty and
+   read as something that had failed to lay out. */
 .where {
-  margin-top: 22px;
-  padding-top: 18px;
+  margin-top: 34px;
+  padding-top: 16px;
   border-top: 1px solid var(--rule);
   font-size: 13px;
   color: var(--ink2);
+  display: grid;
+  /* Two columns that fold to one on their own, rather than at the narrow-window breakpoint:
+     every rule for the empty face is written below that block, so an override in it would be
+     overridden right back. `min()` is what keeps the fold from overflowing a phone. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 60ch), 1fr));
+  gap: 8px 24px;
+}
+.where > div {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: 74ch;
+  max-width: 62ch;
 }
 .where p {
   margin: 0;
@@ -1570,17 +1615,14 @@ kbd {
   }
 }
 
-/* Card resize — the frame, which is a different shape for each chart, and a shorter
-   one again before there is a chart at all. Its size is set by `aspect-ratio` and a
-   floor rather than by a length, so both are enumerated alongside the snippet's own
-   two: a browser that interpolates ratios tweens the frame, and one that does not
-   lands on the jump it makes today. The floor is what binds on a narrow window,
-   where the ratio has been dropped for content height. */
+/* Card resize — the frame, which is a different shape for each chart. Its size is
+   set by `aspect-ratio` rather than by a length, so that property is enumerated
+   alongside the snippet's own two: a browser that interpolates ratios tweens the
+   frame, and one that does not lands on the jump it makes today. */
 .t-resize {
   transition:
     width var(--resize-dur) var(--resize-ease),
     height var(--resize-dur) var(--resize-ease),
-    min-height var(--resize-dur) var(--resize-ease),
     aspect-ratio var(--resize-dur) var(--resize-ease);
   will-change: width, height;
 }

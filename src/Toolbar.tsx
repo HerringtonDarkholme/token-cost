@@ -165,6 +165,11 @@ function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
  *  from that anchor. They leave together and faster, because a dismissal does not need
  *  choreography.
  *
+ *  Within that, the boxed controls are contiguous and the two bare-text ones lead. Reset began
+ *  life at the head of the row, which put a box to the left of "Copy chart" and "Share to X" and
+ *  left the pair marooned between frames, reading as a row that had failed to line up. Order is
+ *  what fixes that, not sizes: text, text, then every box in one run ending on the anchor.
+ *
  *  Nothing here reads the analysis: every one of these is a lens on the view state, which
  *  exists before the data does. That is what lets one toolbar serve both faces of the card
  *  instead of a stripped-down copy for the empty one.
@@ -192,13 +197,13 @@ export function Toolbar({
       {report ? (
         <>
           <span className="t-grow" data-i="4">
-            <ResetButton onReset={onReset} />
-          </span>
-          <span className="t-grow" data-i="3">
             <CopyChartButton />
           </span>
-          <span className="t-grow" data-i="2">
+          <span className="t-grow" data-i="3">
             <ShareButton />
+          </span>
+          <span className="t-grow" data-i="2">
+            <ResetButton onReset={onReset} />
           </span>
           <span className="t-grow" data-i="1">
             <span className="seg t-tt-host">
