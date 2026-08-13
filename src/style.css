@@ -1215,8 +1215,11 @@ tfoot .n {
   max-width: 58ch;
   text-align: center;
   /* The step from the ask to the help: on top of the band's own 18, so the button and the note
-     under it are two things rather than one stack of four evenly spaced rows. */
-  margin: 16px 0 0;
+     under it are two things rather than one stack of four evenly spaced rows. The 32 rather
+     than 16 is the platform hint's doing -- it opens upward into this gap (see below), and the
+     hint is a black chip opening under a black button: at the 3px the smaller gap left, the two
+     read as one shape rather than as a hint above a control. */
+  margin: 32px 0 0;
 }
 .howhead {
   display: flex;
@@ -1259,6 +1262,17 @@ tfoot .n {
 .osbtn:focus-visible {
   color: var(--ink);
   border-color: var(--rule);
+}
+/* This one hint opens *upward*. Everywhere else a tip hangs below its control, which is right in
+   the toolbar -- the bar is the first thing on the page, so downward is the only way that stays
+   on screen. Here the thing directly below the control is the instruction the control chooses,
+   and a hint that covers it answers a question by hiding the answer. Above it is the gap to the
+   button, which holds nothing. It still hangs from the right edge, so it can only ever grow
+   leftward into the card and never off it. */
+.howto .t-tt {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform-origin: 100% 100%;
 }
 .osname {
   min-width: 7ch;
@@ -1533,13 +1547,17 @@ kbd {
   --grow-blur: var(--blur-small);
   --grow-ease: var(--ease-smooth-out);
 
-  /* Tooltip open / close. The scale names an 80ms tooltip delay and a 150ms appear, so those
-     two come off it; the 50ms disappear has no usage on the scale and stays literal, which is
-     the point of it -- a hint that waits before arriving must not wait before leaving. The
-     chip is ink on paper inverted, the same treatment the pressed pill gets. */
+  /* Tooltip open / close. The 150ms appear comes off the scale; the 50ms disappear has no usage
+     on the scale and stays literal, which is the point of it -- a hint that waits before
+     arriving must not wait before leaving. The chip is ink on paper inverted, the same
+     treatment the pressed pill gets.
+     The wait is the one departure from the scale, which names 80ms for this. 80ms is not a
+     wait, it is a frame and a half: every control the pointer crossed on its way somewhere else
+     put a black chip on the page, and a row of small controls is a thing pointers cross
+     constantly. 320ms is long enough that only pointers which *stopped* are answered. */
   --tt-in-dur: var(--duration-quick);
   --tt-out-dur: 50ms;
-  --tt-delay: var(--duration-micro);
+  --tt-delay: 320ms;
   --tt-scale: var(--scale-small);
   --tt-in-ease: var(--ease-out);
   --tt-out-ease: var(--ease-out);
