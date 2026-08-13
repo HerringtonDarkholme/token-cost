@@ -10,7 +10,8 @@
 
 import { analyze, type Dataset } from "../engine.ts";
 import {
-  fold, focusOf, kidsOf, ledger, palette, rowIsOpen, sunburst, SUN_RINGS, type CostNode,
+  fold, focusOf, kidsOf, ledger, palette, postText, POST_MAX, rowIsOpen, sunburst, SUN_RINGS,
+  type CostNode,
 } from "../model.ts";
 import { corpus } from "./fixture.ts";
 
@@ -168,6 +169,18 @@ for (const ttl of ["1h", "5m"] as const) {
 ok(rowIsOpen({}, "k›0", 0) === true, "top-level rows default open");
 ok(rowIsOpen({}, "k›1", 1) === false, "deeper rows default closed");
 ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle overrides the default");
+
+/* 9. The caption that goes out with the shared image: it has to fit a post, and it has to
+      keep the reader's covered amounts covered -- publishing a total someone hid to share
+      their screen would be the worst kind of leak this page could have. */
+{
+  const dd = data.datasets["1h"];
+  const open = postText(dd, false), masked = postText(dd, true);
+  ok(open.length <= POST_MAX && masked.length <= POST_MAX,
+     `the caption fits a post (${open.length}/${masked.length} chars)`);
+  ok(!/undefined|NaN/.test(open + masked), "the caption has no formatting holes");
+  ok(!masked.includes("$"), "covering the amounts keeps money out of the caption");
+}
 
 console.log(fails ? `\n${fails} MODEL FAILURE(S)` : "\nmodel clean");
 process.exit(fails ? 1 : 0);

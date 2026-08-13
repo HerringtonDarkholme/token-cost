@@ -33,6 +33,8 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
 .linkish{background:none;border:0;padding:0 0 2px;cursor:pointer;font-family:var(--mono);font-size:10.5px;
   letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;color:var(--ink2);border-bottom:1px solid var(--rule)}
 .linkish[data-on="1"]{color:var(--accent);border-bottom-color:var(--accent)}
+.linkish:disabled{cursor:progress;color:var(--ink3)}
+.xicon{width:9px;height:9px;fill:currentColor;margin-right:6px}
 .seg{display:flex;border:1px solid var(--rule);background:var(--panel)}
 .seg button{padding:5px 11px;font-size:11px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;
   white-space:nowrap;border:0;cursor:pointer;background:transparent;color:var(--ink2)}

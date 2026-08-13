@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useReport } from "./context.ts";
 import { summaryText } from "./model.ts";
+import { ShareButton } from "./Share.tsx";
 import { setState, type ThemeChoice } from "./store.ts";
 
 /** A momentary "done" state that reverts itself, with the timer cancelled on unmount --
@@ -81,6 +82,7 @@ export function Toolbar({ onReset }: { onReset: () => void }): React.JSX.Element
         onClick={() => { copy(summaryText(d, state.pctOnly, amt)); flashCopy(); }}>
         {copied ? "Summary copied" : "Copy summary"}
       </button>
+      <ShareButton />
       <span className="seg">
         <MaskToggle on={state.pctOnly} />
       </span>

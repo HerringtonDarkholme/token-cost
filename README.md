@@ -221,6 +221,8 @@ file tool under any name gets the same treatment.
 | `Panels.tsx` | the same data ranked and labelled instead of packed |
 | `Ledger.tsx` | the table, where identity does not rest on colour |
 | `Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy link, copy summary |
+| `Share.tsx` | share the chart on X: card → PNG on the clipboard (or on disk), composer opened with the caption |
+| `snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |
 | `style.css` | tokens and layout |
 | `vite.config.ts` | build: bundles and inlines everything into `cost-report.html`, and asserts it is self-contained |
 | `vitest.config.ts` | the render suite only — deliberately without the build plugins, so tests can never write the deliverable |

@@ -261,7 +261,7 @@ export function Report({ data, onReset }: {
               breadcrumb, which addresses one block inside it. */}
           <div className="cardfoot">
             <HoverBar />
-            <span className="seg">
+            <span className="seg" data-nosnap>
               <button type="button" aria-pressed={state.chart === "mosaic"}
                 onClick={() => setState({ chart: "mosaic" })}>Mosaic</button>
               <button type="button" aria-pressed={state.chart === "sun"}

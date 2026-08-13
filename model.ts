@@ -294,3 +294,27 @@ export function summaryText(d: Dataset, pctOnly: boolean, amt: (c: number) => st
     "Cost is carry cost: every token is re-billed on every request it survives.",
   ].join("\n");
 }
+
+/** How long a post can be before the composer starts refusing it. Nothing here is close to
+ *  it, but a line item is a name from someone else's transcript, so the ceiling is enforced
+ *  rather than assumed. */
+export const POST_MAX = 280;
+
+/** The caption that travels with the shared image. Deliberately short and free of figures
+ *  the picture already carries: the image is the evidence, the text is the claim.
+ *
+ *  It honours the masked lens for the same reason the header does -- a reader who covered
+ *  the dollars to share a screen has said they do not want the total published. */
+export function postText(d: Dataset, pctOnly: boolean): string {
+  const top = d.groups[0] || { name: "—", cost: 0 };
+  const name = top.name.length > 40 ? top.name.slice(0, 39).trimEnd() + "…" : top.name;
+  const scope = d.days ? `${d.days} day${d.days === 1 ? "" : "s"}`
+                       : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`;
+  const out = [
+    pctOnly ? `${scope} of Claude Code, itemised.`
+            : `${money(d.total)} of Claude Code across ${scope}, itemised.`,
+    `Biggest line: ${name}, ${pctOf(top.cost, d.total).toFixed(0)}% of the bill.`,
+    "It's a carry bill, not a usage bill — every request re-bills the whole context.",
+  ].join("\n\n");
+  return out.length > POST_MAX ? out.slice(0, POST_MAX - 1).trimEnd() + "…" : out;
+}
