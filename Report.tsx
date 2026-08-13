@@ -253,18 +253,21 @@ export function Report({ data, onReset }: {
                 ? "Every line item · arc = share of the ring inside it · each ring one level deeper"
                 : "Every line item · column width = share of bill · block height = share of column"}
             </span>
-            <div className="mosaicctl">
-              <Crumbs />
-              <span className="seg">
-                <button type="button" aria-pressed={state.chart === "mosaic"}
-                  onClick={() => setState({ chart: "mosaic" })}>Mosaic</button>
-                <button type="button" aria-pressed={state.chart === "sun"}
-                  onClick={() => setState({ chart: "sun" })}>Sunburst</button>
-              </span>
-            </div>
+            <Crumbs />
           </div>
           {state.chart === "sun" ? <Sunburst /> : <Mosaic />}
-          <HoverBar />
+          {/* The chart switch lives at the foot of the card, on the footnote's rule: it picks
+              the whole picture, so it sits below the picture rather than crowding the
+              breadcrumb, which addresses one block inside it. */}
+          <div className="cardfoot">
+            <HoverBar />
+            <span className="seg">
+              <button type="button" aria-pressed={state.chart === "mosaic"}
+                onClick={() => setState({ chart: "mosaic" })}>Mosaic</button>
+              <button type="button" aria-pressed={state.chart === "sun"}
+                onClick={() => setState({ chart: "sun" })}>Sunburst</button>
+            </span>
+          </div>
         </section>
         <Breakdown L={L} />
         <Footnotes />

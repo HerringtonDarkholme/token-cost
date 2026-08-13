@@ -76,7 +76,7 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
 .crumbs button{background:none;border:0;padding:2px 0;cursor:pointer;color:var(--ink2);border-bottom:1px solid var(--rule)}
 .crumbs button[data-cur="1"]{color:var(--ink);border-bottom-color:var(--ink)}
 .crumbs .sep{color:var(--ink3)}
-.mosaicctl{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end}
+.mosaichead .crumbs{justify-content:flex-end}
 .mosaicwrap{flex:1;min-height:0;overflow-x:auto;border-top:1px solid var(--hair)}
 .mosaic{display:flex;height:100%;min-width:860px}
 .col{display:flex;flex-direction:column;min-width:62px;border-right:1px solid var(--hair);transition:filter .16s}
@@ -93,7 +93,11 @@ button{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
 .colhead .cp{display:flex;justify-content:space-between;gap:5px;font-family:var(--mono);font-size:9.5px;
   color:var(--ink3);margin-top:1px}
 .colhead .cum80{color:var(--accent)}
-.hoverbar{display:flex;align-items:center;gap:9px;padding-top:9px;border-top:1px solid var(--ink);min-height:20px}
+/* Footnote and chart switch share one row on the closing rule, so the switch reads as
+   belonging to the card rather than to the mosaic's header. */
+.cardfoot{display:flex;align-items:center;gap:16px;padding-top:9px;border-top:1px solid var(--ink)}
+.cardfoot .seg{flex:0 0 auto}
+.hoverbar{display:flex;align-items:center;gap:9px;min-height:20px;flex:1;min-width:0}
 .hoverbar .sw{width:9px;height:9px;flex:0 0 auto}
 .hoverbar .txt{font-size:12px;line-height:1.35;color:var(--ink2);overflow:hidden}
 .hoverbar .txt[data-on="1"]{color:var(--ink);font-family:var(--mono)}
@@ -208,6 +212,8 @@ tfoot .n{padding-left:8px;padding-right:0;font-size:12px;color:var(--ink3)}
   .strip>div,.strip>div:first-child,.strip>div:last-child{padding:11px 12px;border-right:0;border-bottom:1px solid var(--hair)}
   .foot{grid-template-columns:1fr}
   .card{aspect-ratio:auto}
+  .cardfoot{flex-wrap:wrap;gap:10px}
+  .cardfoot .hoverbar{flex-basis:100%}
   .sun{flex-direction:column;gap:16px}
   .sunchart{height:auto;width:100%;max-width:400px;margin:0 auto}
   .sunlegend{width:100%;max-height:none}
