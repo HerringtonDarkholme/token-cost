@@ -242,7 +242,7 @@ export function Report({ data, onReset }: {
                 Billed · {state.pctOnly ? "amount hidden · " : ""}{state.ttl} cache TTL
               </div>
               <div className="total" data-hidden={state.pctOnly ? 1 : 0}>
-                {state.pctOnly ? "$█,███.██" : money(d.total)}
+                {state.pctOnly ? <span className="mask">****</span> : money(d.total)}
               </div>
             </div>
           </header>

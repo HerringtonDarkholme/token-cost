@@ -220,7 +220,7 @@ file tool under any name gets the same treatment.
 | `Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |
 | `Panels.tsx` | the same data ranked and labelled instead of packed |
 | `Ledger.tsx` | the table, where identity does not rest on colour |
-| `Toolbar.tsx` | TTL lens, `$`/`%`, theme, copy link, copy summary |
+| `Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy link, copy summary |
 | `style.css` | tokens and layout |
 | `vite.config.ts` | build: bundles and inlines everything into `cost-report.html`, and asserts it is self-contained |
 | `vitest.config.ts` | the render suite only — deliberately without the build plugins, so tests can never write the deliverable |

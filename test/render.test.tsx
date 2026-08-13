@@ -192,17 +192,24 @@ describe("interaction", () => {
     expect(container.querySelectorAll('path.sunarc[data-on="1"]')).toHaveLength(0);
   });
 
-  it("hiding amounts masks the total", () => {
-    click(byLabel("button", "%"));
+  it("the eye masks the total, and unmasks it again", () => {
+    const eye = container.querySelector('button[aria-label="Hide dollar amounts"]');
+    const real = container.querySelector(".total")?.textContent;
+    click(eye);
     expect(getState().pctOnly).toBe(true);
     expect(container.querySelector(".total")?.getAttribute("data-hidden")).toBe("1");
-    // Masked, but still the shape of a figure, so the layout does not collapse.
-    expect(container.querySelector(".total")?.textContent).toMatch(/^\$[█,.]+$/);
+    // Covered, not blank: the figure's place is still held, so the layout does not collapse.
+    expect(container.querySelector(".total")?.textContent).toMatch(/^\*+$/);
+    // The same button is the way back -- there is no second one to press.
+    expect(eye?.getAttribute("aria-pressed")).toBe("true");
+    click(eye);
+    expect(getState().pctOnly).toBe(false);
+    expect(container.querySelector(".total")?.textContent).toBe(real);
   });
 
   it("the TTL switch recomputes the page", () => {
     const before = container.querySelector(".total")?.textContent;
-    click(byLabel("button", "5m TTL"));
+    click(byLabel("button", "5m"));
     expect(getState().ttl).toBe("5m");
     expect(container.querySelector(".billed")?.textContent).toContain("5m");
     // The two lenses can legitimately agree to the cent; the label must still move.
