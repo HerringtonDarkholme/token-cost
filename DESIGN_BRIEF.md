@@ -71,7 +71,8 @@ figures, which belong to no dataset the page will ever see again.
 ## 4. Hard constraints — non-negotiable
 
 - **One file.** The build (`pnpm build`, configured in `vite.config.ts`) bundles and inlines
-  everything into `cost-report.html` so it opens by double-click. It emits a classic inline
+  everything into one document — `dist/index.html`, which is what Vercel serves, copied to
+  `cost-report.html` so it also opens by double-click. It emits a classic inline
   script rather than `type="module"`, because module scripts load under rules a `file://`
   page cannot rely on. No CDN scripts, no external stylesheets,
   **no webfont URLs**, no remote images, no `fetch`. Inline everything. A non-system typeface

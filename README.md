@@ -5,9 +5,14 @@ tokens in context — per tool, per bash command, per subcommand.
 
 ## Run it
 
+Open the deployed page, or build the standalone file yourself:
+
 ```sh
+pnpm install && pnpm build
 open cost-report.html          # standalone build — no server needed
 ```
+
+`cost-report.html` is build output, not something the repo carries.
 
 Transcripts are parsed in the page. Nothing is uploaded, and the app makes no network
 request with your data. It reads only the files you hand it through the picker or a drop —
@@ -23,15 +28,35 @@ imports. Vite provides one, with Fast Refresh:
 pnpm install
 pnpm dev              # http://127.0.0.1:8000
 pnpm typecheck        # tsc --noEmit, the only thing that judges types
-pnpm build            # bundle + inline everything back into cost-report.html
+pnpm build            # bundle + inline everything into dist/ and cost-report.html
 pnpm check            # typecheck, build, then all three test suites
 ```
 
-`pnpm build` is what regenerates the committed `cost-report.html`. It bundles to a single
+`pnpm build` writes `dist/index.html` — what Vercel serves — and copies it to
+`cost-report.html` at the root, the same bytes as a file you can double-click. It bundles to a single
 classic (non-module) inline script, because a `type="module"` script is fetched under module
 rules that a `file://` page cannot rely on. The build then asserts the result is genuinely
 self-contained — no `<script src>`, no stylesheet link, no absolute URL, no CSS `@import` —
 and fails rather than ship a page that would reach the network when opened.
+
+## Deploy
+
+Vercel serves `dist/`, built from source on each push — so nothing generated is committed
+and there is no artifact to keep in sync. `vercel.json` states what the Vite preset would
+otherwise infer, so the deploy does not depend on detection.
+
+```sh
+pnpm dlx vercel          # first run links the project, then deploys a preview
+pnpm dlx vercel --prod
+```
+
+Connecting the repo in the Vercel dashboard builds the same way.
+
+It stays a static page with no backend, which is what keeps the privacy claim above true
+when it is hosted rather than opened from disk: there is nothing on the server side to send
+a transcript to. The one thing hosting changes is that the page now arrives over the
+network — the assertion in `vite.config.ts` still holds, so what arrives is one file that
+makes no further requests.
 
 Nothing type-checks as a side effect of bundling: Vite and Node both *erase* types rather
 than verify them, so `pnpm typecheck` is the only step that will tell you a type is wrong.
@@ -181,8 +206,8 @@ file tool under any name gets the same treatment.
 
 | file | what it is |
 |---|---|
-| `cost-report.html` | standalone build — open directly; regenerate with `pnpm build` |
 | `index.html` | document shell and Vite entry (needs the dev server) |
+| `vercel.json` | the deploy: `pnpm build`, serve `dist/` |
 | `engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
 | `model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette. No React, no DOM |
 | `store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |

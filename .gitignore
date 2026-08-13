@@ -8,13 +8,16 @@ transcripts/
 report_data.json
 *.report.json
 
-# Node / Vite. cost-report.html is deliberately NOT ignored: it is the deliverable, the
-# thing a reader downloads and double-clicks. dist/ is only the build's staging area.
+# Node / Vite. cost-report.html is build output like dist/ is: the deployed page is built
+# from source on Vercel, so a committed copy would only ever be a second thing to keep in
+# sync. Build it locally when you want the double-clickable file.
 node_modules/
 dist/
+cost-report.html
 .vite/
 *.log
 *.tsbuildinfo
+.vercel/
 
 # OS / editor
 .DS_Store
