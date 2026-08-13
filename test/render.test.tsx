@@ -8,15 +8,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { analyze } from "../src/engine.ts"
-import { Report } from "../src/Report.tsx"
+import { analyze, type Analysis } from "../src/engine.ts"
+import { Page, type Dir } from "../src/Page.tsx"
 import { getHover, getState, resetState, setHover, setState, type ViewState } from "../src/store.ts"
 import { corpus } from "./fixture.ts"
 
 const data = analyze(corpus(process.env.TRANSCRIPT_DIR))
 const d = data.datasets["1h"]
 
-/** A stable identity, so the report is not handed a fresh callback per render. */
+/** A stable identity, so the page is not handed a fresh callback per render. */
 const noop = (): void => {}
 
 let container: HTMLElement
@@ -28,7 +28,7 @@ beforeAll(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   act(() => {
-    root.render(<Report data={data} onReset={noop} />)
+    root.render(<Page data={data} leaving={false} dir="fwd" onData={noop} onReset={noop} />)
   })
 })
 
@@ -365,8 +365,8 @@ describe("interaction", () => {
       [...container.querySelectorAll('[role="tooltip"]')].map((t) => [t.id, t] as const),
     )
     const described = [...container.querySelectorAll("[aria-describedby]")]
-    // The eye, the two TTL options, the three themes.
-    expect(described).toHaveLength(6)
+    // The reset, the eye, the two TTL options, the three themes.
+    expect(described).toHaveLength(7)
     for (const el of described) {
       const tip = tips.get(el.getAttribute("aria-describedby") || "")
       expect(tip, `hint for ${el.getAttribute("aria-label") || el.textContent}`).toBeDefined()
@@ -418,8 +418,10 @@ describe("interaction", () => {
     show({ chart: "sun" })
     expect(slot()).not.toBe(before)
     expect(slot()?.querySelector(".sun")).not.toBeNull()
-    // Still the card's own child, so `flex: 1` is measured against the card.
-    expect(slot()?.parentElement?.classList.contains("card")).toBe(true)
+    /* Still in a column that runs the height of the card, so `flex: 1` has something to
+       measure against: the card's own panel is between them now, and it forwards the claim. */
+    expect(slot()?.parentElement?.classList.contains("cardslot")).toBe(true)
+    expect(slot()?.parentElement?.parentElement?.classList.contains("card")).toBe(true)
   })
 
   it("a ledger row collapses", () => {
@@ -446,5 +448,105 @@ describe("interaction", () => {
     // The old renderer replaced the whole subtree on every keystroke and had to restore
     // the caret by hand; the input is now a stable node, so focus simply survives.
     expect(document.activeElement).toBe(container.querySelector("#q"))
+  })
+})
+
+/* The two faces of one card, and the turn between them.
+
+   This is the claim the whole page is arranged around: a CSS transition needs the *same
+   element* on both sides of a change, so what has to hold is not that an empty card and a
+   report both render -- it is that they render into the same frame. The moment they are two
+   nodes, the card's size and border stop tweening and the morph is a crossfade between two
+   boxes that happen to look alike. A node identity is not something the eye can check in a
+   screenshot, which is exactly why it is asserted here. */
+describe("the card's two faces", () => {
+  let box: HTMLElement
+  let r: Root
+
+  beforeAll(() => {
+    box = document.createElement("div")
+    document.body.appendChild(box)
+    r = createRoot(box)
+  })
+
+  afterAll(() => {
+    act(() => {
+      r.unmount()
+    })
+    box.remove()
+  })
+
+  const turn = (
+    shown: Analysis | null,
+    { leaving = false, dir = "fwd" }: { leaving?: boolean; dir?: Dir } = {},
+  ): void => {
+    act(() => {
+      r.render(<Page data={shown} leaving={leaving} dir={dir} onData={noop} onReset={noop} />)
+    })
+  }
+
+  it("the empty face is the same card, waiting", () => {
+    turn(null)
+    expect(box.querySelector(".card")?.getAttribute("data-face")).toBe("empty")
+    // The drop target is the card's own interior rather than a second box inside it.
+    expect(box.querySelector(".cardslot > .dropzone")).not.toBeNull()
+    // The figure's place is held by a dash, so the bill has somewhere to arrive.
+    expect(box.querySelector(".total")?.textContent).toBe("—")
+    expect(box.querySelector(".total")?.getAttribute("data-empty")).toBe("1")
+    /* One control, and it is the last one in the bar: the theme switch is the anchor
+       everything else grows leftward from, so it must not have anything to its right. */
+    const bar = [...box.querySelectorAll(".toolbar > *")]
+    expect(bar.at(-1)?.classList.contains("seg")).toBe(true)
+    expect(box.querySelectorAll(".toolbar .seg")).toHaveLength(1)
+    // Absent rather than disabled: there is nothing yet to discard, copy or reprice.
+    expect(box.querySelector('button[aria-label="New analysis"]')).toBeNull()
+  })
+
+  it("a file changes what the card holds, not the card", () => {
+    turn(null)
+    const card = box.querySelector(".card")
+    const slot = box.querySelector(".cardslot")
+    turn(data)
+
+    expect(box.querySelector(".card")).toBe(card)
+    expect(card?.getAttribute("data-face")).toBe("report")
+    // The contents *are* replaced: a fresh panel is what has a closed state to travel from.
+    expect(box.querySelector(".cardslot")).not.toBe(slot)
+    expect(box.querySelector(".dropzone")).toBeNull()
+    expect(box.querySelector(".cardslot .mosaicwrap")).not.toBeNull()
+    expect(box.querySelector(".total")?.textContent).toMatch(/^\$[\d,.]+$/)
+    // And the controls that only mean something now that there is a bill have arrived.
+    expect(box.querySelector('button[aria-label="New analysis"]')).not.toBeNull()
+    expect(box.querySelectorAll(".toolbar .t-grow")).toHaveLength(5)
+    expect([...box.querySelectorAll(".toolbar > *")].at(-1)?.classList.contains("seg")).toBe(true)
+  })
+
+  /* Reset is the leg that cannot be done in one state change: React would take the report's
+     DOM with it on the same tick, leaving nothing on screen to animate. So the face on show is
+     held mounted with `leaving` set, and what has to hold is that it is still there, closed,
+     and pointed the other way. */
+  it("the report is held on its way out, and goes back the way it came", () => {
+    turn(data)
+    const card = box.querySelector(".card")
+
+    turn(data, { leaving: true, dir: "back" })
+    // Still mounted, and still the report: there is something left to animate.
+    expect(box.querySelector(".cardslot .mosaicwrap")).not.toBeNull()
+    /* Both panels, closed and marked: the card's contents and everything under it leave on the
+       same beat, so the page does not come apart in the middle on its way out. */
+    const closing = [".cardslot", ".below"].map((sel) => box.querySelector(sel))
+    expect(closing.map((el) => el?.getAttribute("data-leaving"))).toEqual(["1", "1"])
+    expect(closing.map((el) => el?.getAttribute("data-open"))).toEqual(["false", "false"])
+    // The exit direction is the page's, not the panel's, so it can differ between the legs.
+    expect(box.querySelector(".shell")?.getAttribute("data-dir")).toBe("back")
+    // The toolbar's controls leave with it rather than vanishing out from under the pointer.
+    expect(box.querySelector(".toolbar")?.getAttribute("data-leaving")).toBe("1")
+    expect(box.querySelector('button[aria-label="New analysis"]')).not.toBeNull()
+
+    turn(null, { dir: "back" })
+    expect(box.querySelector(".card")).toBe(card)
+    expect(box.querySelector(".cardslot > .dropzone")).not.toBeNull()
+    expect(box.querySelector(".total")?.textContent).toBe("—")
+    expect(box.querySelector(".toolbar")?.getAttribute("data-leaving")).toBeNull()
   })
 })

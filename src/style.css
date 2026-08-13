@@ -192,7 +192,8 @@ button {
   color: var(--ink3);
   border-right: 1px solid var(--rule);
 }
-.eyebtn {
+.eyebtn,
+.freshbtn {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -227,6 +228,26 @@ button {
 }
 .card[data-chart="sun"] {
   aspect-ratio: 4/3;
+}
+/* The empty face. The frame is the drop target itself, so the invitation is this border going
+   dashed rather than a second box drawn inside the first.
+
+   A letterbox rather than the report's own 16/9, for two reasons that turn out to be the same
+   one: a frame sized for a chart, holding two sentences and two buttons, is two thirds empty --
+   and a card that *grows* into the report says something a card that merely refills does not.
+   `aspect-ratio` interpolates, so the growth is the tween. See `.t-resize`.
+   A border *style* does not interpolate, but that swap lands in the beat when the card is
+   empty, with the outgoing contents gone and the incoming ones not yet arrived. */
+.card[data-face="empty"] {
+  aspect-ratio: 24/9;
+  min-height: 380px;
+  border-style: dashed;
+}
+/* Lit from the zone inside it, because the frame the reader is aiming at is the frame that
+   should answer. Deliberately not transitioned: a drop target that takes 150ms to acknowledge
+   the pointer reads as one that has not noticed. */
+.card:has([data-over="1"]) {
+  border-color: var(--accent);
 }
 .br {
   position: absolute;
@@ -276,6 +297,16 @@ button {
   line-height: 1.02;
   letter-spacing: -0.025em;
   font-weight: 700;
+  text-wrap: balance;
+}
+/* The one word both tenses of the heading share, so it is the one that keeps its colour
+   across the change. */
+.chead h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+.cfig {
+  text-align: right;
 }
 .billed {
   font-family: var(--mono);
@@ -291,7 +322,8 @@ button {
   line-height: 1.02;
   letter-spacing: -0.03em;
 }
-.total[data-hidden="1"] {
+.total[data-hidden="1"],
+.total[data-empty="1"] {
   color: var(--ink3);
 }
 /* An asterisk hangs at the top of its line box, so four of them left where the figure was
@@ -1086,28 +1118,33 @@ tfoot .n {
     max-height: none;
   }
 }
-.drop {
-  border: 1.5px dashed var(--rule);
-  background: var(--panel);
-  padding: clamp(26px, 5vw, 54px) 26px;
+/* The empty face's contents, centred in the whole interior of the card: the frame is the drop
+   target, so the target has to be the frame's inside rather than a panel sitting in the middle
+   of it. `flex: 1` is the same claim the chart makes on the same space. */
+.dropzone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   text-align: center;
-  transition:
-    border-color 0.15s,
-    background 0.15s;
+  padding: 16px 0;
+  transition: background var(--duration-quick) var(--ease-out);
 }
-.drop.over {
-  border-color: var(--accent);
+.dropzone[data-over="1"] {
   background: var(--accent-soft);
 }
-.drop h2 {
+.dropzone h2 {
   font-size: 21px;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0;
   letter-spacing: -0.015em;
 }
-.drop p {
+.dropzone p {
   color: var(--ink2);
-  margin: 0 auto 18px;
+  margin: 0;
   max-width: 56ch;
   font-size: 14px;
 }
@@ -1140,14 +1177,12 @@ tfoot .n {
   display: flex;
   gap: 9px;
   align-items: flex-start;
-  margin-top: 16px;
   font-size: 11.5px;
   color: var(--ink3);
   justify-content: center;
   font-family: var(--mono);
 }
 .status {
-  margin-top: 16px;
   font-size: 13px;
   color: var(--ink2);
   min-height: 22px;
@@ -1159,7 +1194,6 @@ tfoot .n {
   color: var(--accent);
 }
 .filelist {
-  margin-top: 14px;
   font-size: 11.5px;
   color: var(--ink3);
   font-family: var(--mono);
@@ -1238,23 +1272,12 @@ kbd {
   border-radius: 3px;
   vertical-align: baseline;
 }
-h1.big-title {
-  font-size: clamp(26px, 4vw, 38px);
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-  font-weight: 700;
-  margin: 0 0 8px;
-  text-wrap: balance;
-}
-h1.big-title em {
-  font-style: normal;
-  color: var(--accent);
-}
 .lede {
   color: var(--ink2);
-  max-width: 66ch;
-  margin: 0 0 26px;
+  max-width: 68ch;
+  margin: 0 auto;
   font-size: 14.5px;
+  text-wrap: pretty;
 }
 .scopebar {
   display: flex;
@@ -1345,12 +1368,25 @@ h1.big-title em {
      stays the snippet's own literal. */
   --resize-dur: 300ms;
   --resize-ease: var(--ease-smooth-out);
-  /* Panel reveal */
+  /* Panel reveal. A panel travels in from `--panel-translate-y` and out to `--panel-exit-y`,
+     which is the opposite side: content arrives from where it came and leaves toward where it
+     is going. Flipping the one value flips both, which is what `[data-dir]` does below --
+     without it, going back would be going forward with the labels changed. */
   --panel-open-dur: var(--duration-slow);
   --panel-close-dur: var(--duration-medium);
   --panel-translate-y: 24px;
+  --panel-exit-y: calc(var(--panel-translate-y) * -1);
   --panel-blur: var(--blur-small);
   --panel-ease: var(--ease-smooth-out);
+
+  /* Controls growing into the toolbar. Sideways rather than up, because they emerge from
+     beside the theme switch, which does not move; and out faster than in, because arriving is
+     the moment worth watching and leaving is not. */
+  --grow-in-dur: var(--duration-fast);
+  --grow-out-dur: var(--duration-quick);
+  --grow-distance: var(--distance-base);
+  --grow-blur: var(--blur-small);
+  --grow-ease: var(--ease-smooth-out);
 
   /* Tooltip open / close. The scale names an 80ms tooltip delay and a 150ms appear, so those
      two come off it; the 50ms disappear has no usage on the scale and stays literal, which is
@@ -1534,14 +1570,17 @@ h1.big-title em {
   }
 }
 
-/* Card resize — the frame, which is a different shape for each chart. Its size is
-   set by `aspect-ratio` rather than by a length, so that property is enumerated
-   alongside the snippet's own two: a browser that interpolates ratios tweens the
-   frame, and one that does not lands on the jump it makes today. */
+/* Card resize — the frame, which is a different shape for each chart, and a shorter
+   one again before there is a chart at all. Its size is set by `aspect-ratio` and a
+   floor rather than by a length, so both are enumerated alongside the snippet's own
+   two: a browser that interpolates ratios tweens the frame, and one that does not
+   lands on the jump it makes today. The floor is what binds on a narrow window,
+   where the ratio has been dropped for content height. */
 .t-resize {
   transition:
     width var(--resize-dur) var(--resize-ease),
     height var(--resize-dur) var(--resize-ease),
+    min-height var(--resize-dur) var(--resize-ease),
     aspect-ratio var(--resize-dur) var(--resize-ease);
   will-change: width, height;
 }
@@ -1563,6 +1602,19 @@ h1.big-title em {
   display: flex;
   flex-direction: column;
 }
+/* The card's own panel makes the same claim on the card's column that the chart makes on it,
+   since what it holds is either the chart's four rows or the drop zone. */
+.cardslot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Everything under the card, which is most of the page's height. Translate and opacity are
+   composited; a blur across a subtree this tall is not, so this one travels without one. */
+.below {
+  --panel-blur: 0px;
+}
 .t-panel-slide {
   transform: translateY(var(--panel-translate-y));
   opacity: 0;
@@ -1573,6 +1625,11 @@ h1.big-title em {
     opacity var(--panel-close-dur) var(--panel-ease),
     filter var(--panel-close-dur) var(--panel-ease);
   will-change: transform, opacity, filter;
+}
+/* A panel being *shown the door* rather than one that has not arrived yet: same closed state,
+   opposite side. It can sit before the open rule because a leaving panel is never open. */
+.t-panel-slide[data-leaving="1"] {
+  transform: translateY(var(--panel-exit-y));
 }
 .t-panel-slide[data-open="true"] {
   transform: translateY(0);
@@ -1587,5 +1644,70 @@ h1.big-title em {
 @media (prefers-reduced-motion: reduce) {
   .t-panel-slide {
     transition: none !important;
+  }
+}
+
+/* Which way the page is going. The turn back to the empty card is not the turn away from it
+   played in reverse: the report leaves downward and the drop zone comes back from above, the
+   way a stack of pages behaves. One value, because the exit is derived from it. */
+.shell[data-dir="back"] {
+  --panel-translate-y: -24px;
+}
+
+/* Controls growing into the toolbar — the five that only mean something once there is a bill.
+   They mount at their final width and animate nothing that affects layout, which is what keeps
+   the theme switch beside them still and the travelling pills inside them measured against a
+   bar that is not moving. `data-i` counts outward from the anchor, so the TTL lens beside the
+   theme switch appears first. */
+@keyframes t-grow-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--grow-distance));
+    filter: blur(var(--grow-blur));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+}
+@keyframes t-grow-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(var(--grow-distance));
+    filter: blur(var(--grow-blur));
+  }
+}
+.t-grow {
+  display: inline-flex;
+  animation: t-grow-in var(--grow-in-dur) var(--grow-ease) both;
+}
+.t-grow[data-i="1"] {
+  animation-delay: var(--duration-stagger);
+}
+.t-grow[data-i="2"] {
+  animation-delay: calc(var(--duration-stagger) * 2);
+}
+.t-grow[data-i="3"] {
+  animation-delay: calc(var(--duration-stagger) * 3);
+}
+.t-grow[data-i="4"] {
+  animation-delay: calc(var(--duration-stagger) * 4);
+}
+/* Out together, and the delays go with them: a stagger on the way out is choreography nobody
+   asked for on a control they have already finished with. */
+.toolbar[data-leaving="1"] .t-grow {
+  animation: t-grow-out var(--grow-out-dur) var(--grow-ease) both;
+  animation-delay: 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-grow,
+  .toolbar[data-leaving="1"] .t-grow {
+    animation: none !important;
   }
 }

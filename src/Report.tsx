@@ -1,65 +1,27 @@
-/* The report itself: header, thesis strip, mosaic, breakdown, footnotes.
+/* The report's own parts: thesis strip, the picture, the breakdown, the footnotes.
 
-   One subscription to the view state at the top, one context down. A change to the view --
-   lens, drill, query, units -- re-renders from here, and React diffs it to the handful of
-   attributes that actually moved. Hover is the exception: it arrives dozens of times a
+   What holds them is the page (see `Page.tsx`), which outlives any one of them -- these mount
+   when an analysis arrives and unmount when it is discarded, inside a card that does neither.
+
+   One subscription to the view state at the top of the page, one context down. A change to the
+   view -- lens, drill, query, units -- re-renders from there, and React diffs it to the handful
+   of attributes that actually moved. Hover is the exception: it arrives dozens of times a
    second and is read from its own store slice by the few components that draw a highlight,
    so a pointer sweep does not re-render the header, the footnotes and the ledger. They all
    still read the one hover key from the one place, which is what lets the mosaic, the
    panels and the table stay a single instrument. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { Analysis } from "./engine.ts"
-import { ReportContext, useReport, type ReportCtx } from "./context.ts"
-import {
-  branches,
-  count,
-  focusOf,
-  FOLD_MIN,
-  ledger,
-  money,
-  palette,
-  pctOf,
-  type Ledger,
-} from "./model.ts"
-import {
-  hashFor,
-  hoverClear,
-  readHash,
-  setHover,
-  setState,
-  useViewState,
-  type ViewState,
-} from "./store.ts"
+import { useMemo } from "react"
+import type { Dataset } from "./engine.ts"
+import { useReport } from "./context.ts"
+import { count, FOLD_MIN, ledger, money, pctOf } from "./model.ts"
+import { setHover, setState, type ViewState } from "./store.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
-import { Toolbar } from "./Toolbar.tsx"
+import { Reveal } from "./Motion.tsx"
 import { HoverBar, Mosaic } from "./Mosaic.tsx"
 import { Panels } from "./Panels.tsx"
 import { Sunburst } from "./Sunburst.tsx"
 import { LedgerTable, useReconNote } from "./Ledger.tsx"
-
-/** The hash is the shareable view. Writing it is best-effort because `replaceState` can
- *  refuse on a `file://` page, which is how this is normally opened.
- *
- *  The effect keys on the hash *string*, not on the state object: most state changes do not
- *  reach the URL at all, and browsers rate-limit `replaceState` hard enough to start
- *  throwing if it is called on every one of them. */
-function useUrlSync(state: ViewState): void {
-  const hash = hashFor(state)
-  useEffect(() => {
-    try {
-      history.replaceState(null, "", hash || location.pathname + location.search)
-    } catch {
-      /* file:// can refuse */
-    }
-  }, [hash])
-
-  useEffect(() => {
-    const onHash = (): void => setState(readHash(location.hash))
-    window.addEventListener("hashchange", onHash)
-    return () => window.removeEventListener("hashchange", onHash)
-  }, [])
-}
 
 /* No hints on these two: the words are the whole explanation. */
 const VIEWS: ReadonlyArray<SegOption<ViewState["view"]>> = [
@@ -76,91 +38,6 @@ const CHARTS: ReadonlyArray<SegOption<ViewState["chart"]>> = [
    module away, so neither switch needs anything from the component around it. */
 const pickView = (view: ViewState["view"]): void => setState({ view })
 const pickChart = (chart: ViewState["chart"]): void => setState({ chart })
-
-/** How long a digit pop-in runs, read off the stylesheet so the two cannot drift: the last
- *  two characters ride one and two stagger offsets behind the rest of the figure. */
-function popMs(): number {
-  const css = getComputedStyle(document.documentElement)
-  const ms = (name: string, fallback: number): number =>
-    parseFloat(css.getPropertyValue(name)) || fallback
-  return ms("--digit-dur", 500) + ms("--digit-stagger", 70) * 2 + 40
-}
-
-/** A figure that re-enters character by character when it changes. Switching the TTL lens
- *  and covering the amount both put a different number in the same place, and a number that
- *  changes without moving is a number the reader can miss.
- *
- *  The group is keyed on a beat rather than mutated in place: a remount is what replays a CSS
- *  animation, which is the same thing the reference's remove-reflow-re-add dance buys. The
- *  beat drops back to 0 when the animation is over, which is what takes `.is-animating` off
- *  again -- the PNG rasterises this markup in a fresh document, where a live animation would
- *  be caught at its first frame with the digits still invisible. */
-function PopNumber({ value, className }: { value: string; className?: string }): React.JSX.Element {
-  const [beat, setBeat] = useState(0)
-  const shown = useRef(value)
-
-  useEffect(() => {
-    if (shown.current === value) return
-    shown.current = value
-    setBeat((n) => n + 1)
-    const t = setTimeout(() => setBeat(0), popMs())
-    return () => clearTimeout(t)
-  }, [value])
-
-  const chars = [...value]
-  return (
-    <span
-      key={beat}
-      className={`t-digit-group${beat ? " is-animating" : ""}${className ? " " + className : ""}`}
-    >
-      {/* Keyed by position on purpose, which is the one case an index key is the right key:
-          these are the columns of a figure, not a list of things. "$1,204.55" becoming
-          "$989.10" should re-letter the spans that are already there rather than match
-          characters up by name, and the stagger below is a position too. */}
-      {/* oxlint-disable react/no-array-index-key -- see above. A block rather than a
-          `disable-next-line`, because the line the key sits on is oxfmt's to choose. */}
-      {chars.map((ch, i) => (
-        <span
-          key={i}
-          className="t-digit"
-          data-stagger={i === chars.length - 2 ? 1 : i === chars.length - 1 ? 2 : undefined}
-        >
-          {ch}
-        </span>
-      ))}
-      {/* oxlint-enable react/no-array-index-key */}
-    </span>
-  )
-}
-
-/** The panel a swapped-in view arrives in. Mounted closed and opened on the next frame,
- *  because the open state needs a painted closed state to travel from; keyed from outside on
- *  whatever picked the view, so a switch mounts a fresh panel rather than reopening this one.
- *
- *  `className` is for the callers whose panel has to carry layout as well -- the chart sits in
- *  a flex column and has to keep filling it.
- */
-function Reveal({
-  className,
-  children,
-}: {
-  className?: string
-  children: React.ReactNode
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setOpen(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
-  return (
-    <div
-      className={className ? `${className} t-panel-slide` : "t-panel-slide"}
-      data-open={open ? "true" : "false"}
-    >
-      {children}
-    </div>
-  )
-}
 
 function Crumbs(): React.JSX.Element {
   const { state } = useReport()
@@ -247,8 +124,14 @@ function Strip(): React.JSX.Element {
   )
 }
 
-function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
-  const { state, amt } = useReport()
+export function Breakdown(): React.JSX.Element {
+  const { d, state, amt } = useReport()
+  /* Memoised for its identity rather than its cost -- a ledger walk is microseconds, and the
+     memoised rows below it are what actually want a stable `L`. */
+  const L = useMemo(
+    () => ledger(d, state.path, state.open, state.query),
+    [d, state.path, state.open, state.query],
+  )
   const note = useReconNote(L)
   return (
     <section className="bsec">
@@ -279,7 +162,7 @@ function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
   )
 }
 
-function Footnotes(): React.JSX.Element {
+export function Footnotes(): React.JSX.Element {
   const { data, d, amt } = useReport()
   const I = d.insights
   const lensGap = Math.abs(data.datasets["1h"].total - data.datasets["5m"].total)
@@ -349,122 +232,51 @@ function Footnotes(): React.JSX.Element {
   )
 }
 
-export function Report({
-  data,
-  onReset,
-}: {
-  data: Analysis
-  onReset: () => void
-}): React.JSX.Element {
-  const state = useViewState()
-  useUrlSync(state)
-
-  const d = data.datasets[state.ttl]
-  const reqs = d.requests || 1
-
-  /* Memoised so their *identity* survives a re-render, not because they are slow -- a ledger
-     walk is microseconds. Stable nodes are what let the memoised columns, panels and rows
-     below skip the re-render entirely when only a highlight moved. */
-  const focus = useMemo(() => focusOf(d, state.path), [d, state.path])
-  const pal = useMemo(() => palette(data, d), [data, d])
-  const L = useMemo(
-    () => ledger(d, state.path, state.open, state.query),
-    [d, state.path, state.open, state.query],
+/** What the card holds once there is a bill to show: the thesis, the picture, and the two
+ *  rules that frame it. The header above it belongs to the card rather than to this, because
+ *  the card has a header before there is anything to report -- the heading merely changes
+ *  tense when the numbers arrive. */
+export function CardBody(): React.JSX.Element {
+  const { state } = useReport()
+  return (
+    <>
+      <Strip />
+      <div className="mosaichead">
+        <span className="lbl">
+          {state.chart === "sun"
+            ? "Every line item · arc = share of the ring inside it · each ring one level deeper"
+            : "Every line item · column width = share of bill · block height = share of column"}
+        </span>
+        <Crumbs />
+      </div>
+      {/* Keyed on the chart, so the picture the switch asks for arrives rather than
+          appearing: a fresh panel mounts closed and slides up into the space the other
+          one left. The frame around it changes shape at the same time -- `.card` is 16/9
+          for the mosaic and 4/3 for the sunburst -- and `.t-resize` tweens that too, so
+          the whole card moves as one thing instead of snapping to a new height under a
+          picture that was already there. */}
+      <Reveal key={state.chart} className="chartslot">
+        {state.chart === "sun" ? <Sunburst /> : <Mosaic />}
+      </Reveal>
+      {/* The chart switch lives at the foot of the card, on the footnote's rule: it picks
+          the whole picture, so it sits below the picture rather than crowding the
+          breadcrumb, which addresses one block inside it. */}
+      <div className="cardfoot">
+        <HoverBar />
+        <Seg options={CHARTS} value={state.chart} onPick={pickChart} nosnap />
+      </div>
+    </>
   )
+}
 
-  const amt = useCallback<ReportCtx["amt"]>(
-    (cost, base) => {
-      if (!state.pctOnly) return money(cost)
-      const denom = base || d.total
-      const r = denom > 0 ? (cost / denom) * 100 : 0
-      return (r < 1 ? r.toFixed(2) : r.toFixed(1)) + "%"
-    },
-    [state.pctOnly, d.total],
-  )
-
-  const drill = useCallback(
-    (name: string) => {
-      const it = (focus.node.items || []).find((x) => x.name === name)
-      if (!branches(it)) return // nothing to show one level down
-      setHover(null)
-      if (!focus.groupName) setState({ path: [name] })
-      else if (state.path.length === 1) setState({ path: [focus.groupName, name] })
-    },
-    [focus, state.path],
-  )
-
-  const ctx = useMemo<ReportCtx>(
-    () => ({ data, d, state, pal, focus, reqs, amt, drill }),
-    [data, d, state, pal, focus, reqs, amt, drill],
-  )
-
-  const scope = [
+/** How the card's header describes the dataset: what the report covers, said in the eyebrow
+ *  beside the words that are there whether or not a file has been dropped. */
+export function scopeOf(d: Dataset): string {
+  return [
     `${d.sessions} sessions`,
     d.days ? `${d.days} days` : null,
     `${count(d.requests)} requests`,
   ]
     .filter(Boolean)
     .join(" · ")
-
-  return (
-    <ReportContext.Provider value={ctx}>
-      {/* The one place a highlight is dropped: every view marks the elements that stand
-          for something, and this reads the pointer and the focus against those marks. See
-          `hoverClear`. */}
-      <div className="shell" {...hoverClear}>
-        <Toolbar onReset={onReset} />
-        <section className="card t-resize" data-chart={state.chart}>
-          <span className="br br1" />
-          <span className="br br2" />
-          <span className="br br3" />
-          <span className="br br4" />
-          <header className="chead">
-            <div>
-              <div className="eyebrow">Cost attribution · Claude Code · {scope}</div>
-              <h1>Where the money went</h1>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div className="billed">
-                Billed · {state.pctOnly ? "amount hidden · " : ""}
-                {state.ttl} cache TTL
-              </div>
-              <div className="total" data-hidden={state.pctOnly ? 1 : 0}>
-                <PopNumber
-                  value={state.pctOnly ? "****" : money(d.total)}
-                  className={state.pctOnly ? "mask" : undefined}
-                />
-              </div>
-            </div>
-          </header>
-          <Strip />
-          <div className="mosaichead">
-            <span className="lbl">
-              {state.chart === "sun"
-                ? "Every line item · arc = share of the ring inside it · each ring one level deeper"
-                : "Every line item · column width = share of bill · block height = share of column"}
-            </span>
-            <Crumbs />
-          </div>
-          {/* Keyed on the chart, so the picture the switch asks for arrives rather than
-              appearing: a fresh panel mounts closed and slides up into the space the other
-              one left. The frame around it changes shape at the same time -- `.card` is 16/9
-              for the mosaic and 4/3 for the sunburst -- and `.t-resize` tweens that too, so
-              the whole card moves as one thing instead of snapping to a new height under a
-              picture that was already there. */}
-          <Reveal key={state.chart} className="chartslot">
-            {state.chart === "sun" ? <Sunburst /> : <Mosaic />}
-          </Reveal>
-          {/* The chart switch lives at the foot of the card, on the footnote's rule: it picks
-              the whole picture, so it sits below the picture rather than crowding the
-              breadcrumb, which addresses one block inside it. */}
-          <div className="cardfoot">
-            <HoverBar />
-            <Seg options={CHARTS} value={state.chart} onPick={pickChart} nosnap />
-          </div>
-        </section>
-        <Breakdown L={L} />
-        <Footnotes />
-      </div>
-    </ReportContext.Provider>
-  )
 }

@@ -1,6 +1,12 @@
-/* The upload screen: take files from a picker or a drop, read them in the page, hand them
+/* The card's empty face: take files from a picker or a drop, read them in the page, hand them
    to the engine. Nothing leaves the machine -- there is no fetch here and no server to send
    anything to.
+
+   This is the inside of the same card the report ends up in, not a screen of its own, which is
+   why there is no frame drawn here and no heading: the card supplies both, and the heading
+   merely changes tense once the bill exists. What the zone owns is the drop target -- it fills
+   the card's interior, so the frame the reader aims at is the frame that lights up. See
+   `.card:has([data-over="1"])`.
 
    The copy about *where* transcripts live is not decoration. `.claude` is a dotfile, so
    every file picker hides it by default, and a reader who cannot find their transcripts
@@ -8,8 +14,6 @@
 
 import { useRef, useState, type ReactNode } from "react"
 import { analyze, type Analysis, type RawFile } from "./engine.ts"
-import { useViewState } from "./store.ts"
-import { ThemeBar } from "./Toolbar.tsx"
 
 const MAX_LISTED = 60
 
@@ -47,8 +51,7 @@ function walkEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
   })
 }
 
-export function Upload({ onData }: { onData: (data: Analysis) => void }): React.JSX.Element {
-  const { theme } = useViewState()
+export function Intake({ onData }: { onData: (data: Analysis) => void }): React.JSX.Element {
   const [status, setStatus] = useState<Status | null>(null)
   const [names, setNames] = useState<string[] | null>(null)
   const [over, setOver] = useState(false)
@@ -123,6 +126,8 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
       )
       return
     }
+    /* Handed over only once the parse is done, so the card's turn plays against a free main
+       thread: an exit animation started before seconds of synchronous work freezes mid-slide. */
     onData(data)
   }
 
@@ -143,132 +148,132 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
   }
 
   return (
-    <div className="shell">
-      <ThemeBar theme={theme} />
-      <p className="eyebrow">Cost attribution · Claude Code</p>
-      <h1 className="big-title">
-        Where did your <em>Claude Code</em> money go?
-      </h1>
+    <div
+      className="dropzone"
+      data-over={over ? "1" : "0"}
+      onDragEnter={(e) => {
+        e.preventDefault()
+        setOver(true)
+      }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setOver(true)
+      }}
+      onDragLeave={(e) => {
+        // Leaving for a child element is not leaving the drop zone.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false)
+      }}
+      onDrop={(e) => {
+        void onDrop(e)
+      }}
+    >
       <p className="lede">
-        Drop in your session transcripts to itemise every dollar down to the subcommand. Billing is
-        per request and each request re-bills the whole context, so what you get back is{" "}
+        Drop in your Claude Code transcripts to itemise every dollar down to the subcommand. Billing
+        is per request and each request re-bills the whole context, so what you get back is{" "}
         <strong>carry cost</strong> — what each source cost across every request it survived in, not
         its face value.
       </p>
-
-      <div
-        className={over ? "drop over" : "drop"}
-        onDragEnter={(e) => {
-          e.preventDefault()
-          setOver(true)
-        }}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setOver(true)
-        }}
-        onDragLeave={(e) => {
-          // Leaving for a child element is not leaving the drop zone.
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false)
-        }}
-        onDrop={(e) => {
-          void onDrop(e)
-        }}
-      >
-        <h2>
-          Drop <code>.jsonl</code> transcripts here
-        </h2>
-        <p>Or pick a whole project folder. Multiple files are combined into one report.</p>
-        <div className="picks">
-          <button className="btn primary" type="button" onClick={() => filePicker.current?.click()}>
-            Choose files
-          </button>
-          <button className="btn" type="button" onClick={() => dirPicker.current?.click()}>
-            Choose folder
-          </button>
-        </div>
-        <input
-          ref={filePicker}
-          type="file"
-          multiple
-          accept=".jsonl"
-          className="hidden"
-          onChange={(e) => {
-            void handle(e.target.files)
-          }}
-        />
-        <input
-          ref={dirPicker}
-          type="file"
-          multiple
-          webkitdirectory=""
-          directory=""
-          className="hidden"
-          onChange={(e) => {
-            void handle(e.target.files)
-          }}
-        />
-        <p className="privacy">Parsed in this page · nothing is uploaded</p>
-        <div className="status" data-err={status?.err ? "1" : "0"}>
-          {status?.node}
-        </div>
-        {names ? (
-          <div className="filelist">
-            {names.map((n) => (
-              <div key={n}>{n}</div>
-            ))}
-          </div>
-        ) : null}
+      <h2>
+        Drop <code>.jsonl</code> transcripts here
+      </h2>
+      <p>Or pick a whole project folder. Multiple files are combined into one report.</p>
+      <div className="picks">
+        <button className="btn primary" type="button" onClick={() => filePicker.current?.click()}>
+          Choose files
+        </button>
+        <button className="btn" type="button" onClick={() => dirPicker.current?.click()}>
+          Choose folder
+        </button>
       </div>
+      <input
+        ref={filePicker}
+        type="file"
+        multiple
+        accept=".jsonl"
+        className="hidden"
+        onChange={(e) => {
+          void handle(e.target.files)
+        }}
+      />
+      <input
+        ref={dirPicker}
+        type="file"
+        multiple
+        webkitdirectory=""
+        directory=""
+        className="hidden"
+        onChange={(e) => {
+          void handle(e.target.files)
+        }}
+      />
+      <p className="privacy">Parsed in this page · nothing is uploaded</p>
+      <div className="status" data-err={status?.err ? "1" : "0"}>
+        {status?.node}
+      </div>
+      {names ? (
+        <div className="filelist">
+          {names.map((n) => (
+            <div key={n}>{n}</div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
-      <div className="where">
-        <p className="whead">
-          <strong>Where your transcripts live</strong>
-        </p>
-        <p>
-          One <code>.jsonl</code> file per session, in one folder per project, under
-          <code>~/.claude/projects/</code>.
-        </p>
+/** The help that stands under the empty card, where the breakdown stands under a full one.
+ *  It is the one block with no counterpart in the report, which is why it is here rather than
+ *  something the report's own footnotes grow out of. */
+export function Where(): React.JSX.Element {
+  return (
+    <div className="where">
+      <p className="whead">
+        <strong>Where your transcripts live</strong>
+      </p>
+      <p>
+        One <code>.jsonl</code> file per session, in one folder per project, under
+        <code>~/.claude/projects/</code>.
+      </p>
 
-        <p className="whead">
-          <strong>Getting there — the folder is hidden</strong>
-        </p>
-        <p>
-          <code>.claude</code> starts with a dot, so file pickers hide it by default. It is still
-          reachable; you just have to ask for it by name.
-        </p>
-        <ul className="steps">
-          <li>
-            <b>macOS</b> — click <em>Choose folder</em> above, then in the Finder dialog press{" "}
+      <p className="whead">
+        <strong>Getting there — the folder is hidden</strong>
+      </p>
+      <p>
+        <code>.claude</code> starts with a dot, so file pickers hide it by default. It is still
+        reachable; you just have to ask for it by name.
+      </p>
+      <ul className="steps">
+        <li>
+          <b>macOS</b> — click <em>Choose folder</em> above, then in the Finder dialog press{" "}
+          <kbd>⇧</kbd>
+          <kbd>⌘</kbd>
+          <kbd>G</kbd>, paste <code>~/.claude/projects</code>, hit <kbd>return</kbd>, and pick a
+          project folder.
+          <span className="alt">
             <kbd>⇧</kbd>
             <kbd>⌘</kbd>
-            <kbd>G</kbd>, paste <code>~/.claude/projects</code>, hit <kbd>return</kbd>, and pick a
-            project folder.
-            <span className="alt">
-              <kbd>⇧</kbd>
-              <kbd>⌘</kbd>
-              <kbd>.</kbd> also toggles hidden files into view, in the dialog and in Finder.
-            </span>
-          </li>
-          <li>
-            <b>Windows</b> — type <code>%USERPROFILE%\.claude\projects</code> into the dialog&apos;s{" "}
-            <em>File name</em> box and press <kbd>Enter</kbd>.
-          </li>
-          <li>
-            <b>Linux</b> — press <kbd>Ctrl</kbd>
-            <kbd>L</kbd> in the GTK dialog and type <code>~/.claude/projects</code>, or{" "}
-            <kbd>Ctrl</kbd>
-            <kbd>H</kbd> to show hidden files.
-          </li>
-        </ul>
-        <p>
-          Prefer the terminal? Open the folder in your file manager, then drag a project onto the
-          box above:
-        </p>
-        <p>
-          <code>open ~/.claude/projects</code> &nbsp;·&nbsp; largest projects first:{" "}
-          <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
-        </p>
-      </div>
+            <kbd>.</kbd> also toggles hidden files into view, in the dialog and in Finder.
+          </span>
+        </li>
+        <li>
+          <b>Windows</b> — type <code>%USERPROFILE%\.claude\projects</code> into the dialog&apos;s{" "}
+          <em>File name</em> box and press <kbd>Enter</kbd>.
+        </li>
+        <li>
+          <b>Linux</b> — press <kbd>Ctrl</kbd>
+          <kbd>L</kbd> in the GTK dialog and type <code>~/.claude/projects</code>, or{" "}
+          <kbd>Ctrl</kbd>
+          <kbd>H</kbd> to show hidden files.
+        </li>
+      </ul>
+      <p>
+        Prefer the terminal? Open the folder in your file manager, then drag a project onto the card
+        above:
+      </p>
+      <p>
+        <code>open ~/.claude/projects</code> &nbsp;·&nbsp; largest projects first:{" "}
+        <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
+      </p>
     </div>
   )
 }

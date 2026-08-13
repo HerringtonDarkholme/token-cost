@@ -3,10 +3,9 @@
 
 import { useId } from "react"
 import type { TtlAssumption } from "./engine.ts"
-import { useReport } from "./context.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
 import { CopyChartButton, ShareButton } from "./Share.tsx"
-import { setState, type ThemeChoice } from "./store.ts"
+import { setState, useViewState, type ThemeChoice } from "./store.ts"
 import { Tip } from "./Tip.tsx"
 
 /** The sun, a display, the moon. Three glyphs where three words -- LIGHT SYSTEM DARK -- were
@@ -118,39 +117,100 @@ function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
   )
 }
 
-/** The two things worth taking out of the page are the picture and the post. A link is not
- *  one of them: the hash carries the view -- lens, drill, chart -- and none of the data,
- *  which lives only in the reader's own browser, so a shared link opens on an upload screen
- *  for whoever receives it. */
-export function Toolbar({ onReset }: { onReset: () => void }): React.JSX.Element {
-  const { state } = useReport()
-
+/** A page with a plus, for the one control here that throws something away. A picture rather
+ *  than the words "New file" partly because it is the same size as its neighbours that way,
+ *  and partly because the words were the widest thing in the bar for a button pressed once. */
+function Fresh(): React.JSX.Element {
   return (
-    <div className="toolbar">
-      <span className="tick" />
-      <CopyChartButton />
-      <ShareButton />
-      <span className="seg t-tt-host">
-        <MaskToggle on={state.pctOnly} />
-      </span>
-      <Seg label="TTL" hint={TTL_HINT} options={TTLS} value={state.ttl} onPick={pickTtl} />
-      <Seg options={THEMES} value={state.theme} onPick={pickTheme} />
-      <span className="seg">
-        <button type="button" onClick={onReset}>
-          New file
-        </button>
-      </span>
-    </div>
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <rect x="3.2" y="1.8" width="9.6" height="12.4" rx="1" />
+      <path d="M8 5.7v4.9M5.55 8.15h4.9" />
+    </svg>
   )
 }
 
-/** The upload screen carries the same theme control and nothing else, so it gets its own
- *  small toolbar rather than a stripped-down copy of the report's. */
-export function ThemeBar({ theme }: { theme: ThemeChoice }): React.JSX.Element {
+/** Back to the empty card. The one control with a consequence, so the hint carries it: the
+ *  numbers live in this page and nowhere else, and there is no undo -- the transcripts have to
+ *  be picked again. The name stays "New analysis", which is what the button is for; what
+ *  pressing it costs is a description, and `aria-describedby` means it is read out as well as
+ *  drawn. No confirm step on top of that, because re-picking is two clicks. */
+function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
+  const tip = useId()
   return (
-    <div className="toolbar">
+    <span className="seg t-tt-host">
+      <button
+        type="button"
+        className="freshbtn t-tt-trigger"
+        aria-label="New analysis"
+        aria-describedby={tip}
+        onClick={onReset}
+      >
+        <Fresh />
+      </button>
+      <Tip id={tip}>
+        Discard this report and pick different transcripts. Nothing was uploaded, so these numbers
+        only exist in this page — they are gone once you do.
+      </Tip>
+    </span>
+  )
+}
+
+/** The controls, and the order is the point.
+ *
+ *  The theme switch is last in the row and the row is packed to the right, so it sits in the
+ *  same place whether the page is holding a report or waiting for one: everything else grows
+ *  leftward into the tick and leaves it where it was. The controls that only mean something
+ *  once there is a bill are absent until there is one -- a disabled control on first load
+ *  advertises something that cannot be done -- and they arrive on a stagger that runs outward
+ *  from that anchor. They leave together and faster, because a dismissal does not need
+ *  choreography.
+ *
+ *  Nothing here reads the analysis: every one of these is a lens on the view state, which
+ *  exists before the data does. That is what lets one toolbar serve both faces of the card
+ *  instead of a stripped-down copy for the empty one.
+ *
+ *  The two things worth taking out of the page are the picture and the post. A link is not
+ *  one of them: the hash carries the view -- lens, drill, chart -- and none of the data,
+ *  which lives only in the reader's own browser, so a shared link opens on an empty card
+ *  for whoever receives it. */
+export function Toolbar({
+  report,
+  leaving,
+  onReset,
+}: {
+  /** Whether there is a bill to act on. */
+  report: boolean
+  /** The report is on its way out: play the exits, and stay mounted until it is gone. */
+  leaving: boolean
+  onReset: () => void
+}): React.JSX.Element {
+  const state = useViewState()
+
+  return (
+    <div className="toolbar" data-leaving={leaving ? "1" : undefined}>
       <span className="tick" />
-      <Seg options={THEMES} value={theme} onPick={pickTheme} />
+      {report ? (
+        <>
+          <span className="t-grow" data-i="4">
+            <ResetButton onReset={onReset} />
+          </span>
+          <span className="t-grow" data-i="3">
+            <CopyChartButton />
+          </span>
+          <span className="t-grow" data-i="2">
+            <ShareButton />
+          </span>
+          <span className="t-grow" data-i="1">
+            <span className="seg t-tt-host">
+              <MaskToggle on={state.pctOnly} />
+            </span>
+          </span>
+          <span className="t-grow" data-i="0">
+            <Seg label="TTL" hint={TTL_HINT} options={TTLS} value={state.ttl} onPick={pickTtl} />
+          </span>
+        </>
+      ) : null}
+      <Seg options={THEMES} value={state.theme} onPick={pickTheme} />
     </div>
   )
 }

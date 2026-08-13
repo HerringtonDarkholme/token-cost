@@ -144,7 +144,7 @@ are combined into one report.
 dialog press <kbd>⇧⌘G</kbd> and paste `~/.claude/projects` (or <kbd>⇧⌘.</kbd> to reveal
 hidden files); on Windows type `%USERPROFILE%\.claude\projects` into the *File name* box; on
 Linux press <kbd>Ctrl</kbd>+<kbd>L</kbd>. Or run `open ~/.claude/projects` and drag a project
-onto the page. The upload screen repeats these, since that's where you need them.
+onto the page. The empty card repeats these, since that's where you need them.
 
 ## What it computes, and why it isn't just token counts
 
@@ -221,14 +221,16 @@ file tool under any name gets the same treatment.
 | `src/store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
 | `src/context.ts` | the one context the report's components read: dataset, state, palette, formatters |
 | `src/main.tsx` | entry: mounts `<App>` |
-| `src/App.tsx` | upload screen until an analysis exists, report after; owns the theme attribute |
-| `src/Upload.tsx` | picker, folder drop, hand-off to the engine |
-| `src/Report.tsx` | header, thesis strip, breakdown section, footnotes |
+| `src/App.tsx` | the turn: which face the card shows, and the exit phase in between; owns the theme attribute |
+| `src/Page.tsx` | the page itself — shell, toolbar, card, header — which outlives both faces, so the frame can tween rather than being replaced |
+| `src/Motion.tsx` | the three transition primitives: the panel that slides in, the figure that re-enters digit by digit, the copy that swaps |
+| `src/Upload.tsx` | the empty face: picker, folder drop, hand-off to the engine; and the help for finding the transcripts |
+| `src/Report.tsx` | the full face: thesis strip, the picture, breakdown section, footnotes |
 | `src/Mosaic.tsx` | the primary chart — column width = share of bill — and the hover readout |
 | `src/Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |
 | `src/Panels.tsx` | the same data ranked and labelled instead of packed |
 | `src/Ledger.tsx` | the table, where identity does not rest on colour |
-| `src/Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X |
+| `src/Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X, and the reset back to an empty card |
 | `src/Seg.tsx`, `src/Tip.tsx` | the segmented control every lens switch is made of, with its travelling pill; and the hint the controls whose face is a symbol hang off |
 | `src/Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with a caption written |
 | `src/snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |
