@@ -14,12 +14,12 @@ export function hoverBind(t: HoverTarget): { onMouseEnter: () => void; onFocus: 
   return { onMouseEnter: on, onFocus: on };
 }
 
-/** The other half: leaving a chart drops the highlight and the readout goes back to its
-   resting sentence. Bound to the chart's container rather than to every block, because
-   crossing from one block to its neighbour fires leave before enter -- clearing there would
-   blank the whole chart for a frame on every step of a sweep. Blur is filtered the same way:
-   tabbing from one block to the next keeps focus inside the container, so only leaving the
-   chart resets it. */
+/** The other half, and every view that reports a hover needs it: leaving drops the highlight
+   and the readout goes back to its resting sentence. Bound to the container of the hoverable
+   things rather than to each of them, because crossing from one to its neighbour fires leave
+   before enter -- clearing there would blank the readout for a frame on every step of a
+   sweep. Blur is filtered the same way: tabbing from one block to the next keeps focus inside
+   the container, so only leaving it resets. */
 export function clearBind(): {
   onMouseLeave: () => void; onBlur: (e: React.FocusEvent<HTMLElement>) => void;
 } {

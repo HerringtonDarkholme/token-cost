@@ -6,7 +6,7 @@ import { memo } from "react";
 import { useReport } from "./context.ts";
 import { maxCost, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts";
 import { setState, useHover } from "./store.ts";
-import { hoverBind } from "./Mosaic.tsx";
+import { clearBind, hoverBind } from "./Mosaic.tsx";
 
 /** What the footer claims, in words. Two different claims: unfiltered, it asserts the
  *  reconciliation; filtered, it says plainly that the matched rows are a subset shown in
@@ -97,7 +97,11 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
             </th>
           </tr>
         </thead>
-        <tbody>
+        {/* The rows are what carries a highlight, so the rows are what drops it -- bound here
+            rather than on the wrapper so that stepping off the last row into the footer clears
+            the readout, and rather than on each row so that a sweep down the table does not
+            blank it between one row and the next. */}
+        <tbody {...clearBind()}>
           {L.rows.length ? L.rows.map(r => {
             const key = r.group + "›" + r.node.name;
             return (

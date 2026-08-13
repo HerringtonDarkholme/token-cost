@@ -192,6 +192,28 @@ describe("interaction", () => {
     expect(container.querySelectorAll('path.sunarc[data-on="1"]')).toHaveLength(0);
   });
 
+  /* The breakdown reports a hover the same way the charts do, so it has to drop one the same
+     way: the readout is shared, and a highlight left standing after the pointer has moved on
+     describes a row nobody is looking at. Both views, because both bind the hover. */
+  it("leaving the breakdown drops the highlight, panels or table", () => {
+    const out = (): Element | null => container.querySelector(".reconline");
+
+    const pan = container.querySelector(".pan button");
+    pointerTo(out(), pan);
+    expect(getHover()).not.toBeNull();
+    pointerTo(pan, out());
+    expect(getHover()).toBeNull();
+
+    show({ view: "table" });
+    const row = container.querySelector("tbody tr");
+    pointerTo(out(), row);
+    expect(getHover()).not.toBeNull();
+    // Down into the footer, which is inside the table but is not one of the rows.
+    pointerTo(row, container.querySelector("tfoot td"));
+    expect(getHover()).toBeNull();
+    expect(container.querySelector('tbody tr[data-on="1"]')).toBeNull();
+  });
+
   it("the eye masks the total, and unmasks it again", () => {
     const eye = container.querySelector('button[aria-label="Hide dollar amounts"]');
     const real = container.querySelector(".total")?.textContent;

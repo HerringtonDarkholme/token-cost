@@ -5,7 +5,7 @@
 import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
 import { fold, kidsOf, maxCost, pctOf, type CostNode } from "./model.ts";
-import { hoverBind } from "./Mosaic.tsx";
+import { clearBind, hoverBind } from "./Mosaic.tsx";
 import { useHover } from "./store.ts";
 
 /* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when
@@ -97,7 +97,7 @@ export function Panels(): React.JSX.Element {
   }, [d, focus, rootCost, q]);
 
   return (
-    <div className="panels">
+    <div className="panels" {...clearBind()}>
       {panels.map(({ p, kids }) => {
         const key = (focus.groupName || p.name) + "›" + p.name;
         return (
