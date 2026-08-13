@@ -14,7 +14,7 @@
 import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
 import { pctOf, sunburst, type SunBranch } from "./model.ts";
-import { hoverBind } from "./Mosaic.tsx";
+import { clearBind, hoverBind } from "./Mosaic.tsx";
 import { setHover, setState, useHover } from "./store.ts";
 
 /* Ring geometry, in the viewBox's own units: the box is 200 across and centred on the
@@ -106,7 +106,9 @@ function Core({ rootCost, label, kids }: {
       </>;
 
   return (
-    <div className="suncore">
+    /* The hole reads the hover, so the pointer arriving here means it has left the ring:
+       clear, rather than leave a stale arc lit behind a readout of it. */
+    <div className="suncore" onMouseEnter={() => setHover(null)}>
       {up
         ? <button type="button" title="Back one level"
             onClick={() => { setHover(null); setState({ path: state.path.slice(0, -1) }); }}>
@@ -161,11 +163,17 @@ export function Sunburst(): React.JSX.Element {
     return <div className="sunempty">No further breakdown under {label}.</div>;
 
   return (
-    <div className="sun">
+    <div className="sun" {...clearBind()}>
       <div className="sunchart">
         <svg viewBox="-100 -100 200 200" role="img"
           aria-label={`Sunburst: ${branches.length} line items totalling ${amt(rootCost)}, `
             + "each ring a share of the one inside it"}>
+          {/* Sits under the arcs and catches everything they do not cover -- the margin
+              outside the outer ring, the corners of the box -- so sliding off an arc into
+              empty space clears the highlight. `pointer-events` is spelled out because an
+              unfilled shape is not hit-tested. */}
+          <rect x={-100} y={-100} width={200} height={200} fill="none" pointerEvents="all"
+            onMouseEnter={() => setHover(null)} />
           {branches.map(b => (
             <Sector key={b.name} branch={b} q={q} anyHover={!!hk}
               hit={hk && (hk === b.key || hk.startsWith(b.key + "›")) ? hk : null} />

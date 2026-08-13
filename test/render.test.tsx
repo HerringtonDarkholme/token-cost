@@ -10,7 +10,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { analyze } from "../engine.ts";
 import { Report } from "../Report.tsx";
-import { getState, resetState, setHover, setState, type ViewState } from "../store.ts";
+import { getHover, getState, resetState, setHover, setState, type ViewState } from "../store.ts";
 import { corpus } from "./fixture.ts";
 
 const data = analyze(corpus(process.env.TRANSCRIPT_DIR));
@@ -147,6 +147,49 @@ describe("interaction", () => {
     click(byLabel(".legrow button", g.name));
     expect(getState().path).toEqual([g.name]);
     expectClean();
+  });
+
+  /* React synthesises enter/leave from `mouseover`/`mouseout` and their relatedTarget, so
+     that pair is what these dispatch: a bare `mouseleave` would reach no handler at all. */
+  const pointerTo = (from: Element | null, to: Element | null): void => {
+    expect(from).not.toBeNull();
+    expect(to).not.toBeNull();
+    act(() => {
+      from!.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: to }));
+      to!.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, relatedTarget: from }));
+    });
+  };
+
+  it("leaving the mosaic drops the highlight", () => {
+    const seg = container.querySelector(".segb");
+    pointerTo(container.querySelector(".colhead"), seg);
+    expect(getHover()).not.toBeNull();
+    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1");
+
+    // Out of the chart but still inside the shell: the mosaic itself has to clear.
+    pointerTo(seg, container.querySelector(".hoverbar"));
+    expect(getHover()).toBeNull();
+    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("0");
+    expect(container.querySelector('.col[data-dim="1"]')).toBeNull();
+  });
+
+  it("leaving a sunburst arc drops the highlight, hole or corner", () => {
+    show({ chart: "sun" });
+    const arcs = [...container.querySelectorAll("path.sunarc")];
+    const arc = arcs[0];
+
+    // Into the hole, which is a readout of the hover and so cannot keep an arc lit behind it.
+    pointerTo(arcs[arcs.length - 1], arc);
+    expect(getHover()).not.toBeNull();
+    pointerTo(arc, container.querySelector(".suncore > *"));
+    expect(getHover()).toBeNull();
+
+    // Into the empty margin around the rings, caught by the backdrop under them.
+    pointerTo(container.querySelector(".legrow"), arc);
+    expect(getHover()).not.toBeNull();
+    pointerTo(arc, container.querySelector("svg > rect"));
+    expect(getHover()).toBeNull();
+    expect(container.querySelectorAll('path.sunarc[data-on="1"]')).toHaveLength(0);
   });
 
   it("hiding amounts masks the total", () => {

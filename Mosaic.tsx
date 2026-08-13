@@ -14,6 +14,21 @@ export function hoverBind(t: HoverTarget): { onMouseEnter: () => void; onFocus: 
   return { onMouseEnter: on, onFocus: on };
 }
 
+/** The other half: leaving a chart drops the highlight and the readout goes back to its
+   resting sentence. Bound to the chart's container rather than to every block, because
+   crossing from one block to its neighbour fires leave before enter -- clearing there would
+   blank the whole chart for a frame on every step of a sweep. Blur is filtered the same way:
+   tabbing from one block to the next keeps focus inside the container, so only leaving the
+   chart resets it. */
+export function clearBind(): {
+  onMouseLeave: () => void; onBlur: (e: React.FocusEvent<HTMLElement>) => void;
+} {
+  return {
+    onMouseLeave: () => setHover(null),
+    onBlur: e => { if (!e.currentTarget.contains(e.relatedTarget)) setHover(null); },
+  };
+}
+
 /** A column's blocks: its children, or one block standing for the column itself when it
  *  has no breakdown. */
 function segmentsOf(node: CostNode): CostNode[] {
@@ -107,7 +122,7 @@ export function Mosaic(): React.JSX.Element {
   let run = 0;
   return (
     <div className="mosaicwrap">
-      <div className="mosaic">
+      <div className="mosaic" {...clearBind()}>
         {cols.map(n => {
           const cumFrom = pctOf(run, rootCost);
           run += n.cost;
