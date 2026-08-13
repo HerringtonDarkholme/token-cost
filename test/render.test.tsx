@@ -206,6 +206,7 @@ describe("interaction", () => {
     expect(getHover()).not.toBeNull();
     pointerTo(pan, out());
     expect(getHover()).toBeNull();
+    expect(container.querySelector('.pi[data-on="1"]')).toBeNull();
 
     show({ view: "table" });
     const row = container.querySelector("tbody tr");
@@ -215,6 +216,70 @@ describe("interaction", () => {
     pointerTo(row, container.querySelector("tfoot td"));
     expect(getHover()).toBeNull();
     expect(container.querySelector('tbody tr[data-on="1"]')).toBeNull();
+  });
+
+  /* The dead space *inside* a view is the case a per-container clear cannot see, and the
+     panels are full of it: card padding, the price beside a panel's title, the bar under it,
+     a footer, the gaps in the grid. The pointer is still inside `.panels` at every one of
+     those, so what has to hold is that arriving anywhere unmarked drops the highlight --
+     not merely leaving some container that happens to be tiled edge to edge. */
+  it("the highlight drops in a view's own dead space, not just on the way out", () => {
+    const item = container.querySelector(".pi");
+    pointerTo(container.querySelector(".reconline"), item);
+    expect(getHover()).not.toBeNull();
+    expect(container.querySelector('.pi[data-on="1"]')).not.toBeNull();
+
+    // Ten pixels up, onto the panel's own price. Inside `.panels`, and not a hover source.
+    pointerTo(item, container.querySelector(".pantop .pc"));
+    expect(getHover()).toBeNull();
+    expect(container.querySelector('.pi[data-on="1"]')).toBeNull();
+  });
+
+  /* Focus is the other way in, so it has to be a way out too: `hoverBind` reports on focus,
+     and tabbing off the last control in a view has to drop what it reported. */
+  it("tabbing out of the breakdown drops the highlight", () => {
+    show({ view: "table" });
+    const tog = container.querySelector<HTMLElement>("tbody .tog");
+    const away = container.querySelector<HTMLElement>("#q");
+    expect(tog).not.toBeNull();
+    act(() => { tog!.dispatchEvent(new FocusEvent("focusin", { bubbles: true })); });
+    expect(getHover()).not.toBeNull();
+
+    act(() => {
+      tog!.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: away }));
+    });
+    expect(getHover()).toBeNull();
+  });
+
+  /* One hover store, so a row and its block in the chart have to name the same thing. A
+     child row's key used to be group-plus-name with no parent in it, which named nothing on
+     the chart at all -- and the chart's prefix test was loose enough to light the parent
+     column anyway, so it looked right while agreeing about nothing. */
+  it("a child row and its block in the chart are the same hover", () => {
+    show({ view: "table" });
+    const child = [...container.querySelectorAll("tbody tr")].find(tr => tr.className === "d1");
+    expect(child, "the corpus should open a top-level row with children").not.toBeUndefined();
+    pointerTo(container.querySelector(".reconline"), child ?? null);
+
+    // The readout names the parent, which a row that published no parent could not do.
+    expect(container.querySelector(".hoverbar .txt")?.textContent).toContain("›");
+    // And exactly one column reads as hovered: the one this row lives in.
+    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1);
+  });
+
+  /* `startsWith` on the key alone let a sibling whose name is a prefix of another's read as
+     hovered -- `docker` lighting up under `docker-compose`, `pip` under `pip3`. The separator
+     is what makes the test a path test rather than a string test. */
+  it("a hover inside one column does not light the column whose name it starts with", () => {
+    const first = container.querySelector<HTMLElement>(".col .colhead");
+    pointerTo(container.querySelector(".hoverbar"), first);
+    const real = getHover();
+    expect(real).not.toBeNull();
+    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1);
+
+    // The same key with more name on the end: a different line item, and nobody's parent.
+    act(() => { setHover({ ...real!, key: real!.key + "-zzz" }); });
+    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(0);
   });
 
   it("the eye masks the total, and unmasks it again", () => {

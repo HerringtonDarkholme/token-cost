@@ -5,8 +5,7 @@
 import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
 import { fold, kidsOf, maxCost, pctOf, type CostNode } from "./model.ts";
-import { clearBind, hoverBind } from "./Mosaic.tsx";
-import { useHover } from "./store.ts";
+import { hoverBind, useHover } from "./store.ts";
 
 /* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when
    it lands inside this panel, null otherwise. See `Column` in Mosaic.tsx. */
@@ -97,13 +96,13 @@ export function Panels(): React.JSX.Element {
   }, [d, focus, rootCost, q]);
 
   return (
-    <div className="panels" {...clearBind()}>
+    <div className="panels">
       {panels.map(({ p, kids }) => {
         const key = (focus.groupName || p.name) + "›" + p.name;
         return (
           <Panel key={p.name} panel={p} gname={focus.groupName || p.name}
                  maxPanel={maxPanel} kids={kids}
-                 hit={hk && hk.startsWith(key) ? hk : null} anyHover={!!hk} />
+                 hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null} anyHover={!!hk} />
         );
       })}
     </div>

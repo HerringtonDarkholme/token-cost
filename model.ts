@@ -228,6 +228,15 @@ export interface LedgerRow {
   key: string;
   open: boolean;
   hasKids: boolean;
+  /** The hover key for this row, built the way the charts build theirs: `group›item` for a
+   *  top-level row and `group›item›child` below it. One store feeds the highlight in every
+   *  view, so a row and its block in the mosaic have to name the same thing -- with the group
+   *  alone in front of the name, a child row named nothing on the chart at all, and hovering
+   *  it lit its parent column by accident of a prefix match. */
+  hkey: string;
+  /** What this row hangs under, or null at the top level. The readout says "git › git diff"
+   *  rather than "git diff" for the same reason the chart's blocks do. */
+  under: string | null;
 }
 
 export interface Ledger {
@@ -251,12 +260,16 @@ export function ledger(d: Dataset, path: string[], open: Record<string, boolean>
   const rows: LedgerRow[] = [];
   let recon = 0;
 
-  const walk = (list: CostNode[], depth: number, inherit: string | null): void => {
+  const walk = (list: CostNode[], depth: number, inherit: string | null,
+                parent: string | null): void => {
     const parentCost = list.reduce((s, n) => s + n.cost, 0) || 1;
     fold(list, parentCost, depth === 0 && !at.groupName).forEach(n => {
       const g = (depth === 0 && !at.groupName) ? n.name : inherit;
       const kids = kidsOf(n);
       const key = g + "›" + n.name + "›" + depth;
+      /* The disclosure key above is this table's own and carries the depth; the hover key is
+         shared with the charts and carries the path, which is why they are not one string. */
+      const hkey = parent ? `${g}›${parent}›${n.name}` : `${g}›${n.name}`;
       const match = !q || n.name.toLowerCase().includes(q);
       const kidMatch = kids ? kids.some(k => k.name.toLowerCase().includes(q)
         || (k.children || []).some(c => c.name.toLowerCase().includes(q))) : false;
@@ -264,12 +277,13 @@ export function ledger(d: Dataset, path: string[], open: Record<string, boolean>
       const isOpen = q ? (kidMatch || (match && depth === 0)) : rowIsOpen(open, key, depth);
       if (q) { if (match && !(kids && kids.length && isOpen)) recon += n.cost; }
       else if (depth === 0) recon += n.cost;
-      rows.push({ node: n, depth, group: g, key, open: isOpen, hasKids: !!(kids && kids.length) });
-      if (kids && kids.length && isOpen) walk(kids, depth + 1, g);
+      rows.push({ node: n, depth, group: g, key, open: isOpen, hasKids: !!(kids && kids.length),
+                  hkey, under: parent });
+      if (kids && kids.length && isOpen) walk(kids, depth + 1, g, n.name);
     });
   };
 
-  walk(at.node.items || [], 0, at.groupName);
+  walk(at.node.items || [], 0, at.groupName, null);
   return { rows, recon: +recon.toFixed(2), rootCost: at.node.cost || 1 };
 }
 

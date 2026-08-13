@@ -14,7 +14,9 @@ import { ReportContext, useReport, type ReportCtx } from "./context.ts";
 import {
   branches, count, focusOf, FOLD_MIN, ledger, money, palette, pctOf, type Ledger,
 } from "./model.ts";
-import { hashFor, readHash, setHover, setState, useViewState, type ViewState } from "./store.ts";
+import {
+  hashFor, hoverClear, readHash, setHover, setState, useViewState, type ViewState,
+} from "./store.ts";
 import { Seg } from "./Seg.tsx";
 import { Toolbar } from "./Toolbar.tsx";
 import { HoverBar, Mosaic } from "./Mosaic.tsx";
@@ -306,7 +308,10 @@ export function Report({ data, onReset }: {
 
   return (
     <ReportContext.Provider value={ctx}>
-      <div className="shell" onMouseLeave={() => setHover(null)}>
+      {/* The one place a highlight is dropped: every view marks the elements that stand
+          for something, and this reads the pointer and the focus against those marks. See
+          `hoverClear`. */}
+      <div className="shell" {...hoverClear}>
         <Toolbar onReset={onReset} />
         <section className="card t-resize" data-chart={state.chart}>
           <span className="br br1" /><span className="br br2" />

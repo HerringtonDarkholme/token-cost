@@ -5,29 +5,7 @@
 import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
 import { branches, fold, kidsOf, pctOf, type CostNode } from "./model.ts";
-import { setHover, useHover, type HoverTarget } from "./store.ts";
-
-/** Hover *and* keyboard focus report the same target, so tabbing through the mosaic gives
-   the same readout the pointer does. */
-export function hoverBind(t: HoverTarget): { onMouseEnter: () => void; onFocus: () => void } {
-  const on = (): void => setHover(t);
-  return { onMouseEnter: on, onFocus: on };
-}
-
-/** The other half, and every view that reports a hover needs it: leaving drops the highlight
-   and the readout goes back to its resting sentence. Bound to the container of the hoverable
-   things rather than to each of them, because crossing from one to its neighbour fires leave
-   before enter -- clearing there would blank the readout for a frame on every step of a
-   sweep. Blur is filtered the same way: tabbing from one block to the next keeps focus inside
-   the container, so only leaving it resets. */
-export function clearBind(): {
-  onMouseLeave: () => void; onBlur: (e: React.FocusEvent<HTMLElement>) => void;
-} {
-  return {
-    onMouseLeave: () => setHover(null),
-    onBlur: e => { if (!e.currentTarget.contains(e.relatedTarget)) setHover(null); },
-  };
-}
+import { hoverBind, useHover } from "./store.ts";
 
 /** A column's blocks: its children, or one block standing for the column itself when it
  *  has no breakdown. */
@@ -122,7 +100,7 @@ export function Mosaic(): React.JSX.Element {
   let run = 0;
   return (
     <div className="mosaicwrap">
-      <div className="mosaic" {...clearBind()}>
+      <div className="mosaic">
         {cols.map(n => {
           const cumFrom = pctOf(run, rootCost);
           run += n.cost;
@@ -130,7 +108,7 @@ export function Mosaic(): React.JSX.Element {
           return (
             <Column key={n.name} node={n} gname={focus.groupName || n.name}
               cumFrom={cumFrom} cumTo={pctOf(run, rootCost)} width={n.cost / colTotal}
-              hit={hk && hk.startsWith(key) ? hk : null} anyHover={!!hk} />
+              hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null} anyHover={!!hk} />
           );
         })}
       </div>

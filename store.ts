@@ -95,6 +95,49 @@ export function useHover(): HoverTarget | null {
   return useSyncExternalStore(subscribeHover, getHover, getHover);
 }
 
+/* ---------- hover, as the DOM reports it ----------
+   A view marks every element that stands for something -- a block, a row, an arc -- and one
+   handler on the shell reads the pointer against those marks. That is the whole contract:
+   arriving at a marked element sets the hover, arriving at anything else drops it.
+
+   It used to be a `clearBind` on each view's own container, which was correct only where the
+   container happened to be tiled edge to edge by marked elements. The mosaic and the table
+   are; the panels are not, so a card's padding, its footer and the grid's gaps all left a
+   highlight standing, and the sunburst needed two hand-placed clears for its hole and its
+   margin. Delegation has no such precondition, and the next view to call `hoverBind` cannot
+   forget to add its own. */
+
+/** Marks an element as standing for something, and reports it on enter and on focus, so
+ *  tabbing through a view gives the same readout the pointer does. */
+export function hoverBind(t: HoverTarget): {
+  onMouseEnter: () => void; onFocus: () => void; "data-hoversrc": string;
+} {
+  const on = (): void => setHover(t);
+  return { onMouseEnter: on, onFocus: on, "data-hoversrc": "" };
+}
+
+/** The other half, spread once on the shell. Closes over nothing, so it is written once
+ *  rather than rebuilt per render.
+ *
+ *  `mouseover` rather than `mouseleave` is what makes this work: it fires for whatever the
+ *  pointer arrives at, marked or not, and the two cases cannot both apply -- if the target is
+ *  inside a source, that source's own `mouseenter` is setting the hover, and this leaves it
+ *  alone. `mouseleave` is still needed for the way out of the shell entirely, where there is
+ *  no `mouseover` inside it left to read. Blur asks the same question of where focus went. */
+export const hoverClear: {
+  onMouseOver: (e: React.MouseEvent<HTMLElement>) => void;
+  onMouseLeave: () => void;
+  onBlur: (e: React.FocusEvent<HTMLElement>) => void;
+} = {
+  onMouseOver: e => {
+    if (!(e.target as Element).closest("[data-hoversrc]")) setHover(null);
+  },
+  onMouseLeave: () => setHover(null),
+  onBlur: e => {
+    if (!(e.relatedTarget as Element | null)?.closest("[data-hoversrc]")) setHover(null);
+  },
+};
+
 /** Back to a clean slate, keeping the reader's theme: they chose it for the session, not
  *  for the file. */
 export function resetState(): void {

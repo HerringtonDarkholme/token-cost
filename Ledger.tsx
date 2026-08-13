@@ -5,8 +5,7 @@
 import { memo } from "react";
 import { useReport } from "./context.ts";
 import { maxCost, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts";
-import { setState, useHover } from "./store.ts";
-import { clearBind, hoverBind } from "./Mosaic.tsx";
+import { hoverBind, setState, useHover } from "./store.ts";
 
 /** What the footer claims, in words. Two different claims: unfiltered, it asserts the
  *  reconciliation; filtered, it says plainly that the matched rows are a subset shown in
@@ -33,14 +32,13 @@ const Row = memo(function Row({ r, maxRow, rootCost, active }: {
 }): React.JSX.Element {
   const { state, pal, amt, reqs } = useReport();
   const h = pal.hue(r.group);
-  const key = r.group + "›" + r.node.name;
   const pct = r.node.cost / rootCost * 100;
   const name = <span className="nm" data-folded={r.node.folded ? 1 : 0}>{r.node.name}</span>;
 
   return (
     <tr className={`d${r.depth}`} data-on={active ? 1 : 0}
-      {...hoverBind({ key, name: r.node.name, cost: r.node.cost,
-                      under: null, group: r.group || "" })}>
+      {...hoverBind({ key: r.hkey, name: r.node.name, cost: r.node.cost,
+                      under: r.under, group: r.group || "" })}>
       <td className="name">
         <span className="namecell">
           <span className="chip" style={{
@@ -79,7 +77,6 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
   const { state, amt } = useReport();
   const hover = useHover();
   const hk = hover?.key ?? null;
-  const note = useReconNote(L);
   const maxRow = maxCost(L.rows.filter(r => r.depth === 0).map(r => r.node));
   const reconShare = L.recon / L.rootCost;
 
@@ -97,18 +94,11 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
             </th>
           </tr>
         </thead>
-        {/* The rows are what carries a highlight, so the rows are what drops it -- bound here
-            rather than on the wrapper so that stepping off the last row into the footer clears
-            the readout, and rather than on each row so that a sweep down the table does not
-            blank it between one row and the next. */}
-        <tbody {...clearBind()}>
-          {L.rows.length ? L.rows.map(r => {
-            const key = r.group + "›" + r.node.name;
-            return (
-              <Row key={r.key} r={r} maxRow={maxRow} rootCost={L.rootCost}
-                active={hk === key || !!hk?.startsWith(key + "›")} />
-            );
-          }) : (
+        <tbody>
+          {L.rows.length ? L.rows.map(r => (
+            <Row key={r.key} r={r} maxRow={maxRow} rootCost={L.rootCost}
+              active={hk === r.hkey || !!hk?.startsWith(r.hkey + "›")} />
+          )) : (
             <tr>
               <td colSpan={5} style={{ padding: "14px 0", color: "var(--ink3)" }}>
                 No line item matches “{state.query}”.
@@ -121,7 +111,10 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
             <td className="lbl">{state.query ? "Matched" : "Reconciled"}</td>
             <td className="v">{amt(L.recon)}</td>
             <td className="p">{(reconShare * 100).toFixed(reconShare < 0.1 ? 2 : 1)}%</td>
-            <td colSpan={2} className="n">{note}</td>
+            {/* The sentence lives in `.reconline` directly below, which is where it has to
+                live anyway -- the panels view has no table to put a footer in -- so printing
+                it here as well was the same paragraph twice, ten pixels apart. */}
+            <td colSpan={2} className="n" />
           </tr>
         </tfoot>
       </table>
