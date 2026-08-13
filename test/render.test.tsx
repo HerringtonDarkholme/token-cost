@@ -245,6 +245,25 @@ describe("interaction", () => {
     expect(digits().join("")).toMatch(/^\*+$/);
   });
 
+  /* The picture is the biggest thing on the page and the frame around it is a different shape
+     for each chart, so the switch has two jobs. What has to hold structurally is that the
+     chart sits in a panel of its own and that the panel is a *fresh* one per chart -- the same
+     node reopening has no closed state to travel from -- and that the chart keeps the flex
+     column it fills, since neither the mosaic's scroller nor the sunburst's disc has a height
+     of its own to fall back on. */
+  it("each chart arrives in a fresh panel, inside a frame that resizes", () => {
+    expect(container.querySelector(".card.t-resize")).not.toBeNull();
+    const slot = (): Element | null => container.querySelector(".chartslot.t-panel-slide");
+    const before = slot();
+    expect(before?.querySelector(".mosaicwrap")).not.toBeNull();
+
+    show({ chart: "sun" });
+    expect(slot()).not.toBe(before);
+    expect(slot()?.querySelector(".sun")).not.toBeNull();
+    // Still the card's own child, so `flex: 1` is measured against the card.
+    expect(slot()?.parentElement?.classList.contains("card")).toBe(true);
+  });
+
   it("a ledger row collapses", () => {
     show({ view: "table" });
     const rows = () => container.querySelectorAll("tbody tr").length;

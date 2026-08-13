@@ -93,17 +93,25 @@ function PopNumber({ value, className }: {
   );
 }
 
-/** The panel the breakdown's two views arrive in. Mounted closed and opened on the next
- *  frame, because the open state needs a painted closed state to travel from; keyed on the
- *  view from outside, so switching lists mounts a fresh panel rather than reopening this one.
+/** The panel a swapped-in view arrives in. Mounted closed and opened on the next frame,
+ *  because the open state needs a painted closed state to travel from; keyed from outside on
+ *  whatever picked the view, so a switch mounts a fresh panel rather than reopening this one.
+ *
+ *  `className` is for the callers whose panel has to carry layout as well -- the chart sits in
+ *  a flex column and has to keep filling it.
  */
-function Reveal({ children }: { children: React.ReactNode }): React.JSX.Element {
+function Reveal({ className, children }: {
+  className?: string; children: React.ReactNode;
+}): React.JSX.Element {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setOpen(true));
     return () => cancelAnimationFrame(id);
   }, []);
-  return <div className="t-panel-slide" data-open={open ? "true" : "false"}>{children}</div>;
+  return (
+    <div className={className ? `${className} t-panel-slide` : "t-panel-slide"}
+         data-open={open ? "true" : "false"}>{children}</div>
+  );
 }
 
 function Crumbs(): React.JSX.Element {
@@ -290,7 +298,7 @@ export function Report({ data, onReset }: {
     <ReportContext.Provider value={ctx}>
       <div className="shell" onMouseLeave={() => setHover(null)}>
         <Toolbar onReset={onReset} />
-        <section className="card" data-chart={state.chart}>
+        <section className="card t-resize" data-chart={state.chart}>
           <span className="br br1" /><span className="br br2" />
           <span className="br br3" /><span className="br br4" />
           <header className="chead">
@@ -317,7 +325,15 @@ export function Report({ data, onReset }: {
             </span>
             <Crumbs />
           </div>
-          {state.chart === "sun" ? <Sunburst /> : <Mosaic />}
+          {/* Keyed on the chart, so the picture the switch asks for arrives rather than
+              appearing: a fresh panel mounts closed and slides up into the space the other
+              one left. The frame around it changes shape at the same time -- `.card` is 16/9
+              for the mosaic and 4/3 for the sunburst -- and `.t-resize` tweens that too, so
+              the whole card moves as one thing instead of snapping to a new height under a
+              picture that was already there. */}
+          <Reveal key={state.chart} className="chartslot">
+            {state.chart === "sun" ? <Sunburst /> : <Mosaic />}
+          </Reveal>
           {/* The chart switch lives at the foot of the card, on the footnote's rule: it picks
               the whole picture, so it sits below the picture rather than crowding the
               breadcrumb, which addresses one block inside it. */}

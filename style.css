@@ -335,6 +335,11 @@ h1.big-title em{font-style:normal;color:var(--accent)}
   --text-swap-translate-y:var(--distance-micro);
   --text-swap-blur:var(--blur-small);
   --text-swap-ease:var(--ease-in-out);
+  /* Card resize. The scale documents `--ease-smooth-out` for a resize, so the ease
+     comes from it; no duration's documented usage is a container resize, so 300ms
+     stays the snippet's own literal. */
+  --resize-dur:300ms;
+  --resize-ease:var(--ease-smooth-out);
   /* Panel reveal */
   --panel-open-dur:var(--duration-slow);
   --panel-close-dur:var(--duration-medium);
@@ -393,8 +398,25 @@ h1.big-title em{font-style:normal;color:var(--accent)}
   filter:blur(var(--text-swap-blur));opacity:0;transition:none}
 @media (prefers-reduced-motion:reduce){.t-text-swap{transition:none!important}}
 
-/* Panel reveal — the breakdown's two lists, each sliding into the region the
-   other left. */
+/* Card resize — the frame, which is a different shape for each chart. Its size is
+   set by `aspect-ratio` rather than by a length, so that property is enumerated
+   alongside the snippet's own two: a browser that interpolates ratios tweens the
+   frame, and one that does not lands on the jump it makes today. */
+.t-resize{
+  transition:
+    width        var(--resize-dur) var(--resize-ease),
+    height       var(--resize-dur) var(--resize-ease),
+    aspect-ratio var(--resize-dur) var(--resize-ease);
+  will-change:width,height}
+@media (prefers-reduced-motion:reduce){.t-resize{transition:none!important}}
+
+/* Panel reveal — the breakdown's two lists and the card's two charts, each sliding
+   into the region the other left.
+
+   The chart's panel stands where `.mosaicwrap` and `.sun` used to stand, as the
+   flex child that takes the rest of the card, so it has to hand that on: the
+   column is what the chart inside it measures its own height against. */
+.chartslot{flex:1;min-height:0;display:flex;flex-direction:column}
 .t-panel-slide{transform:translateY(var(--panel-translate-y));opacity:0;
   filter:blur(var(--panel-blur));pointer-events:none;
   transition:
