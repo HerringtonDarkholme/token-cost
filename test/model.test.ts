@@ -10,13 +10,28 @@
 
 import { analyze, type Dataset } from "../engine.ts";
 import {
-  fold, focusOf, kidsOf, ledger, palette, postLength, postText, postVariants, POST_MAX,
-  rowIsOpen, sunburst, SUN_RINGS, vouched, type CostNode,
+  fold,
+  focusOf,
+  kidsOf,
+  ledger,
+  palette,
+  postLength,
+  postText,
+  postVariants,
+  POST_MAX,
+  rowIsOpen,
+  sunburst,
+  SUN_RINGS,
+  vouched,
+  type CostNode,
 } from "../model.ts";
 import { corpus } from "./fixture.ts";
 
 let fails = 0;
-const ok = (c: boolean, m: string): void => { if (!c) fails++; console.log((c ? "ok   " : "FAIL ") + m); };
+const ok = (c: boolean, m: string): void => {
+  if (!c) fails++;
+  console.log((c ? "ok   " : "FAIL ") + m);
+};
 const sum = (l: CostNode[]): number => l.reduce((a, n) => a + n.cost, 0);
 /** Folding rounds its "other" row to the cent, and the engine's own split carries a little
  *  float noise, so equality is to the cent plus a hair proportional to the magnitude. */
@@ -42,16 +57,20 @@ for (const ttl of ["1h", "5m"] as const) {
 
   /* 2. The ledger's top-level rows reconcile to the dataset. */
   const L = ledger(d, [], {}, "");
-  ok(near(L.recon, d.total), `root ledger reconciles: $${L.recon.toFixed(2)} vs $${d.total.toFixed(2)}`);
+  ok(
+    near(L.recon, d.total),
+    `root ledger reconciles: $${L.recon.toFixed(2)} vs $${d.total.toFixed(2)}`,
+  );
 
   /* 3. Children sum to their parent, at every open level, everywhere the reader can go. */
   const paths: string[][] = [[]];
   for (const g of d.groups) {
     paths.push([g.name]);
-    const kid = g.items.find(i => i.children && i.children.length > 1);
+    const kid = g.items.find((i) => i.children && i.children.length > 1);
     if (kid) paths.push([g.name, kid.name]);
   }
-  let reconOk = true, checked = 0;
+  let reconOk = true,
+    checked = 0;
   for (const path of paths) {
     const rows = ledger(d, path, {}, "").rows;
     for (let i = 0; i < rows.length; i++) {
@@ -63,8 +82,10 @@ for (const ttl of ["1h", "5m"] as const) {
       checked++;
       if (!near(kids, r.node.cost)) {
         reconOk = false;
-        console.log(`     ${path.join(" › ") || "all"} :: ${r.node.name} — `
-          + `children $${kids.toFixed(2)} vs $${r.node.cost.toFixed(2)}`);
+        console.log(
+          `     ${path.join(" › ") || "all"} :: ${r.node.name} — ` +
+            `children $${kids.toFixed(2)} vs $${r.node.cost.toFixed(2)}`,
+        );
       }
     }
   }
@@ -86,13 +107,16 @@ for (const ttl of ["1h", "5m"] as const) {
     const where = path.join(" › ") || "all";
     for (const r of ledger(d, path, {}, "").rows) {
       const k = kidsOf(r.node);
-      if (k && k.length === 1 && !kidsOf(k[0])) restated(where, `row ${r.node.name} — lone leaf ${k[0].name}`);
+      if (k && k.length === 1 && !kidsOf(k[0]))
+        restated(where, `row ${r.node.name} — lone leaf ${k[0].name}`);
     }
     for (const b of sunburst(focusOf(d, path))) {
       for (const a of b.arcs) {
-        const kids = b.arcs.filter(x => x.ring === a.ring + 1 && x.key === a.key + "›" + x.name);
+        const kids = b.arcs.filter((x) => x.ring === a.ring + 1 && x.key === a.key + "›" + x.name);
         if (kids.length !== 1) continue;
-        const grand = b.arcs.some(x => x.ring === a.ring + 2 && x.key.startsWith(kids[0].key + "›"));
+        const grand = b.arcs.some(
+          (x) => x.ring === a.ring + 2 && x.key.startsWith(kids[0].key + "›"),
+        );
         if (!grand && closeDeg(kids[0].a1 - kids[0].a0, a.a1 - a.a0))
           restated(where, `arc ${a.name} — ring ${a.ring + 1} restates it and stops`);
       }
@@ -102,13 +126,18 @@ for (const ttl of ["1h", "5m"] as const) {
 
   /* 4. A path from an edited URL or a stale bookmark degrades, never throws. */
   ok(focusOf(d, ["no such group"]).groupName === null, "unknown drill path falls back to the root");
-  ok(focusOf(d, [d.groups[0].name, "no such item"]).node.name === d.groups[0].name,
-     "unknown item falls back to its group");
+  ok(
+    focusOf(d, [d.groups[0].name, "no such item"]).node.name === d.groups[0].name,
+    "unknown item falls back to its group",
+  );
 
   /* 5. A query shows matches and the ancestors that give them context, and nothing else.
         It legitimately *adds* rows -- matches deeper than the default disclosure are
         revealed -- so the claim is about relevance, not about row count. */
-  ok(ledger(d, [], {}, "zzzzzznope").rows.length === 0, "a query that matches nothing yields no rows");
+  ok(
+    ledger(d, [], {}, "zzzzzznope").rows.length === 0,
+    "a query that matches nothing yields no rows",
+  );
   const probe = (d.groups[0].items[0]?.name || d.groups[0].name).slice(0, 4).toLowerCase();
   const hits = ledger(d, [], {}, probe).rows;
   const matches = (n: string): boolean => n.toLowerCase().includes(probe);
@@ -124,14 +153,17 @@ for (const ttl of ["1h", "5m"] as const) {
 
   /* 6. Colour follows the entity, and never runs out. */
   const pal = palette(data, d);
-  ok(d.groups.every(g => /^var\(--c[1-8]\)$|^var\(--cn\)$/.test(pal.hue(g.name))),
-     "every group gets a palette token, a 9th takes the neutral");
+  ok(
+    d.groups.every((g) => /^var\(--c[1-8]\)$|^var\(--cn\)$/.test(pal.hue(g.name))),
+    "every group gets a palette token, a 9th takes the neutral",
+  );
   ok(pal.hue("something never seen") === "var(--cn)", "an unknown group is neutral, not undefined");
 
   /* 7. The sunburst's geometry is the arithmetic, not a decoration of it: a sweep has to be
         the node's share of the circle, and a ring has to tile the ring inside it exactly.
         A gap or an overlap would be a claim about money that no other view makes. */
-  let sunOk = true, arcs = 0;
+  let sunOk = true,
+    arcs = 0;
   for (const path of paths) {
     const at = focusOf(d, path);
     const tree = sunburst(at);
@@ -143,17 +175,21 @@ for (const ttl of ["1h", "5m"] as const) {
       /* Ring 0 is laid end to end around the whole circle, in order, with no gaps -- and a
          level that rounds to nothing anywhere is split evenly rather than drawn away. */
       if (!closeDeg(root.a0, cursor)) sunOk = false;
-      if (!closeDeg(root.a1 - root.a0, total > 0 ? b.cost / total * 360 : 360 / tree.length))
+      if (!closeDeg(root.a1 - root.a0, total > 0 ? (b.cost / total) * 360 : 360 / tree.length))
         sunOk = false;
       cursor = root.a1;
 
       const seen = new Set<string>();
       for (const a of b.arcs) {
         arcs++;
-        if (a.ring >= SUN_RINGS || seen.has(a.key)) sunOk = false;   // keys are React keys too
+        if (a.ring >= SUN_RINGS || seen.has(a.key)) sunOk = false; // keys are React keys too
         seen.add(a.key);
-        const kids = b.arcs.filter(k => k.ring === a.ring + 1
-          && k.key.startsWith(a.key + "›") && !k.key.slice(a.key.length + 1).includes("›"));
+        const kids = b.arcs.filter(
+          (k) =>
+            k.ring === a.ring + 1 &&
+            k.key.startsWith(a.key + "›") &&
+            !k.key.slice(a.key.length + 1).includes("›"),
+        );
         if (!kids.length) continue;
         if (!closeDeg(kids[0].a0, a.a0) || !closeDeg(kids[kids.length - 1].a1, a.a1)) sunOk = false;
         for (let i = 1; i < kids.length; i++)
@@ -162,7 +198,10 @@ for (const ttl of ["1h", "5m"] as const) {
     }
     if (!closeDeg(cursor, 360)) sunOk = false;
   }
-  ok(sunOk, `sunburst rings tile exactly and sweep with cost (${arcs} arcs over ${paths.length} paths)`);
+  ok(
+    sunOk,
+    `sunburst rings tile exactly and sweep with cost (${arcs} arcs over ${paths.length} paths)`,
+  );
 }
 
 /* 8. Disclosure defaults: top level open, deeper levels closed, explicit state wins. */
@@ -177,19 +216,31 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
 {
   const dd = data.datasets["1h"];
   const home = "https://a-fairly-long-deployment-name.example.vercel.app/";
-  const open = postVariants(dd, false, home), masked = postVariants(dd, true, home);
+  const open = postVariants(dd, false, home),
+    masked = postVariants(dd, true, home);
   const both = [...open, ...masked];
 
-  ok(open.length > 0 && masked.length > 0,
-     `every dataset yields a caption (${open.length} open / ${masked.length} masked)`);
-  ok(both.every(s => postLength(s) <= POST_MAX),
-     `every caption fits a post (longest ${Math.max(...both.map(postLength))} of ${POST_MAX})`);
-  ok(!both.some(s => /undefined|NaN|\$0\.00|\b0(\.0)?%/.test(s)),
-     "no caption has a hole, or quotes a figure that rounded away to nothing");
-  ok(!masked.some(s => s.includes("$")), "covering the amounts keeps money out of every caption");
-  ok(open.every(s => s.endsWith(home)), "the invitation survives whatever else has to be cut");
-  ok(!postVariants(dd, false).some(s => /yours|https?:/i.test(s)),
-     "with nowhere to point, the invitation is dropped rather than left dangling");
+  ok(
+    open.length > 0 && masked.length > 0,
+    `every dataset yields a caption (${open.length} open / ${masked.length} masked)`,
+  );
+  ok(
+    both.every((s) => postLength(s) <= POST_MAX),
+    `every caption fits a post (longest ${Math.max(...both.map(postLength))} of ${POST_MAX})`,
+  );
+  ok(
+    !both.some((s) => /undefined|NaN|\$0\.00|\b0(\.0)?%/.test(s)),
+    "no caption has a hole, or quotes a figure that rounded away to nothing",
+  );
+  ok(!masked.some((s) => s.includes("$")), "covering the amounts keeps money out of every caption");
+  ok(
+    open.every((s) => s.endsWith(home)),
+    "the invitation survives whatever else has to be cut",
+  );
+  ok(
+    !postVariants(dd, false).some((s) => /yours|https?:/i.test(s)),
+    "with nowhere to point, the invitation is dropped rather than left dangling",
+  );
 
   /* A caption may name a leaf, and a leaf name is the reader's own shell history: an
      internal CLI or a deploy script with a hostname in it. Only the programs the allowlist
@@ -197,16 +248,23 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
      The allowlist itself is the subject here, so the assertion reads it rather than
      restating it; a copy would only drift and start vouching for the wrong thing. */
   const unvouched = dd.groups
-    .filter(g => ["shell", "ingest", "emit", "twoway"].includes(g.id))
-    .flatMap(g => g.items.filter(i => !vouched(g.id, i.name)));
-  ok(unvouched.length > 0, `the corpus contains names that may not be posted (${unvouched.length})`);
-  ok(!unvouched.some(i => both.some(s => s.includes(i.name))),
-     `an in-house CLI or MCP server is charted but never posted (${unvouched.map(i => i.name).join(", ")})`);
+    .filter((g) => ["shell", "ingest", "emit", "twoway"].includes(g.id))
+    .flatMap((g) => g.items.filter((i) => !vouched(g.id, i.name)));
+  ok(
+    unvouched.length > 0,
+    `the corpus contains names that may not be posted (${unvouched.length})`,
+  );
+  ok(
+    !unvouched.some((i) => both.some((s) => s.includes(i.name))),
+    `an in-house CLI or MCP server is charted but never posted (${unvouched.map((i) => i.name).join(", ")})`,
+  );
 
   /* The draw only ever lands on a caption that was built, for any fraction including the
      endpoints -- an out-of-range index here would ship `undefined` into the composer. */
-  ok([0, 0.25, 0.5, 0.999, 1].every(p => open.includes(postText(dd, false, home, p))),
-     "the random draw always lands on one of the built captions");
+  ok(
+    [0, 0.25, 0.5, 0.999, 1].every((p) => open.includes(postText(dd, false, home, p))),
+    "the random draw always lands on one of the built captions",
+  );
 }
 
 console.log(fails ? `\n${fails} MODEL FAILURE(S)` : "\nmodel clean");

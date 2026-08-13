@@ -8,4 +8,8 @@ import { App } from "./App.tsx";
 const host = document.getElementById("app");
 if (!host) throw new Error("missing #app in the document");
 
-createRoot(host).render(<StrictMode><App /></StrictMode>);
+createRoot(host).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);

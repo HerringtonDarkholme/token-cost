@@ -7,10 +7,16 @@ import { Seg } from "./Seg.tsx";
 import { CopyChartButton, ShareButton } from "./Share.tsx";
 import { setState, type ThemeChoice } from "./store.ts";
 
-const THEMES: ReadonlyArray<readonly [ThemeChoice, string]> =
-  [["light", "Light"], ["system", "System"], ["dark", "Dark"]];
+const THEMES: ReadonlyArray<readonly [ThemeChoice, string]> = [
+  ["light", "Light"],
+  ["system", "System"],
+  ["dark", "Dark"],
+];
 
-const TTLS: ReadonlyArray<readonly [TtlAssumption, string]> = [["1h", "1h"], ["5m", "5m"]];
+const TTLS: ReadonlyArray<readonly [TtlAssumption, string]> = [
+  ["1h", "1h"],
+  ["5m", "5m"],
+];
 
 /* The switches hand these down rather than closing over a fresh arrow each render. Nothing
    here needs a component's scope -- a pick is a write to the store, which is a module away --
@@ -40,9 +46,14 @@ function Eye({ off }: { off: boolean }): React.JSX.Element {
  *  "Show, pressed" and no way to tell what that means. */
 function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
   return (
-    <button type="button" className="eyebtn" aria-pressed={on}
-      aria-label="Hide dollar amounts" title={on ? "Show dollar amounts" : "Hide dollar amounts"}
-      onClick={() => setState({ pctOnly: !on })}>
+    <button
+      type="button"
+      className="eyebtn"
+      aria-pressed={on}
+      aria-label="Hide dollar amounts"
+      title={on ? "Show dollar amounts" : "Hide dollar amounts"}
+      onClick={() => setState({ pctOnly: !on })}
+    >
       <span className="eyeamt">$</span>
       <Eye off={on} />
     </button>
@@ -67,7 +78,9 @@ export function Toolbar({ onReset }: { onReset: () => void }): React.JSX.Element
       <Seg label="TTL" options={TTLS} value={state.ttl} onPick={pickTtl} />
       <Seg options={THEMES} value={state.theme} onPick={pickTheme} />
       <span className="seg">
-        <button type="button" onClick={onReset}>New file</button>
+        <button type="button" onClick={onReset}>
+          New file
+        </button>
       </span>
     </div>
   );

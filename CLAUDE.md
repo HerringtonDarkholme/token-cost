@@ -11,12 +11,24 @@ round trip to undo.
 
 ## Before you commit
 
-`pnpm check` — lint, typecheck, build, then all three suites. The build asserts the page is
-self-contained, so a change that reaches the network fails here rather than in someone's
-browser.
+`pnpm check` — format, lint, typecheck, build, then all three suites. The build asserts the
+page is self-contained, so a change that reaches the network fails here rather than in
+someone's browser.
+
+The formatter is oxfmt, and it owns the TypeScript: run `pnpm format` and commit what it
+gives you rather than arguing with it in review. `pnpm check` runs `oxfmt --check`, so an
+unformatted file fails the gate. It formats `.ts` and `.tsx` and nothing else — `style.css`,
+the markdown and `index.html` are hand-composed in shapes oxfmt would flatten, and
+`.oxfmtrc.json` says which and why. Do not reach for the aligned-by-hand column trick in TS;
+it will not survive the next `pnpm format`.
 
 The lint is oxlint, and it is a gate rather than advice: `.oxlintrc.json` is expected to stay
 at zero findings. Every rule it turns off carries the reason in a comment beside it, so if a
 new finding is a false positive, silence it the same way — with the argument written down, or
 at the one site with `// oxlint-disable-next-line <rule>` and a comment saying why. Reaching
 for `-A` on the command line to get a commit out is not the move.
+
+One wrinkle now that a formatter runs first: `oxlint-disable-next-line` points at a line
+number, and which line a violation lands on is oxfmt's decision, not yours. If the construct
+you are silencing spans more than one line, use a `oxlint-disable` / `oxlint-enable` pair
+around it instead — see the digit spans in `Report.tsx`.

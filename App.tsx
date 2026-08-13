@@ -28,13 +28,16 @@ export function App(): React.JSX.Element {
 
   /* Seed from the shared link before anything paints, so a link that says "dark, table
      view, drilled into shell commands" arrives that way rather than snapping into it. */
-  useEffect(() => { setState(readHash(location.hash)); }, []);
+  useEffect(() => {
+    setState(readHash(location.hash));
+  }, []);
 
   /* One function for the life of the app rather than a fresh one per render: dropping the
      analysis is the same act every time, and `setData` is already stable. */
-  const reset = useCallback(() => { setData(null); resetState(); }, []);
+  const reset = useCallback(() => {
+    setData(null);
+    resetState();
+  }, []);
 
-  return data
-    ? <Report data={data} onReset={reset} />
-    : <Upload onData={setData} />;
+  return data ? <Report data={data} onReset={reset} /> : <Upload onData={setData} />;
 }

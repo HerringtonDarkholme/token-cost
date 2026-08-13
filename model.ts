@@ -32,10 +32,10 @@ export const FOLD_MAX = 14;
 /** Percentage of a maximum, guarded. Every row in a group can legitimately round to $0.00
  *  on a small dataset, which makes the group maximum 0 and any bare v/max a NaN that lands
  *  straight in a style attribute. */
-export const pctOf = (v: number, max: number): number => (max > 0 && v >= 0) ? v / max * 100 : 0;
+export const pctOf = (v: number, max: number): number => (max > 0 && v >= 0 ? (v / max) * 100 : 0);
 
 export const maxCost = (list: CostNode[] | null | undefined): number =>
-  (list && list.length) ? Math.max(...list.map(x => x.cost || 0)) : 0;
+  list && list.length ? Math.max(...list.map((x) => x.cost || 0)) : 0;
 
 export const money = (n: number): string =>
   "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -43,16 +43,24 @@ export const money = (n: number): string =>
 export const count = (n: number): string => n.toLocaleString("en-US");
 
 /** Keep the top items, fold the tail into one labelled row. Nothing is dropped. */
-export function fold(list: CostNode[] | null | undefined, parentCost: number, noFold?: boolean): CostNode[] {
+export function fold(
+  list: CostNode[] | null | undefined,
+  parentCost: number,
+  noFold?: boolean,
+): CostNode[] {
   if (!list || !list.length) return [];
   const sorted = list.slice().sort((a, b) => b.cost - a.cost);
   if (noFold) return sorted;
-  const keep: CostNode[] = [], rest: CostNode[] = [];
-  sorted.forEach((n, i) => ((i < FOLD_MAX && n.cost >= parentCost * FOLD_MIN) ? keep : rest).push(n));
-  if (rest.length) keep.push({
-    name: `other (${rest.length} items)`,
-    cost: +rest.reduce((s, n) => s + n.cost, 0).toFixed(2), children: null, folded: true,
-  });
+  const keep: CostNode[] = [],
+    rest: CostNode[] = [];
+  sorted.forEach((n, i) => (i < FOLD_MAX && n.cost >= parentCost * FOLD_MIN ? keep : rest).push(n));
+  if (rest.length)
+    keep.push({
+      name: `other (${rest.length} items)`,
+      cost: +rest.reduce((s, n) => s + n.cost, 0).toFixed(2),
+      children: null,
+      folded: true,
+    });
   return keep;
 }
 
@@ -60,7 +68,7 @@ export function fold(list: CostNode[] | null | undefined, parentCost: number, no
  *  group renders one full-width 100% block, which reads as broken. */
 export function branches(node: CostNode | null | undefined): boolean {
   const k = (node && (node.items || node.children)) || [];
-  return k.length > 1 || (k.length === 1 && ((k[0].items || k[0].children) || []).length > 1);
+  return k.length > 1 || (k.length === 1 && (k[0].items || k[0].children || []).length > 1);
 }
 
 /** The same question, answered with the list: the children worth drawing as a level of
@@ -89,16 +97,17 @@ export interface Palette {
 }
 
 export function palette(data: Analysis, d: Dataset): Palette {
-  const hues = new Map<string, string>(), shorts = new Map<string, string>();
-  const order = (data.groupDefs || []).map(g => g.id);
-  (d.groups || []).forEach(g => {
+  const hues = new Map<string, string>(),
+    shorts = new Map<string, string>();
+  const order = (data.groupDefs || []).map((g) => g.id);
+  (d.groups || []).forEach((g) => {
     const i = order.indexOf(g.id);
-    hues.set(g.name, (i >= 0 && i < 8) ? `var(--c${i + 1})` : "var(--cn)");
+    hues.set(g.name, i >= 0 && i < 8 ? `var(--c${i + 1})` : "var(--cn)");
     if (g.short) shorts.set(g.name, g.short);
   });
   return {
-    hue: g => (g && hues.get(g)) || "var(--cn)",
-    short: name => shorts.get(name),
+    hue: (g) => (g && hues.get(g)) || "var(--cn)",
+    short: (name) => shorts.get(name),
   };
 }
 
@@ -116,10 +125,13 @@ export function focusOf(d: Dataset, path: string[]): Focus {
   let node: CostNode = { name: "all", cost: d.total, items: d.groups };
   let group: CostNode | null = null;
   if (path[0]) {
-    const g = d.groups.find(x => x.name === path[0]);
-    if (g) { group = g; node = { name: g.name, cost: g.cost, items: g.items }; }
+    const g = d.groups.find((x) => x.name === path[0]);
+    if (g) {
+      group = g;
+      node = { name: g.name, cost: g.cost, items: g.items };
+    }
     if (path[1] && group) {
-      const it = (group.items || []).find(x => x.name === path[1]);
+      const it = (group.items || []).find((x) => x.name === path[1]);
       if (it) node = { name: it.name, cost: it.cost, items: it.children || [] };
     }
   }
@@ -173,7 +185,7 @@ export const SUN_MIN_SPLIT = 4;
  *  line item, and the reader has to be able to see it to click into it. */
 function shareIn(list: CostNode[]): (cost: number) => number {
   const total = list.reduce((s, n) => s + n.cost, 0);
-  return total > 0 ? (c => c / total) : (() => 1 / (list.length || 1));
+  return total > 0 ? (c) => c / total : () => 1 / (list.length || 1);
 }
 
 /** Lay the focused subtree out as nested rings. Each ring exactly tiles the one inside it,
@@ -191,8 +203,14 @@ export function sunburst(focus: Focus, rings: number = SUN_RINGS): SunBranch[] {
     const group = focus.groupName || n.name;
     const arcs: SunArc[] = [];
 
-    const walk = (node: CostNode, ring: number, a0: number, span: number,
-                  key: string, under: string | null): void => {
+    const walk = (
+      node: CostNode,
+      ring: number,
+      a0: number,
+      span: number,
+      key: string,
+      under: string | null,
+    ): void => {
       arcs.push({ key, name: node.name, cost: node.cost, ring, a0, a1: a0 + span, under });
       if (ring + 1 >= rings || span < SUN_MIN_SPLIT) return;
       const kids = fold(kidsOf(node) || [], node.cost);
@@ -212,8 +230,13 @@ export function sunburst(focus: Focus, rings: number = SUN_RINGS): SunBranch[] {
     walk(n, 0, at, span, group + "›" + n.name, null);
     at += span;
     out.push({
-      key: group + "›" + n.name, name: n.name, group, cost: n.cost,
-      items: (kidsOf(n) || []).length, folded: !!n.folded, arcs,
+      key: group + "›" + n.name,
+      name: n.name,
+      group,
+      cost: n.cost,
+      items: (kidsOf(n) || []).length,
+      folded: !!n.folded,
+      arcs,
     });
   }
   return out;
@@ -254,31 +277,54 @@ export const rowIsOpen = (open: Record<string, boolean>, key: string, depth: num
 /** Flatten the focused subtree into ledger rows, honouring open state and the query.
  *  `recon` is what the footer reconciles: the sum of the top-level rows, or of the matched
  *  rows when a query is active. */
-export function ledger(d: Dataset, path: string[], open: Record<string, boolean>, query: string): Ledger {
+export function ledger(
+  d: Dataset,
+  path: string[],
+  open: Record<string, boolean>,
+  query: string,
+): Ledger {
   const at = focusOf(d, path);
   const q = query.trim().toLowerCase();
   const rows: LedgerRow[] = [];
   let recon = 0;
 
-  const walk = (list: CostNode[], depth: number, inherit: string | null,
-                parent: string | null): void => {
+  const walk = (
+    list: CostNode[],
+    depth: number,
+    inherit: string | null,
+    parent: string | null,
+  ): void => {
     const parentCost = list.reduce((s, n) => s + n.cost, 0) || 1;
-    fold(list, parentCost, depth === 0 && !at.groupName).forEach(n => {
-      const g = (depth === 0 && !at.groupName) ? n.name : inherit;
+    fold(list, parentCost, depth === 0 && !at.groupName).forEach((n) => {
+      const g = depth === 0 && !at.groupName ? n.name : inherit;
       const kids = kidsOf(n);
       const key = g + "›" + n.name + "›" + depth;
       /* The disclosure key above is this table's own and carries the depth; the hover key is
          shared with the charts and carries the path, which is why they are not one string. */
       const hkey = parent ? `${g}›${parent}›${n.name}` : `${g}›${n.name}`;
       const match = !q || n.name.toLowerCase().includes(q);
-      const kidMatch = kids ? kids.some(k => k.name.toLowerCase().includes(q)
-        || (k.children || []).some(c => c.name.toLowerCase().includes(q))) : false;
+      const kidMatch = kids
+        ? kids.some(
+            (k) =>
+              k.name.toLowerCase().includes(q) ||
+              (k.children || []).some((c) => c.name.toLowerCase().includes(q)),
+          )
+        : false;
       if (q && !match && !kidMatch) return;
-      const isOpen = q ? (kidMatch || (match && depth === 0)) : rowIsOpen(open, key, depth);
-      if (q) { if (match && !(kids && kids.length && isOpen)) recon += n.cost; }
-      else if (depth === 0) recon += n.cost;
-      rows.push({ node: n, depth, group: g, key, open: isOpen, hasKids: !!(kids && kids.length),
-                  hkey, under: parent });
+      const isOpen = q ? kidMatch || (match && depth === 0) : rowIsOpen(open, key, depth);
+      if (q) {
+        if (match && !(kids && kids.length && isOpen)) recon += n.cost;
+      } else if (depth === 0) recon += n.cost;
+      rows.push({
+        node: n,
+        depth,
+        group: g,
+        key,
+        open: isOpen,
+        hasKids: !!(kids && kids.length),
+        hkey,
+        under: parent,
+      });
       if (kids && kids.length && isOpen) walk(kids, depth + 1, g, n.name);
     });
   };
@@ -325,11 +371,54 @@ const SAID: Partial<Record<GroupId, string>> = {
  *  These give nothing away. Anything else still counts, still charts, and is simply never
  *  said by name. */
 export const PUBLIC_PROGS = new Set([
-  "awk", "bash", "cargo", "cat", "cp", "curl", "diff", "docker", "du", "echo", "find", "gh",
-  "git", "go", "grep", "head", "jq", "kubectl", "ls", "make", "mkdir", "mv", "node", "npm",
-  "pnpm", "psql", "python", "python3", "rg", "rm", "rsync", "ruby", "rustc", "sed", "sh",
-  "sort", "ssh", "tail", "tar", "terraform", "touch", "tr", "uniq", "wc", "which", "xargs",
-  "yarn", "zsh",
+  "awk",
+  "bash",
+  "cargo",
+  "cat",
+  "cp",
+  "curl",
+  "diff",
+  "docker",
+  "du",
+  "echo",
+  "find",
+  "gh",
+  "git",
+  "go",
+  "grep",
+  "head",
+  "jq",
+  "kubectl",
+  "ls",
+  "make",
+  "mkdir",
+  "mv",
+  "node",
+  "npm",
+  "pnpm",
+  "psql",
+  "python",
+  "python3",
+  "rg",
+  "rm",
+  "rsync",
+  "ruby",
+  "rustc",
+  "sed",
+  "sh",
+  "sort",
+  "ssh",
+  "tail",
+  "tar",
+  "terraform",
+  "touch",
+  "tr",
+  "uniq",
+  "wc",
+  "which",
+  "xargs",
+  "yarn",
+  "zsh",
 ]);
 
 /** Tools a caption may name out loud, for the same reason and with a sharper edge: an MCP
@@ -338,17 +427,33 @@ export const PUBLIC_PROGS = new Set([
  *  which every reader already has. A split row keeps its ` · results` / ` · call args`
  *  suffix when it is said, but is vouched for by the tool underneath it. */
 export const PUBLIC_TOOLS = new Set([
-  "Agent", "Bash", "BashOutput", "Edit", "ExitPlanMode", "Glob", "Grep", "KillShell",
-  "MultiEdit", "NotebookEdit", "NotebookRead", "Read", "SlashCommand", "Task", "TodoWrite",
-  "WebFetch", "WebSearch", "Write",
+  "Agent",
+  "Bash",
+  "BashOutput",
+  "Edit",
+  "ExitPlanMode",
+  "Glob",
+  "Grep",
+  "KillShell",
+  "MultiEdit",
+  "NotebookEdit",
+  "NotebookRead",
+  "Read",
+  "SlashCommand",
+  "Task",
+  "TodoWrite",
+  "WebFetch",
+  "WebSearch",
+  "Write",
 ]);
 
 /** What a leaf is vouched for by, ignoring the direction suffix the engine adds when a tool
  *  earns two rows. Shell items are program names; everything else in a tool-shaped group is
  *  a tool display name. */
 export const vouched = (gid: GroupId, name: string): boolean =>
-  gid === "shell" ? PUBLIC_PROGS.has(name)
-                  : PUBLIC_TOOLS.has(name.replace(/ · (results|call args)$/, ""));
+  gid === "shell"
+    ? PUBLIC_PROGS.has(name)
+    : PUBLIC_TOOLS.has(name.replace(/ · (results|call args)$/, ""));
 
 /** A share said the way a caption needs it. The figures worth posting here are often well
  *  under one percent -- "0% of it was me typing" is not the joke -- so a small share keeps a
@@ -387,29 +492,31 @@ interface Facts {
 }
 
 function factsOf(d: Dataset, pctOnly: boolean): Facts {
-  const amt = (cost: number): string => pctOnly ? share(cost, d.total) : money(cost);
+  const amt = (cost: number): string => (pctOnly ? share(cost, d.total) : money(cost));
   const sayable = (cost: number): boolean => /[1-9]/.test(amt(cost));
 
   const leaves = (...ids: GroupId[]): CostNode[] =>
-    d.groups.filter(g => ids.includes(g.id))
-      .flatMap(g => (g.items as CostNode[]).filter(n => vouched(g.id, n.name)))
-      .filter(n => sayable(n.cost))
+    d.groups
+      .filter((g) => ids.includes(g.id))
+      .flatMap((g) => (g.items as CostNode[]).filter((n) => vouched(g.id, n.name)))
+      .filter((n) => sayable(n.cost))
       .sort((a, b) => b.cost - a.cost);
 
   const { proseGen, proseCarry } = d.insights;
   return {
     d,
     masked: pctOnly,
-    scope: d.days ? `${d.days} day${d.days === 1 ? "" : "s"}`
-                  : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`,
+    scope: d.days
+      ? `${d.days} day${d.days === 1 ? "" : "s"}`
+      : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`,
     tools: leaves("shell", "ingest", "emit", "twoway"),
     progs: leaves("shell"),
-    typed: d.groups.find(g => g.id === "typed") as CostNode | undefined || null,
+    typed: (d.groups.find((g) => g.id === "typed") as CostNode | undefined) || null,
     carry: proseGen > 0 && proseCarry > 0 ? proseCarry / proseGen : 0,
     amt,
     sayable,
-    outOf: (cost) => pctOnly ? `${share(cost, d.total)} of it`
-                             : `${money(cost)} of ${money(d.total)}`,
+    outOf: (cost) =>
+      pctOnly ? `${share(cost, d.total)} of it` : `${money(cost)} of ${money(d.total)}`,
   };
 }
 
@@ -441,8 +548,9 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
     if (!a) return null;
     /* Covered, the scope has nowhere good to sit: "12% of it over 31 days" reads as a rate
        rather than as a share of one bill, and the image carries the span anyway. */
-    const mine = f.masked ? `Mine's ${a.name}, at ${f.amt(a.cost)} of the bill.`
-                          : `Mine's ${a.name}, at ${f.outOf(a.cost)} over ${f.scope}.`;
+    const mine = f.masked
+      ? `Mine's ${a.name}, at ${f.amt(a.cost)} of the bill.`
+      : `Mine's ${a.name}, at ${f.outOf(a.cost)} over ${f.scope}.`;
     return {
       lines: [
         "What's the most expensive tool on your Claude Code bill?",
@@ -460,9 +568,10 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
     return {
       lines: [
         `Guess what ${a.name} costs you in Claude Code.`,
-        (f.masked ? `Mine was ${f.amt(a.cost)} of my bill. `
-                  : `Mine was ${f.amt(a.cost)} over ${f.scope}. `)
-          + rest.map(n => `${n.name} was ${f.amt(n.cost)}.`).join(" "),
+        (f.masked
+          ? `Mine was ${f.amt(a.cost)} of my bill. `
+          : `Mine was ${f.amt(a.cost)} over ${f.scope}. `) +
+          rest.map((n) => `${n.name} was ${f.amt(n.cost)}.`).join(" "),
         "Every command's output sits in your context and gets re-billed on every turn after it.",
       ],
       cta: "Yours",
@@ -474,10 +583,11 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
   (f) => ({
     lines: [
       "What's your AI agent actually costing you?",
-      `Mine: ${f.masked || !f.sayable(f.d.total) ? "" : `${money(f.d.total)} over `}`
-        + `${f.scope} and ${count(f.d.requests)} requests.`
-        + (f.typed && /[1-9]/.test(share(f.typed.cost, f.d.total))
-            ? ` I typed ${share(f.typed.cost, f.d.total)} of it.` : ""),
+      `Mine: ${f.masked || !f.sayable(f.d.total) ? "" : `${money(f.d.total)} over `}` +
+        `${f.scope} and ${count(f.d.requests)} requests.` +
+        (f.typed && /[1-9]/.test(share(f.typed.cost, f.d.total))
+          ? ` I typed ${share(f.typed.cost, f.d.total)} of it.`
+          : ""),
     ],
     cta: "Itemise yours",
   }),
@@ -508,8 +618,8 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
         "Which costs more in Claude Code: what the model writes, or what it re-reads?",
         f.masked || !f.sayable(proseGen)
           ? `Mine: re-reading its own prose cost ${times} what writing it did.`
-          : `Mine: ${money(proseGen)} to write. ${money(proseCarry)} to re-read the same `
-            + `prose on later turns. ${times}.`,
+          : `Mine: ${money(proseGen)} to write. ${money(proseCarry)} to re-read the same ` +
+            `prose on later turns. ${times}.`,
       ],
       cta: "Check yours",
     };
@@ -560,8 +670,9 @@ function assemble(draft: Draft, home?: string | null): string {
  *  draw happened to return. */
 export function postVariants(d: Dataset, pctOnly: boolean, home?: string | null): string[] {
   const f = factsOf(d, pctOnly);
-  return VARIANTS.map(v => v(f)).filter((x): x is Draft => x !== null)
-    .map(draft => assemble(draft, home));
+  return VARIANTS.map((v) => v(f))
+    .filter((x): x is Draft => x !== null)
+    .map((draft) => assemble(draft, home));
 }
 
 /** The caption that travels with the shared image, drawn at random from the ones this
@@ -572,8 +683,12 @@ export function postVariants(d: Dataset, pctOnly: boolean, home?: string | null)
  *  and a template. `pick` is a fraction of the way through the list, taken as an argument so
  *  that this file stays as testable as the rest of it: nothing else here needs a seed, and a
  *  function that reaches for `Math.random` on its own cannot be asserted about. */
-export function postText(d: Dataset, pctOnly: boolean, home?: string | null,
-                         pick: number = Math.random()): string {
+export function postText(
+  d: Dataset,
+  pctOnly: boolean,
+  home?: string | null,
+  pick: number = Math.random(),
+): string {
   const all = postVariants(d, pctOnly, home);
   const i = Math.min(all.length - 1, Math.max(0, Math.floor(pick * all.length)));
   return all[i];

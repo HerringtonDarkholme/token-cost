@@ -12,10 +12,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Analysis } from "./engine.ts";
 import { ReportContext, useReport, type ReportCtx } from "./context.ts";
 import {
-  branches, count, focusOf, FOLD_MIN, ledger, money, palette, pctOf, type Ledger,
+  branches,
+  count,
+  focusOf,
+  FOLD_MIN,
+  ledger,
+  money,
+  palette,
+  pctOf,
+  type Ledger,
 } from "./model.ts";
 import {
-  hashFor, hoverClear, readHash, setHover, setState, useViewState, type ViewState,
+  hashFor,
+  hoverClear,
+  readHash,
+  setHover,
+  setState,
+  useViewState,
+  type ViewState,
 } from "./store.ts";
 import { Seg } from "./Seg.tsx";
 import { Toolbar } from "./Toolbar.tsx";
@@ -35,7 +49,9 @@ function useUrlSync(state: ViewState): void {
   useEffect(() => {
     try {
       history.replaceState(null, "", hash || location.pathname + location.search);
-    } catch { /* file:// can refuse */ }
+    } catch {
+      /* file:// can refuse */
+    }
   }, [hash]);
 
   useEffect(() => {
@@ -45,11 +61,15 @@ function useUrlSync(state: ViewState): void {
   }, []);
 }
 
-const VIEWS: ReadonlyArray<readonly [ViewState["view"], string]> =
-  [["panels", "Panels"], ["table", "Table"]];
+const VIEWS: ReadonlyArray<readonly [ViewState["view"], string]> = [
+  ["panels", "Panels"],
+  ["table", "Table"],
+];
 
-const CHARTS: ReadonlyArray<readonly [ViewState["chart"], string]> =
-  [["mosaic", "Mosaic"], ["sun", "Sunburst"]];
+const CHARTS: ReadonlyArray<readonly [ViewState["chart"], string]> = [
+  ["mosaic", "Mosaic"],
+  ["sun", "Sunburst"],
+];
 
 /* Written once rather than closed over per render: a pick is a write to the store, which is a
    module away, so neither switch needs anything from the component around it. */
@@ -74,33 +94,40 @@ function popMs(): number {
  *  beat drops back to 0 when the animation is over, which is what takes `.is-animating` off
  *  again -- the PNG rasterises this markup in a fresh document, where a live animation would
  *  be caught at its first frame with the digits still invisible. */
-function PopNumber({ value, className }: {
-  value: string; className?: string;
-}): React.JSX.Element {
+function PopNumber({ value, className }: { value: string; className?: string }): React.JSX.Element {
   const [beat, setBeat] = useState(0);
   const shown = useRef(value);
 
   useEffect(() => {
     if (shown.current === value) return;
     shown.current = value;
-    setBeat(n => n + 1);
+    setBeat((n) => n + 1);
     const t = setTimeout(() => setBeat(0), popMs());
     return () => clearTimeout(t);
   }, [value]);
 
   const chars = [...value];
   return (
-    <span key={beat}
-      className={`t-digit-group${beat ? " is-animating" : ""}${className ? " " + className : ""}`}>
+    <span
+      key={beat}
+      className={`t-digit-group${beat ? " is-animating" : ""}${className ? " " + className : ""}`}
+    >
       {/* Keyed by position on purpose, which is the one case an index key is the right key:
           these are the columns of a figure, not a list of things. "$1,204.55" becoming
           "$989.10" should re-letter the spans that are already there rather than match
           characters up by name, and the stagger below is a position too. */}
+      {/* oxlint-disable react/no-array-index-key -- see above. A block rather than a
+          `disable-next-line`, because the line the key sits on is oxfmt's to choose. */}
       {chars.map((ch, i) => (
-        // oxlint-disable-next-line react/no-array-index-key
-        <span key={i} className="t-digit"
-          data-stagger={i === chars.length - 2 ? 1 : i === chars.length - 1 ? 2 : undefined}>{ch}</span>
+        <span
+          key={i}
+          className="t-digit"
+          data-stagger={i === chars.length - 2 ? 1 : i === chars.length - 1 ? 2 : undefined}
+        >
+          {ch}
+        </span>
       ))}
+      {/* oxlint-enable react/no-array-index-key */}
     </span>
   );
 }
@@ -112,8 +139,12 @@ function PopNumber({ value, className }: {
  *  `className` is for the callers whose panel has to carry layout as well -- the chart sits in
  *  a flex column and has to keep filling it.
  */
-function Reveal({ className, children }: {
-  className?: string; children: React.ReactNode;
+function Reveal({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -121,8 +152,12 @@ function Reveal({ className, children }: {
     return () => cancelAnimationFrame(id);
   }, []);
   return (
-    <div className={className ? `${className} t-panel-slide` : "t-panel-slide"}
-         data-open={open ? "true" : "false"}>{children}</div>
+    <div
+      className={className ? `${className} t-panel-slide` : "t-panel-slide"}
+      data-open={open ? "true" : "false"}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -130,13 +165,29 @@ function Crumbs(): React.JSX.Element {
   const { state } = useReport();
   return (
     <nav className="crumbs" aria-label="Breadcrumb">
-      <button type="button" data-cur={state.path.length ? 0 : 1}
-        onClick={() => { setHover(null); setState({ path: [] }); }}>all</button>
+      <button
+        type="button"
+        data-cur={state.path.length ? 0 : 1}
+        onClick={() => {
+          setHover(null);
+          setState({ path: [] });
+        }}
+      >
+        all
+      </button>
       {state.path.map((p, i) => (
         <span key={p}>
           <span className="sep">/</span>
-          <button type="button" data-cur={i === state.path.length - 1 ? 1 : 0}
-            onClick={() => { setHover(null); setState({ path: state.path.slice(0, i + 1) }); }}>{p}</button>
+          <button
+            type="button"
+            data-cur={i === state.path.length - 1 ? 1 : 0}
+            onClick={() => {
+              setHover(null);
+              setState({ path: state.path.slice(0, i + 1) });
+            }}
+          >
+            {p}
+          </button>
         </span>
       ))}
     </nav>
@@ -162,7 +213,8 @@ function Strip(): React.JSX.Element {
           <span className="to">{amt(I.proseCarry)}</span>
         </div>
         <div className="cap">
-          Written once, carried {I.proseGen > 0 ? (I.proseCarry / I.proseGen).toFixed(1) + "×" : "—"}
+          Written once, carried{" "}
+          {I.proseGen > 0 ? (I.proseCarry / I.proseGen).toFixed(1) + "×" : "—"}
         </div>
       </div>
       <div>
@@ -176,9 +228,13 @@ function Strip(): React.JSX.Element {
       </div>
       <div>
         <div className="big">
-          {state.pctOnly ? pctOf(I.fixed, d.total).toFixed(1) + "%" : "$" + (I.fixed / reqs).toFixed(3)}
+          {state.pctOnly
+            ? pctOf(I.fixed, d.total).toFixed(1) + "%"
+            : "$" + (I.fixed / reqs).toFixed(3)}
           <span className="sm"> of</span>{" "}
-          <span className="dim">{state.pctOnly ? "the bill" : "$" + (d.total / reqs).toFixed(3)}</span>
+          <span className="dim">
+            {state.pctOnly ? "the bill" : "$" + (d.total / reqs).toFixed(3)}
+          </span>
         </div>
         <div className="cap">
           {state.pctOnly
@@ -199,8 +255,13 @@ function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
         <h2>Breakdown</h2>
         <div className="bctl">
           <label htmlFor="q">Find</label>
-          <input id="q" type="search" value={state.query} placeholder="git diff, thinking, schema…"
-                 onChange={e => setState({ query: e.target.value })} />
+          <input
+            id="q"
+            type="search"
+            value={state.query}
+            placeholder="git diff, thinking, schema…"
+            onChange={(e) => setState({ query: e.target.value })}
+          />
           <Seg options={VIEWS} value={state.view} onPick={pickView} />
         </div>
       </div>
@@ -209,7 +270,9 @@ function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
       </Reveal>
       <div className="reconline">
         <span>{note}</span>
-        <span>Reconciled: <strong>{amt(L.recon)}</strong></span>
+        <span>
+          Reconciled: <strong>{amt(L.recon)}</strong>
+        </span>
       </div>
     </section>
   );
@@ -220,10 +283,11 @@ function Footnotes(): React.JSX.Element {
   const I = d.insights;
   const lensGap = Math.abs(data.datasets["1h"].total - data.datasets["5m"].total);
   const density = data.density
-    ? `${data.density.code.toFixed(2)} chars/token for machine text and `
-      + `${data.density.text.toFixed(2)} for prose, `
-      + (data.densityCalibrated ? "both measured from this dataset"
-                                : "defaults, too few samples to measure")
+    ? `${data.density.code.toFixed(2)} chars/token for machine text and ` +
+      `${data.density.text.toFixed(2)} for prose, ` +
+      (data.densityCalibrated
+        ? "both measured from this dataset"
+        : "defaults, too few samples to measure")
     : "~4 chars/token";
 
   return (
@@ -231,43 +295,65 @@ function Footnotes(): React.JSX.Element {
       <div>
         <h3>What to change on Monday</h3>
         <ul>
-          <li><strong>Cut the intake, not the output.</strong> {amt(I.ingest)} of the bill is
-            content tools pulled <em>into</em> context, against {amt(I.emit)} of arguments sent
-            out and {amt(I.typed)} for everything you typed
-            {I.typed > 0 ? ` (${(I.ingest / I.typed).toFixed(0)}× less)` : ""}. Tool output lands
-            in the prefix whole and is re-billed until it falls out — ask for narrower slices.</li>
-          <li><strong>Trim the preamble.</strong> {amt(I.fixed)} of fixed overhead is the only
-            line you can delete once and stop paying {count(d.requests)} times.</li>
-          <li><strong>Compact sooner.</strong> Carry cost is linear in how long a result
-            survives, not in how big it looked.</li>
+          <li>
+            <strong>Cut the intake, not the output.</strong> {amt(I.ingest)} of the bill is content
+            tools pulled <em>into</em> context, against {amt(I.emit)} of arguments sent out and{" "}
+            {amt(I.typed)} for everything you typed
+            {I.typed > 0 ? ` (${(I.ingest / I.typed).toFixed(0)}× less)` : ""}. Tool output lands in
+            the prefix whole and is re-billed until it falls out — ask for narrower slices.
+          </li>
+          <li>
+            <strong>Trim the preamble.</strong> {amt(I.fixed)} of fixed overhead is the only line
+            you can delete once and stop paying {count(d.requests)} times.
+          </li>
+          <li>
+            <strong>Compact sooner.</strong> Carry cost is linear in how long a result survives, not
+            in how big it looked.
+          </li>
         </ul>
       </div>
       <div>
         <h3>Caveats</h3>
         <ul className="cav">
-          <li>Cache writes bill at 2× input on a 1h TTL and 1.25× on 5m. Where the transcript
-            records which applied, that is used verbatim; the switch only reprices what it
-            omitted, which is why the two lenses differ by just {money(lensGap)} here.</li>
-          <li>“Model output” exceeds output-token spend because prose written once is re-billed
-            as input on every later request.</li>
-          <li>Blocks under {(FOLD_MIN * 100).toFixed(1)}% of their parent are folded into a
-            labelled “other”; nothing is dropped. Identity is carried by the table as well
-            as by hue.</li>
-          <li>Totals are exact; the split across line items is estimated from character counts
-            at {density}.</li>
-          <li>Cache-write TTL was recorded for {data.ttlMeasuredShare != null
-            ? (data.ttlMeasuredShare * 100).toFixed(1) + "%" : "an unknown share"} of written
-            tokens, so the lens above only reprices the remainder.
+          <li>
+            Cache writes bill at 2× input on a 1h TTL and 1.25× on 5m. Where the transcript records
+            which applied, that is used verbatim; the switch only reprices what it omitted, which is
+            why the two lenses differ by just {money(lensGap)} here.
+          </li>
+          <li>
+            “Model output” exceeds output-token spend because prose written once is re-billed as
+            input on every later request.
+          </li>
+          <li>
+            Blocks under {(FOLD_MIN * 100).toFixed(1)}% of their parent are folded into a labelled
+            “other”; nothing is dropped. Identity is carried by the table as well as by hue.
+          </li>
+          <li>
+            Totals are exact; the split across line items is estimated from character counts at{" "}
+            {density}.
+          </li>
+          <li>
+            Cache-write TTL was recorded for{" "}
+            {data.ttlMeasuredShare != null
+              ? (data.ttlMeasuredShare * 100).toFixed(1) + "%"
+              : "an unknown share"}{" "}
+            of written tokens, so the lens above only reprices the remainder.
             {data.models && data.models.length
-              ? ` Models: ${data.models.map(m => m.id).join(", ")}.` : ""}</li>
+              ? ` Models: ${data.models.map((m) => m.id).join(", ")}.`
+              : ""}
+          </li>
         </ul>
       </div>
     </section>
   );
 }
 
-export function Report({ data, onReset }: {
-  data: Analysis; onReset: () => void;
+export function Report({
+  data,
+  onReset,
+}: {
+  data: Analysis;
+  onReset: () => void;
 }): React.JSX.Element {
   const state = useViewState();
   useUrlSync(state);
@@ -282,29 +368,42 @@ export function Report({ data, onReset }: {
   const pal = useMemo(() => palette(data, d), [data, d]);
   const L = useMemo(
     () => ledger(d, state.path, state.open, state.query),
-    [d, state.path, state.open, state.query]);
+    [d, state.path, state.open, state.query],
+  );
 
-  const amt = useCallback<ReportCtx["amt"]>((cost, base) => {
-    if (!state.pctOnly) return money(cost);
-    const denom = base || d.total;
-    const r = denom > 0 ? cost / denom * 100 : 0;
-    return (r < 1 ? r.toFixed(2) : r.toFixed(1)) + "%";
-  }, [state.pctOnly, d.total]);
+  const amt = useCallback<ReportCtx["amt"]>(
+    (cost, base) => {
+      if (!state.pctOnly) return money(cost);
+      const denom = base || d.total;
+      const r = denom > 0 ? (cost / denom) * 100 : 0;
+      return (r < 1 ? r.toFixed(2) : r.toFixed(1)) + "%";
+    },
+    [state.pctOnly, d.total],
+  );
 
-  const drill = useCallback((name: string) => {
-    const it = (focus.node.items || []).find(x => x.name === name);
-    if (!branches(it)) return;                         // nothing to show one level down
-    setHover(null);
-    if (!focus.groupName) setState({ path: [name] });
-    else if (state.path.length === 1) setState({ path: [focus.groupName, name] });
-  }, [focus, state.path]);
+  const drill = useCallback(
+    (name: string) => {
+      const it = (focus.node.items || []).find((x) => x.name === name);
+      if (!branches(it)) return; // nothing to show one level down
+      setHover(null);
+      if (!focus.groupName) setState({ path: [name] });
+      else if (state.path.length === 1) setState({ path: [focus.groupName, name] });
+    },
+    [focus, state.path],
+  );
 
   const ctx = useMemo<ReportCtx>(
     () => ({ data, d, state, pal, focus, reqs, amt, drill }),
-    [data, d, state, pal, focus, reqs, amt, drill]);
+    [data, d, state, pal, focus, reqs, amt, drill],
+  );
 
-  const scope = [`${d.sessions} sessions`, d.days ? `${d.days} days` : null,
-                 `${count(d.requests)} requests`].filter(Boolean).join(" · ");
+  const scope = [
+    `${d.sessions} sessions`,
+    d.days ? `${d.days} days` : null,
+    `${count(d.requests)} requests`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <ReportContext.Provider value={ctx}>
@@ -314,8 +413,10 @@ export function Report({ data, onReset }: {
       <div className="shell" {...hoverClear}>
         <Toolbar onReset={onReset} />
         <section className="card t-resize" data-chart={state.chart}>
-          <span className="br br1" /><span className="br br2" />
-          <span className="br br3" /><span className="br br4" />
+          <span className="br br1" />
+          <span className="br br2" />
+          <span className="br br3" />
+          <span className="br br4" />
           <header className="chead">
             <div>
               <div className="eyebrow">Cost attribution · Claude Code · {scope}</div>
@@ -323,11 +424,14 @@ export function Report({ data, onReset }: {
             </div>
             <div style={{ textAlign: "right" }}>
               <div className="billed">
-                Billed · {state.pctOnly ? "amount hidden · " : ""}{state.ttl} cache TTL
+                Billed · {state.pctOnly ? "amount hidden · " : ""}
+                {state.ttl} cache TTL
               </div>
               <div className="total" data-hidden={state.pctOnly ? 1 : 0}>
-                <PopNumber value={state.pctOnly ? "****" : money(d.total)}
-                           className={state.pctOnly ? "mask" : undefined} />
+                <PopNumber
+                  value={state.pctOnly ? "****" : money(d.total)}
+                  className={state.pctOnly ? "mask" : undefined}
+                />
               </div>
             </div>
           </header>

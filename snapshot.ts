@@ -33,7 +33,9 @@ function pageCss(): string {
   for (const sheet of Array.from(document.styleSheets)) {
     try {
       for (const rule of Array.from(sheet.cssRules)) out += rule.cssText + "\n";
-    } catch { /* unreadable sheet, not ours */ }
+    } catch {
+      /* unreadable sheet, not ours */
+    }
   }
   return out;
 }
@@ -72,7 +74,8 @@ function load(src: string): Promise<HTMLImageElement> {
 /** `el`, drawn as it stands, as a PNG blob. */
 export async function snapshot(el: HTMLElement, scale = SCALE): Promise<Blob> {
   const rect = el.getBoundingClientRect();
-  const w = Math.ceil(rect.width) + PAD * 2, h = Math.ceil(rect.height) + PAD * 2;
+  const w = Math.ceil(rect.width) + PAD * 2,
+    h = Math.ceil(rect.height) + PAD * 2;
 
   const clone = el.cloneNode(true) as HTMLElement;
   for (const gone of Array.from(clone.querySelectorAll(OMIT))) gone.remove();
@@ -82,21 +85,24 @@ export async function snapshot(el: HTMLElement, scale = SCALE): Promise<Blob> {
   clone.style.height = `${rect.height}px`;
 
   const css = pageCss();
-  const paper = getComputedStyle(document.documentElement).getPropertyValue("--paper").trim() || "#fff";
+  const paper =
+    getComputedStyle(document.documentElement).getPropertyValue("--paper").trim() || "#fff";
   const body = getComputedStyle(document.body);
-  const frame = `${themeVars(css)}width:${w}px;height:${h}px;padding:${PAD}px;`
-    + `background:${paper};color:${body.color};font-family:${body.fontFamily};`
-    + "font-variant-numeric:tabular-nums;box-sizing:border-box;";
+  const frame =
+    `${themeVars(css)}width:${w}px;height:${h}px;padding:${PAD}px;` +
+    `background:${paper};color:${body.color};font-family:${body.fontFamily};` +
+    "font-variant-numeric:tabular-nums;box-sizing:border-box;";
 
   /* CDATA because the stylesheet is XML text here, and one `&` or `<` in it would otherwise
      fail the parse -- silently, as an image that will not load. */
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w * scale}" height="${h * scale}" `
-    + `viewBox="0 0 ${w} ${h}">`
-    + `<foreignObject x="0" y="0" width="${w}" height="${h}">`
-    + `<div xmlns="http://www.w3.org/1999/xhtml" style="${attr(frame)}">`
-    + `<style><![CDATA[\n${css}\n]]></style>`
-    + new XMLSerializer().serializeToString(clone)
-    + "</div></foreignObject></svg>";
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w * scale}" height="${h * scale}" ` +
+    `viewBox="0 0 ${w} ${h}">` +
+    `<foreignObject x="0" y="0" width="${w}" height="${h}">` +
+    `<div xmlns="http://www.w3.org/1999/xhtml" style="${attr(frame)}">` +
+    `<style><![CDATA[\n${css}\n]]></style>` +
+    new XMLSerializer().serializeToString(clone) +
+    "</div></foreignObject></svg>";
 
   const img = await load("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg));
 
@@ -112,7 +118,10 @@ export async function snapshot(el: HTMLElement, scale = SCALE): Promise<Blob> {
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
   return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(b => b ? resolve(b) : reject(new Error("the canvas produced no image")), "image/png");
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("the canvas produced no image"))),
+      "image/png",
+    );
   });
 }
 

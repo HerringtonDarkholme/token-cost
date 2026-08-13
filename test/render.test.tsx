@@ -27,14 +27,28 @@ beforeAll(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => { root.render(<Report data={data} onReset={noop} />); });
+  act(() => {
+    root.render(<Report data={data} onReset={noop} />);
+  });
 });
 
-afterAll(() => { act(() => { root.unmount(); }); });
+afterAll(() => {
+  act(() => {
+    root.unmount();
+  });
+});
 
-beforeEach(() => { act(() => { resetState(); }); });
+beforeEach(() => {
+  act(() => {
+    resetState();
+  });
+});
 
-const show = (patch: Partial<ViewState>): void => { act(() => { setState(patch); }); };
+const show = (patch: Partial<ViewState>): void => {
+  act(() => {
+    setState(patch);
+  });
+};
 const html = (): string => container.innerHTML;
 
 /** The invariants every state has to hold, whatever it is showing. */
@@ -76,12 +90,21 @@ describe("view states", () => {
     ["query miss · table", { view: "table", query: "zzzzzznope" }],
   ];
   for (const [label, patch] of states)
-    it(label, () => { show(patch); expectClean(); });
+    it(label, () => {
+      show(patch);
+      expectClean();
+    });
 
   it("hover readout", () => {
     const g = d.groups[0];
     act(() => {
-      setHover({ key: `${g.name}›${g.name}`, name: g.name, cost: g.cost, under: null, group: g.name });
+      setHover({
+        key: `${g.name}›${g.name}`,
+        name: g.name,
+        cost: g.cost,
+        under: null,
+        group: g.name,
+      });
     });
     expectClean();
     expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1");
@@ -96,7 +119,7 @@ describe("drill-down", () => {
       expectClean();
       expect(container.querySelector(".crumbs")?.textContent).toContain(g.name);
 
-      const kid = (g.items || []).find(i => i.children && i.children.length > 1);
+      const kid = (g.items || []).find((i) => i.children && i.children.length > 1);
       if (kid) {
         show({ path: [g.name, kid.name] });
         expectClean();
@@ -109,10 +132,12 @@ describe("drill-down", () => {
 describe("interaction", () => {
   const click = (el: Element | null): void => {
     expect(el).not.toBeNull();
-    act(() => { el!.dispatchEvent(new MouseEvent("click", { bubbles: true })); });
+    act(() => {
+      el!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
   };
   const byLabel = (sel: string, text: string): Element | null =>
-    [...container.querySelectorAll(sel)].find(e => e.textContent?.trim() === text) || null;
+    [...container.querySelectorAll(sel)].find((e) => e.textContent?.trim() === text) || null;
 
   it("the view switch is a real control", () => {
     click(byLabel("button", "Table"));
@@ -135,9 +160,15 @@ describe("interaction", () => {
 
   it("the sunburst reads from the same hover store, and its legend drills", () => {
     show({ chart: "sun" });
-    const g = d.groups.find(x => (x.items || []).length > 1) || d.groups[0];
+    const g = d.groups.find((x) => (x.items || []).length > 1) || d.groups[0];
     act(() => {
-      setHover({ key: `${g.name}›${g.name}`, name: g.name, cost: g.cost, under: null, group: g.name });
+      setHover({
+        key: `${g.name}›${g.name}`,
+        name: g.name,
+        cost: g.cost,
+        under: null,
+        group: g.name,
+      });
     });
     // The hovered branch lights up -- and only it.
     const lit = container.querySelectorAll('path.sunarc[data-on="1"]');
@@ -242,7 +273,9 @@ describe("interaction", () => {
     const tog = container.querySelector<HTMLElement>("tbody .tog");
     const away = container.querySelector<HTMLElement>("#q");
     expect(tog).not.toBeNull();
-    act(() => { tog!.dispatchEvent(new FocusEvent("focusin", { bubbles: true })); });
+    act(() => {
+      tog!.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    });
     expect(getHover()).not.toBeNull();
 
     act(() => {
@@ -257,7 +290,7 @@ describe("interaction", () => {
      column anyway, so it looked right while agreeing about nothing. */
   it("a child row and its block in the chart are the same hover", () => {
     show({ view: "table" });
-    const child = [...container.querySelectorAll("tbody tr")].find(tr => tr.className === "d1");
+    const child = [...container.querySelectorAll("tbody tr")].find((tr) => tr.className === "d1");
     expect(child, "the corpus should open a top-level row with children").not.toBeUndefined();
     pointerTo(container.querySelector(".reconline"), child ?? null);
 
@@ -278,7 +311,9 @@ describe("interaction", () => {
     expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1);
 
     // The same key with more name on the end: a different line item, and nobody's parent.
-    act(() => { setHover({ ...real!, key: real!.key + "-zzz" }); });
+    act(() => {
+      setHover({ ...real!, key: real!.key + "-zzz" });
+    });
     expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(0);
   });
 
@@ -324,12 +359,15 @@ describe("interaction", () => {
      number: the same characters, in order, and no digit left out. */
   it("the total is a row of digits, and stays the whole figure", () => {
     const digits = (): string[] =>
-      [...container.querySelectorAll(".total .t-digit")].map(el => el.textContent || "");
+      [...container.querySelectorAll(".total .t-digit")].map((el) => el.textContent || "");
     expect(digits().join("")).toBe(container.querySelector(".total")?.textContent);
     expect(digits().length).toBeGreaterThan(3);
     // The last two characters ride behind the rest, which is what makes cents feel alive.
-    expect([...container.querySelectorAll(".total .t-digit[data-stagger]")]
-      .map(el => el.getAttribute("data-stagger"))).toEqual(["1", "2"]);
+    expect(
+      [...container.querySelectorAll(".total .t-digit[data-stagger]")].map((el) =>
+        el.getAttribute("data-stagger"),
+      ),
+    ).toEqual(["1", "2"]);
 
     show({ pctOnly: true });
     expect(digits().join("")).toMatch(/^\*+$/);

@@ -21,9 +21,22 @@ function segmentsOf(node: CostNode): CostNode[] {
    block therefore changes props for only the column entered and the column left -- the rest
    compare equal and never re-render, which is the difference between touching two columns
    and touching every block on the page. */
-const Column = memo(function Column({ node, gname, cumFrom, cumTo, width, hit, anyHover }: {
-  node: CostNode; gname: string; cumFrom: number; cumTo: number; width: number;
-  hit: string | null; anyHover: boolean;
+const Column = memo(function Column({
+  node,
+  gname,
+  cumFrom,
+  cumTo,
+  width,
+  hit,
+  anyHover,
+}: {
+  node: CostNode;
+  gname: string;
+  cumFrom: number;
+  cumTo: number;
+  width: number;
+  hit: string | null;
+  anyHover: boolean;
 }): React.JSX.Element {
   const { pal, focus, amt, drill } = useReport();
   const h = pal.hue(gname);
@@ -36,24 +49,38 @@ const Column = memo(function Column({ node, gname, cumFrom, cumTo, width, hit, a
   /* The 80% mark is the one cumulative number worth calling out: it says how few columns
      carry most of the bill. Narrow columns show nothing rather than an unreadable stub. */
   const crosses80 = cumFrom < 80 && cumTo >= 80;
-  const cum = crosses80 ? "◂80%" : (width < 0.075 ? "" : cumTo.toFixed(0) + "%");
+  const cum = crosses80 ? "◂80%" : width < 0.075 ? "" : cumTo.toFixed(0) + "%";
 
   return (
-    <div className="col" data-dim={dim ? 1 : 0} data-flat={branches(node) ? 0 : 1}
-         style={{ flex: Math.max(width, 0.012) }}>
+    <div
+      className="col"
+      data-dim={dim ? 1 : 0}
+      data-flat={branches(node) ? 0 : 1}
+      style={{ flex: Math.max(width, 0.012) }}
+    >
       <div className="colsegs">
         {segs.map((s, i) => {
-          const share = s.cost / segTotal, pct = share * 100;
+          const share = s.cost / segTotal,
+            pct = share * 100;
           const segKey = key + "›" + s.name;
           const active = hit === segKey || hit === key;
           /* Prose re-billed as input is the one block the page argues about, so it keeps
              full strength and a dashed edge while the rest of the column ramps down. */
           const carry = s.name.includes("re-billed");
           return (
-            <button type="button" key={segKey} className="segb"
+            <button
+              type="button"
+              key={segKey}
+              className="segb"
               title={`${s.name} · ${amt(s.cost)}`}
               onClick={() => drill(node.name)}
-              {...hoverBind({ key: segKey, name: s.name, cost: s.cost, under: node.name, group: gname })}
+              {...hoverBind({
+                key: segKey,
+                name: s.name,
+                cost: s.cost,
+                under: node.name,
+                group: gname,
+              })}
               style={{
                 flex: Math.max(share, 0.002),
                 background: h,
@@ -63,15 +90,19 @@ const Column = memo(function Column({ node, gname, cumFrom, cumTo, width, hit, a
                 boxShadow: active ? "inset 0 0 0 2px var(--paper)" : undefined,
                 outline: carry && !active ? "2px dashed var(--paper)" : undefined,
                 outlineOffset: carry && !active ? "-4px" : undefined,
-              }}>
+              }}
+            >
               {pct > 7 ? <span className="sl">{s.name}</span> : null}
             </button>
           );
         })}
       </div>
-      <button type="button" className="colhead"
+      <button
+        type="button"
+        className="colhead"
         onClick={() => drill(node.name)}
-        {...hoverBind({ key, name: node.name, cost: node.cost, under: null, group: gname })}>
+        {...hoverBind({ key, name: node.name, cost: node.cost, under: null, group: gname })}
+      >
         <span className="cn" style={{ fontSize: width < 0.08 ? "10.5px" : "11.5px" }}>
           {(!focus.groupName && pal.short(node.name)) || node.name}
         </span>
@@ -94,21 +125,30 @@ export function Mosaic(): React.JSX.Element {
   /* Memoised so the folded nodes keep their identity when only the hover moved -- otherwise
      every column would get a fresh `node` prop and the memo above would never hit. */
   const cols = useMemo(
-    () => fold(focus.node.items || [], rootCost, !focus.groupName), [focus, rootCost]);
+    () => fold(focus.node.items || [], rootCost, !focus.groupName),
+    [focus, rootCost],
+  );
   const colTotal = cols.reduce((s, n) => s + n.cost, 0) || 1;
 
   let run = 0;
   return (
     <div className="mosaicwrap">
       <div className="mosaic">
-        {cols.map(n => {
+        {cols.map((n) => {
           const cumFrom = pctOf(run, rootCost);
           run += n.cost;
           const key = (focus.groupName || n.name) + "›" + n.name;
           return (
-            <Column key={n.name} node={n} gname={focus.groupName || n.name}
-              cumFrom={cumFrom} cumTo={pctOf(run, rootCost)} width={n.cost / colTotal}
-              hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null} anyHover={!!hk} />
+            <Column
+              key={n.name}
+              node={n}
+              gname={focus.groupName || n.name}
+              cumFrom={cumFrom}
+              cumTo={pctOf(run, rootCost)}
+              width={n.cost / colTotal}
+              hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null}
+              anyHover={!!hk}
+            />
           );
         })}
       </div>
@@ -130,11 +170,11 @@ export function HoverBar(): React.JSX.Element {
       <span className="sw" style={{ background: h ? pal.hue(h.group) : "transparent" }} />
       <span className="txt" data-on={h ? 1 : 0}>
         {h
-          ? `${h.under ? h.under + " › " : ""}${h.name}   ${amt(h.cost)}   `
-            + `${(share * 100).toFixed(share < 0.01 ? 2 : 1)}% of ${under}`
-          : `Accented block = prose the model wrote once for ${amt(d.insights.proseGen)}, `
-            + `re-billed as input for ${amt(d.insights.proseCarry)} more. Carry cost tracks `
-            + "survival, not size. Hover any block for its line item."}
+          ? `${h.under ? h.under + " › " : ""}${h.name}   ${amt(h.cost)}   ` +
+            `${(share * 100).toFixed(share < 0.01 ? 2 : 1)}% of ${under}`
+          : `Accented block = prose the model wrote once for ${amt(d.insights.proseGen)}, ` +
+            `re-billed as input for ${amt(d.insights.proseCarry)} more. Carry cost tracks ` +
+            "survival, not size. Hover any block for its line item."}
       </span>
     </div>
   );

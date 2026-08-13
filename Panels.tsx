@@ -9,9 +9,20 @@ import { hoverBind, useHover } from "./store.ts";
 
 /* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when
    it lands inside this panel, null otherwise. See `Column` in Mosaic.tsx. */
-const Panel = memo(function Panel({ panel, gname, maxPanel, kids, hit, anyHover }: {
-  panel: CostNode; gname: string; maxPanel: number; kids: CostNode[];
-  hit: string | null; anyHover: boolean;
+const Panel = memo(function Panel({
+  panel,
+  gname,
+  maxPanel,
+  kids,
+  hit,
+  anyHover,
+}: {
+  panel: CostNode;
+  gname: string;
+  maxPanel: number;
+  kids: CostNode[];
+  hit: string | null;
+  anyHover: boolean;
 }): React.JSX.Element {
   const { state, pal, amt, reqs, drill } = useReport();
   const h = pal.hue(gname);
@@ -26,40 +37,69 @@ const Panel = memo(function Panel({ panel, gname, maxPanel, kids, hit, anyHover 
   const shown = kids.reduce((a, k) => a + k.cost, 0);
   const foot = !kidsAll.length
     ? "single line item · no further breakdown"
-    : (Math.abs(shown - panel.cost) < 0.01 ? "" : `shown: ${amt(shown)} of ${amt(panel.cost)}`);
+    : Math.abs(shown - panel.cost) < 0.01
+      ? ""
+      : `shown: ${amt(shown)} of ${amt(panel.cost)}`;
 
   return (
     <div className="pan">
       <div className="pantop">
-        <button type="button" style={{ borderBottom: `2px solid ${h}`, opacity: dim ? 0.55 : 1 }}
+        <button
+          type="button"
+          style={{ borderBottom: `2px solid ${h}`, opacity: dim ? 0.55 : 1 }}
           onClick={() => drill(panel.name)}
-          {...hoverBind({ key, name: panel.name, cost: panel.cost, under: null, group: gname })}>
+          {...hoverBind({ key, name: panel.name, cost: panel.cost, under: null, group: gname })}
+        >
           {panel.name}
         </button>
         <span className="pc">{amt(panel.cost)}</span>
       </div>
       <div className="panbar">
         <span className="track">
-          <span style={{ width: `${Math.max(pctOf(panel.cost, maxPanel), 0.8)}%`,
-                         background: h, opacity: dim ? 0.5 : 1 }} />
+          <span
+            style={{
+              width: `${Math.max(pctOf(panel.cost, maxPanel), 0.8)}%`,
+              background: h,
+              opacity: dim ? 0.5 : 1,
+            }}
+          />
         </span>
         <span className="pr">
           {state.pctOnly ? `${amt(panel.cost)} of bill` : `$${(panel.cost / reqs).toFixed(4)}/req`}
         </span>
       </div>
       <div className="panitems">
-        {kids.map(k => {
+        {kids.map((k) => {
           const kk = key + "›" + k.name;
           const active = hit === kk;
           return (
-            <div className="pi" key={kk} data-on={active ? 1 : 0}
-              {...hoverBind({ key: kk, name: k.name, cost: k.cost, under: panel.name, group: gname })}>
-              <button type="button" data-folded={k.folded ? 1 : 0} onClick={() => drill(panel.name)}>
+            <div
+              className="pi"
+              key={kk}
+              data-on={active ? 1 : 0}
+              {...hoverBind({
+                key: kk,
+                name: k.name,
+                cost: k.cost,
+                under: panel.name,
+                group: gname,
+              })}
+            >
+              <button
+                type="button"
+                data-folded={k.folded ? 1 : 0}
+                onClick={() => drill(panel.name)}
+              >
                 {k.name}
               </button>
               <span className="tk">
-                <span style={{ width: `${Math.max(pctOf(k.cost, maxKid), 1)}%`,
-                               background: h, opacity: active ? 1 : 0.6 }} />
+                <span
+                  style={{
+                    width: `${Math.max(pctOf(k.cost, maxKid), 1)}%`,
+                    background: h,
+                    opacity: active ? 1 : 0.6,
+                  }}
+                />
               </span>
               <span className="pv">{amt(k.cost)}</span>
             </div>
@@ -87,11 +127,14 @@ export function Panels(): React.JSX.Element {
       : d.groups.slice().sort((a, b) => b.cost - a.cost);
     return {
       maxPanel: maxCost(src),
-      panels: src.map(p => {
-        const kids = fold(kidsOf(p) || [], p.cost)
-          .filter(k => !q || k.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
-        return { p, kids };
-      }).filter(({ kids }) => !q || kids.length),
+      panels: src
+        .map((p) => {
+          const kids = fold(kidsOf(p) || [], p.cost).filter(
+            (k) => !q || k.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
+          );
+          return { p, kids };
+        })
+        .filter(({ kids }) => !q || kids.length),
     };
   }, [d, focus, rootCost, q]);
 
@@ -100,9 +143,15 @@ export function Panels(): React.JSX.Element {
       {panels.map(({ p, kids }) => {
         const key = (focus.groupName || p.name) + "›" + p.name;
         return (
-          <Panel key={p.name} panel={p} gname={focus.groupName || p.name}
-                 maxPanel={maxPanel} kids={kids}
-                 hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null} anyHover={!!hk} />
+          <Panel
+            key={p.name}
+            panel={p}
+            gname={focus.groupName || p.name}
+            maxPanel={maxPanel}
+            kids={kids}
+            hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null}
+            anyHover={!!hk}
+          />
         );
       })}
     </div>

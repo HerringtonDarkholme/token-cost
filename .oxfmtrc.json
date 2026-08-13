@@ -1,0 +1,22 @@
+{
+  // oxfmt. Comments are used here for the same reason they are in `.oxlintrc.json`: an
+  // exclusion without its reason written down is one somebody deletes in six months.
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+
+  // oxfmt formats TypeScript here and nothing else. Everything it is pointed away from
+  // below is hand-composed in a shape the formatter would flatten:
+  //
+  //   *.css   -- `style.css` is one declaration per line, packed. Reformatted it is 280
+  //              lines becoming 1271, and the palette blocks stop reading as tables.
+  //   *.md    -- README and DESIGN_BRIEF are wrapped by hand to a measure; oxfmt also
+  //              rewrites `*emphasis*` as `_emphasis_`.
+  //   *.html  -- `index.html` is the shell the build inlines into, and is nearly all
+  //              content already.
+  //   *.json  -- the two configs that matter (`.oxlintrc.json`, this file) are comment
+  //              carrying and laid out for reading. `sortPackageJson` would also reorder
+  //              `package.json`.
+  //   .agents -- a vendored skill, not ours to format. `.oxlintrc.json` skips it too.
+  //
+  // `dist`, `cost-report.html` and `node_modules` need no entry: oxfmt reads `.gitignore`.
+  "ignorePatterns": ["*.css", "*.md", "*.html", "*.json", "*.yaml", ".agents"]
+}

@@ -15,7 +15,13 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
-export function Seg<T extends string>({ label, options, value, onPick, nosnap }: {
+export function Seg<T extends string>({
+  label,
+  options,
+  value,
+  onPick,
+  nosnap,
+}: {
   /** Names what the options choose, said once instead of once per button. */
   label?: string;
   options: ReadonlyArray<readonly [T, string]>;
@@ -32,7 +38,8 @@ export function Seg<T extends string>({ label, options, value, onPick, nosnap }:
    *  and forces a reflow, so first paint and resize snap into place instead of sliding in
    *  from `translateX(0)` at zero width. */
   const place = useCallback((animate: boolean): void => {
-    const el = pill.current, host = bar.current;
+    const el = pill.current,
+      host = bar.current;
     if (!el || !host) return;
     const on = host.querySelector<HTMLElement>('button[aria-pressed="true"]');
     if (!on) return;
@@ -65,8 +72,15 @@ export function Seg<T extends string>({ label, options, value, onPick, nosnap }:
       {label ? <span className="seglbl">{label}</span> : null}
       <span className="t-tabs-pill" aria-hidden="true" ref={pill} />
       {options.map(([v, text]) => (
-        <button key={v} type="button" className="t-tab" aria-pressed={v === value}
-          onClick={() => onPick(v)}>{text}</button>
+        <button
+          key={v}
+          type="button"
+          className="t-tab"
+          aria-pressed={v === value}
+          onClick={() => onPick(v)}
+        >
+          {text}
+        </button>
       ))}
     </span>
   );

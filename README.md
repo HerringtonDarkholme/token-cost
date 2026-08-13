@@ -34,9 +34,10 @@ imports. Vite provides one, with Fast Refresh:
 ```sh
 pnpm install
 pnpm dev              # http://127.0.0.1:8000
+pnpm format           # oxfmt, which owns the .ts/.tsx and nothing else
 pnpm typecheck        # tsc --noEmit, the only thing that judges types
 pnpm build            # bundle + inline everything into dist/ and cost-report.html
-pnpm check            # typecheck, build, then all three test suites
+pnpm check            # format, lint, typecheck, build, then all three test suites
 ```
 
 `pnpm build` writes `dist/index.html` — what Vercel serves — and copies it to

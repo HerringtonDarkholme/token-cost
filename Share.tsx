@@ -34,12 +34,20 @@ type Outcome = "busy" | "copied" | "saved" | "failed";
 function useOutcome(ms = 6000): [Outcome | null, (o: Outcome | null) => void] {
   const [at, setAt] = useState<Outcome | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  return [at, (o: Outcome | null) => {
-    setAt(o);
-    if (timer.current) clearTimeout(timer.current);
-    if (o && o !== "busy") timer.current = setTimeout(() => setAt(null), ms);
-  }];
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+  return [
+    at,
+    (o: Outcome | null) => {
+      setAt(o);
+      if (timer.current) clearTimeout(timer.current);
+      if (o && o !== "busy") timer.current = setTimeout(() => setAt(null), ms);
+    },
+  ];
 }
 
 /** The card as a PNG, on the clipboard or on disk, with `then` run only if it got there. */
@@ -48,7 +56,10 @@ function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
 
   const run = async (then?: () => void): Promise<void> => {
     const card = document.querySelector<HTMLElement>(".card");
-    if (!card) { setAt("failed"); return; }
+    if (!card) {
+      setAt("failed");
+      return;
+    }
     setAt("busy");
 
     /* Started before the clipboard call and handed over unresolved: Safari only accepts a
@@ -66,7 +77,10 @@ function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
       try {
         download(await png, FILENAME);
         done = "saved";
-      } catch { setAt("failed"); return; }
+      } catch {
+        setAt("failed");
+        return;
+      }
     }
     setAt(done);
     then?.();
@@ -137,8 +151,15 @@ function TextSwap({ token, children }: { token: string; children: ReactNode }): 
   }, [phase]);
 
   return (
-    <span ref={el} className={`t-text-swap${phase === "exit" ? " is-exit" : ""}`
-      + `${phase === "enter" ? " is-enter-start" : ""}`}>{shown.body}</span>
+    <span
+      ref={el}
+      className={
+        `t-text-swap${phase === "exit" ? " is-exit" : ""}` +
+        `${phase === "enter" ? " is-enter-start" : ""}`
+      }
+    >
+      {shown.body}
+    </span>
   );
 }
 
@@ -148,8 +169,10 @@ function TextSwap({ token, children }: { token: string; children: ReactNode }): 
 function XMark(): React.JSX.Element {
   return (
     <svg className="xicon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254
-               2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z" />
+      <path
+        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254
+               2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z"
+      />
     </svg>
   );
 }
@@ -157,8 +180,15 @@ function XMark(): React.JSX.Element {
 export function CopyChartButton(): React.JSX.Element {
   const [at, run] = useChartPng();
   return (
-    <button type="button" className="linkish" data-on={at && at !== "busy" ? 1 : 0}
-      disabled={at === "busy"} onClick={() => { void run(); }}>
+    <button
+      type="button"
+      className="linkish"
+      data-on={at && at !== "busy" ? 1 : 0}
+      disabled={at === "busy"}
+      onClick={() => {
+        void run();
+      }}
+    >
       <TextSwap token={at || "idle"}>{at ? COPY[at] : "Copy chart"}</TextSwap>
     </button>
   );
@@ -172,22 +202,41 @@ export function ShareButton(): React.JSX.Element {
     /* Where the invitation points: this page, if it is somewhere a reader can be sent. A
        standalone file opened from disk has an address that means nothing to anyone else, so
        it gets no link rather than a dead one. */
-    const home = location.protocol === "http:" || location.protocol === "https:"
-      ? location.origin + location.pathname : null;
-    const url = "https://x.com/intent/post?text="
-      + encodeURIComponent(postText(d, state.pctOnly, home));
+    const home =
+      location.protocol === "http:" || location.protocol === "https:"
+        ? location.origin + location.pathname
+        : null;
+    const url =
+      "https://x.com/intent/post?text=" + encodeURIComponent(postText(d, state.pctOnly, home));
     /* Opened last, and only on success, so a blocked popup cannot cost the reader the image.
        The activation from the click survives the render in every browser that allows popups
        at all; if it does not, the caption is a click away in the composer anyway. */
-    void run(() => { window.open(url, "_blank", "noopener,noreferrer"); });
+    void run(() => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
   };
 
   /* The mark carries no text of its own, so the accessible name has to say the word it
      stands for -- a button announced as "share to" is a button announced as nothing. */
   return (
-    <button type="button" className="linkish" data-on={at && at !== "busy" ? 1 : 0}
-      disabled={at === "busy"} onClick={share} aria-label={at ? SHARE[at] : "Share to X"}>
-      <TextSwap token={at || "idle"}>{at ? SHARE[at] : <>Share to<XMark /></>}</TextSwap>
+    <button
+      type="button"
+      className="linkish"
+      data-on={at && at !== "busy" ? 1 : 0}
+      disabled={at === "busy"}
+      onClick={share}
+      aria-label={at ? SHARE[at] : "Share to X"}
+    >
+      <TextSwap token={at || "idle"}>
+        {at ? (
+          SHARE[at]
+        ) : (
+          <>
+            Share to
+            <XMark />
+          </>
+        )}
+      </TextSwap>
     </button>
   );
 }

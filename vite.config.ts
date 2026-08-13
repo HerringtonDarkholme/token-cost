@@ -72,9 +72,11 @@ function standalone(): Plugin {
       const firstScript = html.search(/<script\b/i);
       const mountPoint = html.indexOf('id="app"');
       if (firstScript >= 0 && firstScript < html.indexOf("</head>"))
-        throw new Error(`${STANDALONE} runs its script inside <head>: a classic inline `
-          + "script there executes before <body> is parsed, so the page mounts against "
-          + "nothing.");
+        throw new Error(
+          `${STANDALONE} runs its script inside <head>: a classic inline ` +
+            "script there executes before <body> is parsed, so the page mounts against " +
+            "nothing.",
+        );
       if (firstScript >= 0 && mountPoint >= 0 && firstScript < mountPoint)
         throw new Error(`${STANDALONE} runs its script before #app exists in the document.`);
 

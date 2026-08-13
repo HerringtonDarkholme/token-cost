@@ -38,8 +38,14 @@ export interface ViewState {
 }
 
 const INITIAL: ViewState = {
-  ttl: "1h", path: [], open: {}, query: "", chart: "mosaic", view: "panels",
-  pctOnly: false, theme: "system",
+  ttl: "1h",
+  path: [],
+  open: {},
+  query: "",
+  chart: "mosaic",
+  view: "panels",
+  pctOnly: false,
+  theme: "system",
 };
 
 let state: ViewState = { ...INITIAL };
@@ -49,12 +55,14 @@ export const getState = (): ViewState => state;
 
 export function setState(patch: Partial<ViewState>): void {
   state = { ...state, ...patch };
-  listeners.forEach(fn => fn());
+  listeners.forEach((fn) => fn());
 }
 
 function subscribe(fn: () => void): () => void {
   listeners.add(fn);
-  return () => { listeners.delete(fn); };
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 /** Subscribe a component to the whole state. The report re-renders from the top on any
@@ -83,12 +91,14 @@ export function setHover(t: HoverTarget | null): void {
      without moving the pointer, and re-entering the same block has to pick that up. */
   if (hover === t || (hover?.key === t?.key && hover?.cost === t?.cost)) return;
   hover = t;
-  hoverListeners.forEach(fn => fn());
+  hoverListeners.forEach((fn) => fn());
 }
 
 function subscribeHover(fn: () => void): () => void {
   hoverListeners.add(fn);
-  return () => { hoverListeners.delete(fn); };
+  return () => {
+    hoverListeners.delete(fn);
+  };
 }
 
 export function useHover(): HoverTarget | null {
@@ -110,7 +120,9 @@ export function useHover(): HoverTarget | null {
 /** Marks an element as standing for something, and reports it on enter and on focus, so
  *  tabbing through a view gives the same readout the pointer does. */
 export function hoverBind(t: HoverTarget): {
-  onMouseEnter: () => void; onFocus: () => void; "data-hoversrc": string;
+  onMouseEnter: () => void;
+  onFocus: () => void;
+  "data-hoversrc": string;
 } {
   const on = (): void => setHover(t);
   return { onMouseEnter: on, onFocus: on, "data-hoversrc": "" };
@@ -129,11 +141,11 @@ export const hoverClear: {
   onMouseLeave: () => void;
   onBlur: (e: React.FocusEvent<HTMLElement>) => void;
 } = {
-  onMouseOver: e => {
+  onMouseOver: (e) => {
     if (!(e.target as Element).closest("[data-hoversrc]")) setHover(null);
   },
   onMouseLeave: () => setHover(null),
-  onBlur: e => {
+  onBlur: (e) => {
     if (!(e.relatedTarget as Element | null)?.closest("[data-hoversrc]")) setHover(null);
   },
 };
@@ -154,7 +166,7 @@ export function readHash(hash: string): Partial<ViewState> {
   const h = (hash || "").replace(/^#/, "");
   if (!h) return {};
   const p: Record<string, string> = {};
-  h.split("&").forEach(kv => {
+  h.split("&").forEach((kv) => {
     const [a, b] = kv.split("=");
     if (a) p[a] = decodeURIComponent(b || "");
   });
