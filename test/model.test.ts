@@ -10,8 +10,8 @@
 
 import { analyze, type Dataset } from "../engine.ts";
 import {
-  fold, focusOf, kidsOf, ledger, palette, postText, POST_MAX, rowIsOpen, sunburst, SUN_RINGS,
-  type CostNode,
+  fold, focusOf, kidsOf, ledger, palette, postLength, postText, POST_MAX, rowIsOpen, sunburst,
+  SUN_RINGS, type CostNode,
 } from "../model.ts";
 import { corpus } from "./fixture.ts";
 
@@ -175,11 +175,15 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
       their screen would be the worst kind of leak this page could have. */
 {
   const dd = data.datasets["1h"];
-  const open = postText(dd, false), masked = postText(dd, true);
-  ok(open.length <= POST_MAX && masked.length <= POST_MAX,
-     `the caption fits a post (${open.length}/${masked.length} chars)`);
+  const home = "https://a-fairly-long-deployment-name.example.vercel.app/";
+  const open = postText(dd, false, home), masked = postText(dd, true, home);
+  ok(postLength(open) <= POST_MAX && postLength(masked) <= POST_MAX,
+     `the caption fits a post (${postLength(open)}/${postLength(masked)} of ${POST_MAX})`);
   ok(!/undefined|NaN/.test(open + masked), "the caption has no formatting holes");
   ok(!masked.includes("$"), "covering the amounts keeps money out of the caption");
+  ok(open.endsWith(home), "the invitation survives whatever else has to be cut");
+  ok(!postText(dd, false).includes("Show me yours"),
+     "with nowhere to point, the invitation is dropped rather than left dangling");
 }
 
 console.log(fails ? `\n${fails} MODEL FAILURE(S)` : "\nmodel clean");

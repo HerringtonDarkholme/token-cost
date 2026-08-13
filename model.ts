@@ -280,6 +280,11 @@ export function ledger(d: Dataset, path: string[], open: Record<string, boolean>
  *  of, so the ceiling is enforced rather than assumed. */
 export const POST_MAX = 280;
 
+/** X bills a link at 23 characters however long it is, so the ceiling is measured the way
+ *  the composer measures it rather than on the raw string. */
+export const postLength = (s: string): number =>
+  s.replace(/https?:\/\/\S+/g, "x".repeat(23)).length;
+
 /** How a group is said out loud. The chart's names are column headings -- "Tools · content
  *  read in" -- and a heading dropped into a sentence reads as a spreadsheet. A post is a
  *  sentence, so each group gets a phrase. Anything unmapped falls back to the heading. */
@@ -297,24 +302,37 @@ const SAID: Partial<Record<GroupId, string>> = {
 
 /** The caption that travels with the shared image.
  *
- *  Written as a post, not as a summary: the image is already the evidence, so the text gets
- *  one number worth stopping on and the claim that number is there to support. Every figure
- *  the picture carries anyway is left to the picture.
+ *  What is actually being posted is one developer's own working week -- what their tools
+ *  pulled in, what the model thought about, what they typed -- so the caption reads as
+ *  theirs and ends by asking to see everyone else's. The picture is the evidence and
+ *  carries the figures; the text gets one number worth stopping on, the claim that number
+ *  supports, and the invitation.
  *
- *  It honours the masked lens for the same reason the header does -- a reader who covered
- *  the dollars to share a screen has said they do not want the total published. */
-export function postText(d: Dataset, pctOnly: boolean): string {
+ *  `home` is where a reader can run their own, and is dropped when there is nowhere to
+ *  point -- a page opened from disk has no address anyone else can use, and an invitation
+ *  with no link is just a boast.
+ *
+ *  The masked lens is honoured for the same reason the header honours it: a reader who
+ *  covered the dollars to share a screen has said they do not want the total published. */
+export function postText(d: Dataset, pctOnly: boolean, home?: string | null): string {
   const top = d.groups[0];
   const heading = top ? (SAID[top.id] || top.name.toLowerCase()) : "—";
   const said = heading.length > 44 ? heading.slice(0, 43).trimEnd() + "…" : heading;
   const scope = d.days ? `${d.days} day${d.days === 1 ? "" : "s"}`
                        : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`;
-  const out = [
+
+  const lines = [
     pctOnly ? `Itemised ${scope} of my Claude Code bill.`
             : `Itemised my Claude Code bill: ${money(d.total)} over ${scope}.`,
     `Biggest line: ${said}, ${pctOf(top ? top.cost : 0, d.total).toFixed(0)}% of it.`,
-    "You don't pay for what the model writes. You pay rent on your context — "
-      + "every request re-bills the whole thing.",
-  ].join("\n\n");
-  return out.length > POST_MAX ? out.slice(0, POST_MAX - 1).trimEnd() + "…" : out;
+    "You don't pay for what the model writes — you pay rent on your context.",
+  ];
+  if (home) lines.push(`Show me yours: ${home}`);
+
+  /* Over the ceiling, the line to lose is the middle one: it is the only claim the image
+     already makes on its own. Truncating instead would eat the link, which is the one part
+     of the post that has to survive intact. */
+  const out = lines.join("\n\n");
+  if (postLength(out) <= POST_MAX) return out;
+  return [lines[0], lines[2], ...lines.slice(3)].join("\n\n");
 }

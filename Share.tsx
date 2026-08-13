@@ -75,20 +75,22 @@ function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
 }
 
 const COPY: Record<Outcome, string> = {
-  busy: "Rendering the chart…",
+  busy: "Rendering…",
   copied: "Chart copied",
   saved: "Chart saved as a PNG",
   failed: "Could not render the chart",
 };
 
 const SHARE: Record<Outcome, string> = {
-  busy: "Rendering the chart…",
+  busy: "Rendering…",
   copied: "Image copied — paste it into the post",
   saved: "Image saved — attach it to the post",
   failed: "Could not render the image",
 };
 
-/** The X mark, filled with `currentColor` so it inverts with the button like the eye does. */
+/** The X mark, filled with `currentColor` so it inverts with the button like the eye does.
+ *  It stands in for the word at the end of the label rather than leading it as an icon --
+ *  the sentence is "share to X", and X is a logo, not a letter. */
 function XMark(): React.JSX.Element {
   return (
     <svg className="xicon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -113,18 +115,25 @@ export function ShareButton(): React.JSX.Element {
   const [at, run] = useChartPng();
 
   const share = (): void => {
-    const url = "https://x.com/intent/post?text=" + encodeURIComponent(postText(d, state.pctOnly));
+    /* Where the invitation points: this page, if it is somewhere a reader can be sent. A
+       standalone file opened from disk has an address that means nothing to anyone else, so
+       it gets no link rather than a dead one. */
+    const home = location.protocol === "http:" || location.protocol === "https:"
+      ? location.origin + location.pathname : null;
+    const url = "https://x.com/intent/post?text="
+      + encodeURIComponent(postText(d, state.pctOnly, home));
     /* Opened last, and only on success, so a blocked popup cannot cost the reader the image.
        The activation from the click survives the render in every browser that allows popups
        at all; if it does not, the caption is a click away in the composer anyway. */
     void run(() => { window.open(url, "_blank", "noopener,noreferrer"); });
   };
 
+  /* The mark carries no text of its own, so the accessible name has to say the word it
+     stands for -- a button announced as "share to" is a button announced as nothing. */
   return (
     <button type="button" className="linkish" data-on={at && at !== "busy" ? 1 : 0}
-      disabled={at === "busy"} onClick={share}>
-      <XMark />
-      {at ? SHARE[at] : "Share chart on X"}
+      disabled={at === "busy"} onClick={share} aria-label={at ? SHARE[at] : "Share to X"}>
+      {at ? SHARE[at] : <>Share to<XMark /></>}
     </button>
   );
 }
