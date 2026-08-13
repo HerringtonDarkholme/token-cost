@@ -6,31 +6,31 @@
    forwards, and so that `amt()` is impossible to bypass -- hiding amounts has to hide all
    of them, and a component that formatted its own dollars would leak one. */
 
-import { createContext, useContext } from "react";
-import type { Analysis, Dataset } from "./engine.ts";
-import type { Focus, Palette } from "./model.ts";
-import type { ViewState } from "./store.ts";
+import { createContext, useContext } from "react"
+import type { Analysis, Dataset } from "./engine.ts"
+import type { Focus, Palette } from "./model.ts"
+import type { ViewState } from "./store.ts"
 
 export interface ReportCtx {
-  data: Analysis;
+  data: Analysis
   /** The dataset for the current TTL lens. */
-  d: Dataset;
-  state: ViewState;
-  pal: Palette;
+  d: Dataset
+  state: ViewState
+  pal: Palette
   /** The subtree the breadcrumb is pointing at. */
-  focus: Focus;
+  focus: Focus
   /** Dollars, or share of `base` (default: the whole bill) when amounts are hidden. */
-  amt(cost: number, base?: number): string;
+  amt(cost: number, base?: number): string
   /** Requests, floored at 1 so per-request figures can never divide by zero. */
-  reqs: number;
+  reqs: number
   /** Drill one level down into `name`, if it has anything to show. */
-  drill(name: string): void;
+  drill(name: string): void
 }
 
-export const ReportContext = createContext<ReportCtx | null>(null);
+export const ReportContext = createContext<ReportCtx | null>(null)
 
 export function useReport(): ReportCtx {
-  const ctx = useContext(ReportContext);
-  if (!ctx) throw new Error("useReport() outside <Report>");
-  return ctx;
+  const ctx = useContext(ReportContext)
+  if (!ctx) throw new Error("useReport() outside <Report>")
+  return ctx
 }

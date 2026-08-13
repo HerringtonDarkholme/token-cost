@@ -4,15 +4,15 @@
    without a directory being discovered automatically. Pass a real one when you want to see
    the views survive real data -- `TRANSCRIPT_DIR=~/.claude/projects/<project>`. */
 
-import fs from "node:fs";
-import path from "node:path";
-import type { RawFile } from "../engine.ts";
+import fs from "node:fs"
+import path from "node:path"
+import type { RawFile } from "../engine.ts"
 
 export function readDir(dir: string): RawFile[] {
   return fs
     .readdirSync(dir)
     .filter((f) => f.endsWith(".jsonl"))
-    .map((f) => ({ name: f, text: fs.readFileSync(path.join(dir, f), "utf8") }));
+    .map((f) => ({ name: f, text: fs.readFileSync(path.join(dir, f), "utf8") }))
 }
 
 /** A corpus with enough shape to reach every view: several groups, shell programs that
@@ -23,14 +23,14 @@ export function readDir(dir: string): RawFile[] {
  *  They are also the most expensive things in the corpus, so a caption that names leaves by
  *  cost alone reaches for one of them first, and the suite catches it. */
 export function synthetic(): RawFile[] {
-  const L: string[] = [];
+  const L: string[] = []
   const progs: Array<[string, string[]]> = [
     ["git", ["diff", "log", "status", "commit"]],
     ["docker", ["build", "run", "ps"]],
     ["acme-deploy", ["push", "rollback", "status"]],
-  ];
+  ]
   for (let k = 0; k < 30; k++) {
-    const [prog, verbs] = progs[k % progs.length];
+    const [prog, verbs] = progs[k % progs.length]
     L.push(
       JSON.stringify({
         sessionId: "s",
@@ -56,7 +56,7 @@ export function synthetic(): RawFile[] {
           ],
         },
       }),
-    );
+    )
     L.push(
       JSON.stringify({
         sessionId: "s",
@@ -71,7 +71,7 @@ export function synthetic(): RawFile[] {
           ],
         },
       }),
-    );
+    )
     L.push(
       JSON.stringify({
         sessionId: "s",
@@ -96,7 +96,7 @@ export function synthetic(): RawFile[] {
           ],
         },
       }),
-    );
+    )
     L.push(
       JSON.stringify({
         sessionId: "s",
@@ -105,7 +105,7 @@ export function synthetic(): RawFile[] {
           content: [{ type: "tool_result", tool_use_id: "r" + k, content: "source ".repeat(600) }],
         },
       }),
-    );
+    )
     L.push(
       JSON.stringify({
         sessionId: "s",
@@ -130,7 +130,7 @@ export function synthetic(): RawFile[] {
           ],
         },
       }),
-    );
+    )
     L.push(
       JSON.stringify({
         sessionId: "s",
@@ -141,7 +141,7 @@ export function synthetic(): RawFile[] {
           ],
         },
       }),
-    );
+    )
     L.push(
       JSON.stringify({
         sessionId: "s",
@@ -156,11 +156,11 @@ export function synthetic(): RawFile[] {
           ],
         },
       }),
-    );
+    )
   }
-  return [{ name: "synthetic.jsonl", text: L.join("\n") }];
+  return [{ name: "synthetic.jsonl", text: L.join("\n") }]
 }
 
 export function corpus(dir?: string): RawFile[] {
-  return dir ? readDir(dir) : synthetic();
+  return dir ? readDir(dir) : synthetic()
 }

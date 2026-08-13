@@ -1,4 +1,4 @@
-import "react";
+import "react"
 
 /* `webkitdirectory` is how a file input is asked for a whole folder. It is not in the HTML
    standard and so not in React's attribute types, but it is the only thing that makes
@@ -7,7 +7,7 @@ import "react";
    attribute stays spelled correctly. */
 declare module "react" {
   interface InputHTMLAttributes<T> {
-    webkitdirectory?: string;
-    directory?: string;
+    webkitdirectory?: string
+    directory?: string
   }
 }

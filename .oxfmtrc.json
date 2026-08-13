@@ -18,5 +18,10 @@
   //   .agents -- a vendored skill, not ours to format. `.oxlintrc.json` skips it too.
   //
   // `dist`, `cost-report.html` and `node_modules` need no entry: oxfmt reads `.gitignore`.
-  "ignorePatterns": ["*.css", "*.md", "*.html", "*.json", "*.yaml", ".agents"]
+  "ignorePatterns": ["*.css", "*.md", "*.html", "*.json", "*.yaml", ".agents"],
+
+  // No statement-ending semicolons. oxfmt still writes a leading one on the few lines that
+  // would otherwise be swallowed by the line above (a statement opening with `(`, `[`, `` ` ``,
+  // `+`, `-` or `/`), so this is a style choice rather than a correctness one.
+  "semi": false
 }

@@ -2,10 +2,10 @@
    the mosaic rather than a peer of it -- same data, sorted and labelled instead of packed,
    for when you want to read names rather than compare areas. */
 
-import { memo, useMemo } from "react";
-import { useReport } from "./context.ts";
-import { fold, kidsOf, maxCost, pctOf, type CostNode } from "./model.ts";
-import { hoverBind, useHover } from "./store.ts";
+import { memo, useMemo } from "react"
+import { useReport } from "./context.ts"
+import { fold, kidsOf, maxCost, pctOf, type CostNode } from "./model.ts"
+import { hoverBind, useHover } from "./store.ts"
 
 /* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when
    it lands inside this panel, null otherwise. See `Column` in Mosaic.tsx. */
@@ -17,29 +17,29 @@ const Panel = memo(function Panel({
   hit,
   anyHover,
 }: {
-  panel: CostNode;
-  gname: string;
-  maxPanel: number;
-  kids: CostNode[];
-  hit: string | null;
-  anyHover: boolean;
+  panel: CostNode
+  gname: string
+  maxPanel: number
+  kids: CostNode[]
+  hit: string | null
+  anyHover: boolean
 }): React.JSX.Element {
-  const { state, pal, amt, reqs, drill } = useReport();
-  const h = pal.hue(gname);
-  const key = gname + "›" + panel.name;
-  const dim = anyHover && !hit;
-  const maxKid = maxCost(kids);
+  const { state, pal, amt, reqs, drill } = useReport()
+  const h = pal.hue(gname)
+  const key = gname + "›" + panel.name
+  const dim = anyHover && !hit
+  const maxKid = maxCost(kids)
 
   /* Two different footers, and the difference matters: a panel with no children is a
      genuine leaf, while one whose children sum short of it has been filtered by the query
      and must say so rather than appear to under-count. */
-  const kidsAll = kidsOf(panel) || [];
-  const shown = kids.reduce((a, k) => a + k.cost, 0);
+  const kidsAll = kidsOf(panel) || []
+  const shown = kids.reduce((a, k) => a + k.cost, 0)
   const foot = !kidsAll.length
     ? "single line item · no further breakdown"
     : Math.abs(shown - panel.cost) < 0.01
       ? ""
-      : `shown: ${amt(shown)} of ${amt(panel.cost)}`;
+      : `shown: ${amt(shown)} of ${amt(panel.cost)}`
 
   return (
     <div className="pan">
@@ -70,8 +70,8 @@ const Panel = memo(function Panel({
       </div>
       <div className="panitems">
         {kids.map((k) => {
-          const kk = key + "›" + k.name;
-          const active = hit === kk;
+          const kk = key + "›" + k.name
+          const active = hit === kk
           return (
             <div
               className="pi"
@@ -103,20 +103,20 @@ const Panel = memo(function Panel({
               </span>
               <span className="pv">{amt(k.cost)}</span>
             </div>
-          );
+          )
         })}
       </div>
       {foot ? <div className="panfoot">{foot}</div> : null}
     </div>
-  );
-});
+  )
+})
 
 export function Panels(): React.JSX.Element {
-  const { d, focus, state } = useReport();
-  const hover = useHover();
-  const hk = hover?.key ?? null;
-  const q = state.query.trim().toLowerCase();
-  const rootCost = focus.node.cost || 1;
+  const { d, focus, state } = useReport()
+  const hover = useHover()
+  const hk = hover?.key ?? null
+  const q = state.query.trim().toLowerCase()
+  const rootCost = focus.node.cost || 1
 
   /* Memoised for node identity, so a hover leaves the memoised panels' props untouched. */
   const { panels, maxPanel } = useMemo(() => {
@@ -124,24 +124,24 @@ export function Panels(): React.JSX.Element {
        one away would hide a role rather than a long tail. Below the root, fold as usual. */
     const src: CostNode[] = focus.groupName
       ? fold(focus.node.items || [], rootCost)
-      : d.groups.slice().sort((a, b) => b.cost - a.cost);
+      : d.groups.slice().sort((a, b) => b.cost - a.cost)
     return {
       maxPanel: maxCost(src),
       panels: src
         .map((p) => {
           const kids = fold(kidsOf(p) || [], p.cost).filter(
             (k) => !q || k.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q),
-          );
-          return { p, kids };
+          )
+          return { p, kids }
         })
         .filter(({ kids }) => !q || kids.length),
-    };
-  }, [d, focus, rootCost, q]);
+    }
+  }, [d, focus, rootCost, q])
 
   return (
     <div className="panels">
       {panels.map(({ p, kids }) => {
-        const key = (focus.groupName || p.name) + "›" + p.name;
+        const key = (focus.groupName || p.name) + "›" + p.name
         return (
           <Panel
             key={p.name}
@@ -152,8 +152,8 @@ export function Panels(): React.JSX.Element {
             hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null}
             anyHover={!!hk}
           />
-        );
+        )
       })}
     </div>
-  );
+  )
 }

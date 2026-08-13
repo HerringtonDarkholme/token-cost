@@ -6,16 +6,16 @@
    every file picker hides it by default, and a reader who cannot find their transcripts
    never sees the report at all. */
 
-import { useRef, useState, type ReactNode } from "react";
-import { analyze, type Analysis, type RawFile } from "./engine.ts";
-import { useViewState } from "./store.ts";
-import { ThemeBar } from "./Toolbar.tsx";
+import { useRef, useState, type ReactNode } from "react"
+import { analyze, type Analysis, type RawFile } from "./engine.ts"
+import { useViewState } from "./store.ts"
+import { ThemeBar } from "./Toolbar.tsx"
 
-const MAX_LISTED = 60;
+const MAX_LISTED = 60
 
 interface Status {
-  node: ReactNode;
-  err: boolean;
+  node: ReactNode
+  err: boolean
 }
 
 /** Walk a dropped folder. `webkitGetAsEntry` is non-standard and the DOM types declare it
@@ -24,42 +24,42 @@ interface Status {
 function walkEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
   return new Promise((res) => {
     if (entry.isFile) {
-      (entry as FileSystemFileEntry).file(
+      ;(entry as FileSystemFileEntry).file(
         (f) => {
-          out.push(f);
-          res();
+          out.push(f)
+          res()
         },
         () => res(),
-      );
+      )
     } else if (entry.isDirectory) {
-      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      const reader = (entry as FileSystemDirectoryEntry).createReader()
       const more = (): void =>
         reader.readEntries(
           async (entries) => {
-            if (!entries.length) return res();
-            await Promise.all(entries.map((e) => walkEntry(e, out)));
-            more();
+            if (!entries.length) return res()
+            await Promise.all(entries.map((e) => walkEntry(e, out)))
+            more()
           },
           () => res(),
-        );
-      more();
-    } else res();
-  });
+        )
+      more()
+    } else res()
+  })
 }
 
 export function Upload({ onData }: { onData: (data: Analysis) => void }): React.JSX.Element {
-  const { theme } = useViewState();
-  const [status, setStatus] = useState<Status | null>(null);
-  const [names, setNames] = useState<string[] | null>(null);
-  const [over, setOver] = useState(false);
-  const filePicker = useRef<HTMLInputElement>(null);
-  const dirPicker = useRef<HTMLInputElement>(null);
+  const { theme } = useViewState()
+  const [status, setStatus] = useState<Status | null>(null)
+  const [names, setNames] = useState<string[] | null>(null)
+  const [over, setOver] = useState(false)
+  const filePicker = useRef<HTMLInputElement>(null)
+  const dirPicker = useRef<HTMLInputElement>(null)
 
-  const say = (node: ReactNode, err = false): void => setStatus({ node, err });
+  const say = (node: ReactNode, err = false): void => setStatus({ node, err })
 
   async function handle(list: FileList | File[] | null): Promise<void> {
-    const all = [...(list || [])];
-    const files = all.filter((f) => f.name.endsWith(".jsonl"));
+    const all = [...(list || [])]
+    const files = all.filter((f) => f.name.endsWith(".jsonl"))
     if (!files.length) {
       say(
         all.length ? (
@@ -70,48 +70,48 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
           "No files selected."
         ),
         true,
-      );
-      return;
+      )
+      return
     }
 
     say(
       <>
         Reading <b>{files.length}</b> file{files.length > 1 ? "s" : ""}…
       </>,
-    );
+    )
     setNames(
       files
         .slice(0, MAX_LISTED)
         .map((f) => f.name)
         .concat(files.length > MAX_LISTED ? [`… +${files.length - MAX_LISTED} more`] : []),
-    );
+    )
 
-    let payload: RawFile[];
+    let payload: RawFile[]
     try {
-      payload = await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() })));
+      payload = await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() })))
     } catch (e) {
-      say(`Could not read the files: ${(e as Error).message}`, true);
-      return;
+      say(`Could not read the files: ${(e as Error).message}`, true)
+      return
     }
 
-    const bytes = payload.reduce((a, b) => a + b.text.length, 0);
+    const bytes = payload.reduce((a, b) => a + b.text.length, 0)
     say(
       <>
         Analyzing <b>{(bytes / 1e6).toFixed(1)} MB</b>…
       </>,
-    );
+    )
     /* Let that status actually paint before the parse takes the main thread: a multi-hundred
        megabyte corpus is seconds of synchronous work, and a page that goes silent first
        reads as hung. */
-    await new Promise((r) => setTimeout(r, 16));
+    await new Promise((r) => setTimeout(r, 16))
 
-    let data: Analysis;
+    let data: Analysis
     try {
-      data = analyze(payload);
+      data = analyze(payload)
     } catch (e) {
-      say(`Analysis failed: ${(e as Error).message}`, true);
-      console.error(e);
-      return;
+      say(`Analysis failed: ${(e as Error).message}`, true)
+      console.error(e)
+      return
     }
     if (!data.requests) {
       say(
@@ -120,25 +120,25 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
           transcripts from <code>~/.claude/projects/</code>?
         </>,
         true,
-      );
-      return;
+      )
+      return
     }
-    onData(data);
+    onData(data)
   }
 
   async function onDrop(e: React.DragEvent): Promise<void> {
-    e.preventDefault();
-    setOver(false);
-    const items = e.dataTransfer?.items;
+    e.preventDefault()
+    setOver(false)
+    const items = e.dataTransfer?.items
     if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
-      const out: File[] = [];
+      const out: File[] = []
       const entries = [...items]
         .map((i) => i.webkitGetAsEntry())
-        .filter((x): x is FileSystemEntry => !!x);
-      await Promise.all(entries.map((entry) => walkEntry(entry, out)));
-      await handle(out);
+        .filter((x): x is FileSystemEntry => !!x)
+      await Promise.all(entries.map((entry) => walkEntry(entry, out)))
+      await handle(out)
     } else {
-      await handle(e.dataTransfer?.files ?? null);
+      await handle(e.dataTransfer?.files ?? null)
     }
   }
 
@@ -159,19 +159,19 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
       <div
         className={over ? "drop over" : "drop"}
         onDragEnter={(e) => {
-          e.preventDefault();
-          setOver(true);
+          e.preventDefault()
+          setOver(true)
         }}
         onDragOver={(e) => {
-          e.preventDefault();
-          setOver(true);
+          e.preventDefault()
+          setOver(true)
         }}
         onDragLeave={(e) => {
           // Leaving for a child element is not leaving the drop zone.
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false)
         }}
         onDrop={(e) => {
-          void onDrop(e);
+          void onDrop(e)
         }}
       >
         <h2>
@@ -193,7 +193,7 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
           accept=".jsonl"
           className="hidden"
           onChange={(e) => {
-            void handle(e.target.files);
+            void handle(e.target.files)
           }}
         />
         <input
@@ -204,7 +204,7 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
           directory=""
           className="hidden"
           onChange={(e) => {
-            void handle(e.target.files);
+            void handle(e.target.files)
           }}
         />
         <p className="privacy">Parsed in this page · nothing is uploaded</p>
@@ -270,5 +270,5 @@ export function Upload({ onData }: { onData: (data: Analysis) => void }): React.
         </p>
       </div>
     </div>
-  );
+  )
 }

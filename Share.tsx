@@ -18,75 +18,75 @@
    -- anything that silently copies and then reports "shared" has lied about the one step
    the reader still has to take. */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { useReport } from "./context.ts";
-import { postText } from "./model.ts";
-import { download, snapshot } from "./snapshot.ts";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useReport } from "./context.ts"
+import { postText } from "./model.ts"
+import { download, snapshot } from "./snapshot.ts"
 
-const FILENAME = "where-the-money-went.png";
+const FILENAME = "where-the-money-went.png"
 
 /** Not a result, so it never times out: "busy" ends when the work does. */
-type Outcome = "busy" | "copied" | "saved" | "failed";
+type Outcome = "busy" | "copied" | "saved" | "failed"
 
 /** Like the toolbar's flash, but carrying which outcome to announce, and held long enough
  *  to be read as an instruction rather than a receipt. The timer is cancelled on unmount
  *  because loading a new file unmounts the report mid-flight. */
 function useOutcome(ms = 6000): [Outcome | null, (o: Outcome | null) => void] {
-  const [at, setAt] = useState<Outcome | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [at, setAt] = useState<Outcome | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(
     () => () => {
-      if (timer.current) clearTimeout(timer.current);
+      if (timer.current) clearTimeout(timer.current)
     },
     [],
-  );
+  )
   return [
     at,
     (o: Outcome | null) => {
-      setAt(o);
-      if (timer.current) clearTimeout(timer.current);
-      if (o && o !== "busy") timer.current = setTimeout(() => setAt(null), ms);
+      setAt(o)
+      if (timer.current) clearTimeout(timer.current)
+      if (o && o !== "busy") timer.current = setTimeout(() => setAt(null), ms)
     },
-  ];
+  ]
 }
 
 /** The card as a PNG, on the clipboard or on disk, with `then` run only if it got there. */
 function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
-  const [at, setAt] = useOutcome();
+  const [at, setAt] = useOutcome()
 
   const run = async (then?: () => void): Promise<void> => {
-    const card = document.querySelector<HTMLElement>(".card");
+    const card = document.querySelector<HTMLElement>(".card")
     if (!card) {
-      setAt("failed");
-      return;
+      setAt("failed")
+      return
     }
-    setAt("busy");
+    setAt("busy")
 
     /* Started before the clipboard call and handed over unresolved: Safari only accepts a
        write it can tie to the click, so the ClipboardItem has to be constructed with the
        promise rather than with an image awaited first. */
-    const png = snapshot(card);
+    const png = snapshot(card)
 
-    let done: Outcome;
+    let done: Outcome
     try {
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-      done = "copied";
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })])
+      done = "copied"
     } catch {
       /* No clipboard, no permission, or no ClipboardItem at all. The render itself may also
          have failed, in which case awaiting it here rethrows into the catch below. */
       try {
-        download(await png, FILENAME);
-        done = "saved";
+        download(await png, FILENAME)
+        done = "saved"
       } catch {
-        setAt("failed");
-        return;
+        setAt("failed")
+        return
       }
     }
-    setAt(done);
-    then?.();
-  };
+    setAt(done)
+    then?.()
+  }
 
-  return [at, run];
+  return [at, run]
 }
 
 const COPY: Record<Outcome, string> = {
@@ -94,20 +94,20 @@ const COPY: Record<Outcome, string> = {
   copied: "Chart copied",
   saved: "Chart saved as a PNG",
   failed: "Could not render the chart",
-};
+}
 
 const SHARE: Record<Outcome, string> = {
   busy: "Rendering…",
   copied: "Image copied — paste it into the post",
   saved: "Image saved — attach it to the post",
   failed: "Could not render the image",
-};
+}
 
 /** How long the label's exit leg runs, read off the stylesheet so the swap's three phases
  *  stay in step with the CSS that draws them. */
 function swapMs(): number {
-  const dur = getComputedStyle(document.documentElement).getPropertyValue("--text-swap-dur");
-  return parseFloat(dur) || 150;
+  const dur = getComputedStyle(document.documentElement).getPropertyValue("--text-swap-dur")
+  return parseFloat(dur) || 150
 }
 
 /** These buttons say what just happened -- "Copy chart" becomes "Rendering…" becomes "Chart
@@ -121,34 +121,34 @@ function swapMs(): number {
  *  `token` is what identifies the label, because the label itself is fresh JSX every render.
  */
 function TextSwap({ token, children }: { token: string; children: ReactNode }): React.JSX.Element {
-  const el = useRef<HTMLSpanElement>(null);
-  const [shown, setShown] = useState<{ token: string; body: ReactNode }>({ token, body: children });
-  const [phase, setPhase] = useState<"" | "exit" | "enter">("");
+  const el = useRef<HTMLSpanElement>(null)
+  const [shown, setShown] = useState<{ token: string; body: ReactNode }>({ token, body: children })
+  const [phase, setPhase] = useState<"" | "exit" | "enter">("")
 
   /* Read through a ref rather than a dependency: the children are a new element on every
      render of the parent, and a dependency on them would restart the exit leg mid-flight. */
-  const latest = useRef(children);
-  latest.current = children;
+  const latest = useRef(children)
+  latest.current = children
 
   useEffect(() => {
-    if (token === shown.token) return;
-    setPhase("exit");
+    if (token === shown.token) return
+    setPhase("exit")
     const t = setTimeout(() => {
-      setShown({ token, body: latest.current });
-      setPhase("enter");
-    }, swapMs());
-    return () => clearTimeout(t);
-  }, [token, shown.token]);
+      setShown({ token, body: latest.current })
+      setPhase("enter")
+    }, swapMs())
+    return () => clearTimeout(t)
+  }, [token, shown.token])
 
   /* `is-enter-start` puts the new label below its resting place with the transition
      suspended, so it needs the reflow before the class comes off again -- that read is what
      makes the return a transition rather than a second jump. Same single task as the
      reference's `void el.offsetHeight`, since a layout effect commits before paint. */
   useLayoutEffect(() => {
-    if (phase !== "enter") return;
-    void el.current?.offsetHeight;
-    setPhase("");
-  }, [phase]);
+    if (phase !== "enter") return
+    void el.current?.offsetHeight
+    setPhase("")
+  }, [phase])
 
   return (
     <span
@@ -160,7 +160,7 @@ function TextSwap({ token, children }: { token: string; children: ReactNode }): 
     >
       {shown.body}
     </span>
-  );
+  )
 }
 
 /** The X mark, filled with `currentColor` so it inverts with the button like the eye does.
@@ -174,11 +174,11 @@ function XMark(): React.JSX.Element {
                2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z"
       />
     </svg>
-  );
+  )
 }
 
 export function CopyChartButton(): React.JSX.Element {
-  const [at, run] = useChartPng();
+  const [at, run] = useChartPng()
   return (
     <button
       type="button"
@@ -186,17 +186,17 @@ export function CopyChartButton(): React.JSX.Element {
       data-on={at && at !== "busy" ? 1 : 0}
       disabled={at === "busy"}
       onClick={() => {
-        void run();
+        void run()
       }}
     >
       <TextSwap token={at || "idle"}>{at ? COPY[at] : "Copy chart"}</TextSwap>
     </button>
-  );
+  )
 }
 
 export function ShareButton(): React.JSX.Element {
-  const { d, state } = useReport();
-  const [at, run] = useChartPng();
+  const { d, state } = useReport()
+  const [at, run] = useChartPng()
 
   const share = (): void => {
     /* Where the invitation points: this page, if it is somewhere a reader can be sent. A
@@ -205,16 +205,16 @@ export function ShareButton(): React.JSX.Element {
     const home =
       location.protocol === "http:" || location.protocol === "https:"
         ? location.origin + location.pathname
-        : null;
+        : null
     const url =
-      "https://x.com/intent/post?text=" + encodeURIComponent(postText(d, state.pctOnly, home));
+      "https://x.com/intent/post?text=" + encodeURIComponent(postText(d, state.pctOnly, home))
     /* Opened last, and only on success, so a blocked popup cannot cost the reader the image.
        The activation from the click survives the render in every browser that allows popups
        at all; if it does not, the caption is a click away in the composer anyway. */
     void run(() => {
-      window.open(url, "_blank", "noopener,noreferrer");
-    });
-  };
+      window.open(url, "_blank", "noopener,noreferrer")
+    })
+  }
 
   /* The mark carries no text of its own, so the accessible name has to say the word it
      stands for -- a button announced as "share to" is a button announced as nothing. */
@@ -238,5 +238,5 @@ export function ShareButton(): React.JSX.Element {
         )}
       </TextSwap>
     </button>
-  );
+  )
 }

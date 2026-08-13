@@ -2,29 +2,29 @@
    contrast on a light ground, so identity has to be carried by text somewhere, and this is
    where the numbers are legible to a screen reader and copyable to a spreadsheet. */
 
-import { memo } from "react";
-import { useReport } from "./context.ts";
-import { maxCost, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts";
-import { hoverBind, setState, useHover } from "./store.ts";
+import { memo } from "react"
+import { useReport } from "./context.ts"
+import { maxCost, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts"
+import { hoverBind, setState, useHover } from "./store.ts"
 
 /** What the footer claims, in words. Two different claims: unfiltered, it asserts the
  *  reconciliation; filtered, it says plainly that the matched rows are a subset shown in
  *  their parents' context, so nobody reads the total as having shrunk. */
 export function useReconNote(L: Ledger): string {
-  const { d, state, amt } = useReport();
+  const { d, state, amt } = useReport()
   if (state.query)
     return (
       `Filtered view · ${amt(L.recon)} across matching line items, shown in their ` +
       "parents' context; parent rows keep their own full totals."
-    );
-  let s = "Children sum to parent at every level; folded rows keep their full value.";
+    )
+  let s = "Children sum to parent at every level; folded rows keep their full value."
   if (!state.path.length && Math.abs(d.total - L.recon) > 0.005) {
     const gap = state.pctOnly
       ? (((d.total - L.recon) / d.total) * 100).toFixed(2) + "%"
-      : "$" + (d.total - L.recon).toFixed(2);
-    s += ` ${gap} of the billed total is unattributed rounding.`;
+      : "$" + (d.total - L.recon).toFixed(2)
+    s += ` ${gap} of the billed total is unattributed rounding.`
   }
-  return s;
+  return s
 }
 
 /* One row, memoised on `active` rather than on the hover target, so moving the pointer down
@@ -35,19 +35,19 @@ const Row = memo(function Row({
   rootCost,
   active,
 }: {
-  r: LedgerRow;
-  maxRow: number;
-  rootCost: number;
-  active: boolean;
+  r: LedgerRow
+  maxRow: number
+  rootCost: number
+  active: boolean
 }): React.JSX.Element {
-  const { state, pal, amt, reqs } = useReport();
-  const h = pal.hue(r.group);
-  const pct = (r.node.cost / rootCost) * 100;
+  const { state, pal, amt, reqs } = useReport()
+  const h = pal.hue(r.group)
+  const pct = (r.node.cost / rootCost) * 100
   const name = (
     <span className="nm" data-folded={r.node.folded ? 1 : 0}>
       {r.node.name}
     </span>
-  );
+  )
 
   return (
     <tr
@@ -112,15 +112,15 @@ const Row = memo(function Row({
         {state.pctOnly ? amt(r.node.cost) : "$" + (r.node.cost / reqs).toFixed(4)}
       </td>
     </tr>
-  );
-});
+  )
+})
 
 export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
-  const { state, amt } = useReport();
-  const hover = useHover();
-  const hk = hover?.key ?? null;
-  const maxRow = maxCost(L.rows.filter((r) => r.depth === 0).map((r) => r.node));
-  const reconShare = L.recon / L.rootCost;
+  const { state, amt } = useReport()
+  const hover = useHover()
+  const hk = hover?.key ?? null
+  const maxRow = maxCost(L.rows.filter((r) => r.depth === 0).map((r) => r.node))
+  const reconShare = L.recon / L.rootCost
 
   return (
     <div className="tblwrap">
@@ -176,5 +176,5 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
         </tfoot>
       </table>
     </div>
-  );
+  )
 }

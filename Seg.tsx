@@ -13,7 +13,7 @@
    these are buttons, not tabs, and `aria-selected` on a button that is not in a tablist is
    announced as nothing. The pill is decoration over the top of that, and says so. */
 
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react"
 
 export function Seg<T extends string>({
   label,
@@ -23,49 +23,49 @@ export function Seg<T extends string>({
   nosnap,
 }: {
   /** Names what the options choose, said once instead of once per button. */
-  label?: string;
-  options: ReadonlyArray<readonly [T, string]>;
-  value: T;
-  onPick: (v: T) => void;
+  label?: string
+  options: ReadonlyArray<readonly [T, string]>
+  value: T
+  onPick: (v: T) => void
   /** Keep this control out of the PNG, for the ones that sit inside the card. */
-  nosnap?: boolean;
+  nosnap?: boolean
 }): React.JSX.Element {
-  const bar = useRef<HTMLSpanElement>(null);
-  const pill = useRef<HTMLSpanElement>(null);
-  const settled = useRef(false);
+  const bar = useRef<HTMLSpanElement>(null)
+  const pill = useRef<HTMLSpanElement>(null)
+  const settled = useRef(false)
 
   /** Write the pressed button's box onto the pill. `animate` false suspends the transition
    *  and forces a reflow, so first paint and resize snap into place instead of sliding in
    *  from `translateX(0)` at zero width. */
   const place = useCallback((animate: boolean): void => {
     const el = pill.current,
-      host = bar.current;
-    if (!el || !host) return;
-    const on = host.querySelector<HTMLElement>('button[aria-pressed="true"]');
-    if (!on) return;
+      host = bar.current
+    if (!el || !host) return
+    const on = host.querySelector<HTMLElement>('button[aria-pressed="true"]')
+    if (!on) return
 
-    const prev = el.style.transition;
-    if (!animate) el.style.transition = "none";
-    el.style.transform = `translateX(${on.offsetLeft}px)`;
-    el.style.width = `${on.offsetWidth}px`;
+    const prev = el.style.transition
+    if (!animate) el.style.transition = "none"
+    el.style.transform = `translateX(${on.offsetLeft}px)`
+    el.style.width = `${on.offsetWidth}px`
     if (!animate) {
-      void el.offsetWidth;
-      el.style.transition = prev;
+      void el.offsetWidth
+      el.style.transition = prev
     }
-  }, []);
+  }, [])
 
   /* Before paint, so the pill is already under the pressed option on the frame it appears,
      and every later change is a slide. */
   useLayoutEffect(() => {
-    place(settled.current);
-    settled.current = true;
-  }, [place, value, options]);
+    place(settled.current)
+    settled.current = true
+  }, [place, value, options])
 
   useEffect(() => {
-    const onResize = (): void => place(false);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [place]);
+    const onResize = (): void => place(false)
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [place])
 
   return (
     <span className="seg t-tabs" ref={bar} data-nosnap={nosnap ? "" : undefined}>
@@ -83,5 +83,5 @@ export function Seg<T extends string>({
         </button>
       ))}
     </span>
-  );
+  )
 }

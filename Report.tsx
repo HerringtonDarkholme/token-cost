@@ -8,9 +8,9 @@
    still read the one hover key from the one place, which is what lets the mosaic, the
    panels and the table stay a single instrument. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Analysis } from "./engine.ts";
-import { ReportContext, useReport, type ReportCtx } from "./context.ts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { Analysis } from "./engine.ts"
+import { ReportContext, useReport, type ReportCtx } from "./context.ts"
 import {
   branches,
   count,
@@ -21,7 +21,7 @@ import {
   palette,
   pctOf,
   type Ledger,
-} from "./model.ts";
+} from "./model.ts"
 import {
   hashFor,
   hoverClear,
@@ -30,13 +30,13 @@ import {
   setState,
   useViewState,
   type ViewState,
-} from "./store.ts";
-import { Seg } from "./Seg.tsx";
-import { Toolbar } from "./Toolbar.tsx";
-import { HoverBar, Mosaic } from "./Mosaic.tsx";
-import { Panels } from "./Panels.tsx";
-import { Sunburst } from "./Sunburst.tsx";
-import { LedgerTable, useReconNote } from "./Ledger.tsx";
+} from "./store.ts"
+import { Seg } from "./Seg.tsx"
+import { Toolbar } from "./Toolbar.tsx"
+import { HoverBar, Mosaic } from "./Mosaic.tsx"
+import { Panels } from "./Panels.tsx"
+import { Sunburst } from "./Sunburst.tsx"
+import { LedgerTable, useReconNote } from "./Ledger.tsx"
 
 /** The hash is the shareable view. Writing it is best-effort because `replaceState` can
  *  refuse on a `file://` page, which is how this is normally opened.
@@ -45,44 +45,44 @@ import { LedgerTable, useReconNote } from "./Ledger.tsx";
  *  reach the URL at all, and browsers rate-limit `replaceState` hard enough to start
  *  throwing if it is called on every one of them. */
 function useUrlSync(state: ViewState): void {
-  const hash = hashFor(state);
+  const hash = hashFor(state)
   useEffect(() => {
     try {
-      history.replaceState(null, "", hash || location.pathname + location.search);
+      history.replaceState(null, "", hash || location.pathname + location.search)
     } catch {
       /* file:// can refuse */
     }
-  }, [hash]);
+  }, [hash])
 
   useEffect(() => {
-    const onHash = (): void => setState(readHash(location.hash));
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
+    const onHash = (): void => setState(readHash(location.hash))
+    window.addEventListener("hashchange", onHash)
+    return () => window.removeEventListener("hashchange", onHash)
+  }, [])
 }
 
 const VIEWS: ReadonlyArray<readonly [ViewState["view"], string]> = [
   ["panels", "Panels"],
   ["table", "Table"],
-];
+]
 
 const CHARTS: ReadonlyArray<readonly [ViewState["chart"], string]> = [
   ["mosaic", "Mosaic"],
   ["sun", "Sunburst"],
-];
+]
 
 /* Written once rather than closed over per render: a pick is a write to the store, which is a
    module away, so neither switch needs anything from the component around it. */
-const pickView = (view: ViewState["view"]): void => setState({ view });
-const pickChart = (chart: ViewState["chart"]): void => setState({ chart });
+const pickView = (view: ViewState["view"]): void => setState({ view })
+const pickChart = (chart: ViewState["chart"]): void => setState({ chart })
 
 /** How long a digit pop-in runs, read off the stylesheet so the two cannot drift: the last
  *  two characters ride one and two stagger offsets behind the rest of the figure. */
 function popMs(): number {
-  const css = getComputedStyle(document.documentElement);
+  const css = getComputedStyle(document.documentElement)
   const ms = (name: string, fallback: number): number =>
-    parseFloat(css.getPropertyValue(name)) || fallback;
-  return ms("--digit-dur", 500) + ms("--digit-stagger", 70) * 2 + 40;
+    parseFloat(css.getPropertyValue(name)) || fallback
+  return ms("--digit-dur", 500) + ms("--digit-stagger", 70) * 2 + 40
 }
 
 /** A figure that re-enters character by character when it changes. Switching the TTL lens
@@ -95,18 +95,18 @@ function popMs(): number {
  *  again -- the PNG rasterises this markup in a fresh document, where a live animation would
  *  be caught at its first frame with the digits still invisible. */
 function PopNumber({ value, className }: { value: string; className?: string }): React.JSX.Element {
-  const [beat, setBeat] = useState(0);
-  const shown = useRef(value);
+  const [beat, setBeat] = useState(0)
+  const shown = useRef(value)
 
   useEffect(() => {
-    if (shown.current === value) return;
-    shown.current = value;
-    setBeat((n) => n + 1);
-    const t = setTimeout(() => setBeat(0), popMs());
-    return () => clearTimeout(t);
-  }, [value]);
+    if (shown.current === value) return
+    shown.current = value
+    setBeat((n) => n + 1)
+    const t = setTimeout(() => setBeat(0), popMs())
+    return () => clearTimeout(t)
+  }, [value])
 
-  const chars = [...value];
+  const chars = [...value]
   return (
     <span
       key={beat}
@@ -129,7 +129,7 @@ function PopNumber({ value, className }: { value: string; className?: string }):
       ))}
       {/* oxlint-enable react/no-array-index-key */}
     </span>
-  );
+  )
 }
 
 /** The panel a swapped-in view arrives in. Mounted closed and opened on the next frame,
@@ -143,14 +143,14 @@ function Reveal({
   className,
   children,
 }: {
-  className?: string;
-  children: React.ReactNode;
+  className?: string
+  children: React.ReactNode
 }): React.JSX.Element {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false)
   useEffect(() => {
-    const id = requestAnimationFrame(() => setOpen(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
+    const id = requestAnimationFrame(() => setOpen(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
   return (
     <div
       className={className ? `${className} t-panel-slide` : "t-panel-slide"}
@@ -158,19 +158,19 @@ function Reveal({
     >
       {children}
     </div>
-  );
+  )
 }
 
 function Crumbs(): React.JSX.Element {
-  const { state } = useReport();
+  const { state } = useReport()
   return (
     <nav className="crumbs" aria-label="Breadcrumb">
       <button
         type="button"
         data-cur={state.path.length ? 0 : 1}
         onClick={() => {
-          setHover(null);
-          setState({ path: [] });
+          setHover(null)
+          setState({ path: [] })
         }}
       >
         all
@@ -182,8 +182,8 @@ function Crumbs(): React.JSX.Element {
             type="button"
             data-cur={i === state.path.length - 1 ? 1 : 0}
             onClick={() => {
-              setHover(null);
-              setState({ path: state.path.slice(0, i + 1) });
+              setHover(null)
+              setState({ path: state.path.slice(0, i + 1) })
             }}
           >
             {p}
@@ -191,14 +191,14 @@ function Crumbs(): React.JSX.Element {
         </span>
       ))}
     </nav>
-  );
+  )
 }
 
 /** The four figures that carry the thesis. Each is a mechanism the reader can check in
  *  their own numbers, not a headline figure that belongs to one dataset. */
 function Strip(): React.JSX.Element {
-  const { d, state, amt, reqs } = useReport();
-  const I = d.insights;
+  const { d, state, amt, reqs } = useReport()
+  const I = d.insights
   return (
     <div className="strip">
       <div>
@@ -243,12 +243,12 @@ function Strip(): React.JSX.Element {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
-  const { state, amt } = useReport();
-  const note = useReconNote(L);
+  const { state, amt } = useReport()
+  const note = useReconNote(L)
   return (
     <section className="bsec">
       <div className="bhead">
@@ -275,20 +275,20 @@ function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
         </span>
       </div>
     </section>
-  );
+  )
 }
 
 function Footnotes(): React.JSX.Element {
-  const { data, d, amt } = useReport();
-  const I = d.insights;
-  const lensGap = Math.abs(data.datasets["1h"].total - data.datasets["5m"].total);
+  const { data, d, amt } = useReport()
+  const I = d.insights
+  const lensGap = Math.abs(data.datasets["1h"].total - data.datasets["5m"].total)
   const density = data.density
     ? `${data.density.code.toFixed(2)} chars/token for machine text and ` +
       `${data.density.text.toFixed(2)} for prose, ` +
       (data.densityCalibrated
         ? "both measured from this dataset"
         : "defaults, too few samples to measure")
-    : "~4 chars/token";
+    : "~4 chars/token"
 
   return (
     <section className="foot">
@@ -345,57 +345,57 @@ function Footnotes(): React.JSX.Element {
         </ul>
       </div>
     </section>
-  );
+  )
 }
 
 export function Report({
   data,
   onReset,
 }: {
-  data: Analysis;
-  onReset: () => void;
+  data: Analysis
+  onReset: () => void
 }): React.JSX.Element {
-  const state = useViewState();
-  useUrlSync(state);
+  const state = useViewState()
+  useUrlSync(state)
 
-  const d = data.datasets[state.ttl];
-  const reqs = d.requests || 1;
+  const d = data.datasets[state.ttl]
+  const reqs = d.requests || 1
 
   /* Memoised so their *identity* survives a re-render, not because they are slow -- a ledger
      walk is microseconds. Stable nodes are what let the memoised columns, panels and rows
      below skip the re-render entirely when only a highlight moved. */
-  const focus = useMemo(() => focusOf(d, state.path), [d, state.path]);
-  const pal = useMemo(() => palette(data, d), [data, d]);
+  const focus = useMemo(() => focusOf(d, state.path), [d, state.path])
+  const pal = useMemo(() => palette(data, d), [data, d])
   const L = useMemo(
     () => ledger(d, state.path, state.open, state.query),
     [d, state.path, state.open, state.query],
-  );
+  )
 
   const amt = useCallback<ReportCtx["amt"]>(
     (cost, base) => {
-      if (!state.pctOnly) return money(cost);
-      const denom = base || d.total;
-      const r = denom > 0 ? (cost / denom) * 100 : 0;
-      return (r < 1 ? r.toFixed(2) : r.toFixed(1)) + "%";
+      if (!state.pctOnly) return money(cost)
+      const denom = base || d.total
+      const r = denom > 0 ? (cost / denom) * 100 : 0
+      return (r < 1 ? r.toFixed(2) : r.toFixed(1)) + "%"
     },
     [state.pctOnly, d.total],
-  );
+  )
 
   const drill = useCallback(
     (name: string) => {
-      const it = (focus.node.items || []).find((x) => x.name === name);
-      if (!branches(it)) return; // nothing to show one level down
-      setHover(null);
-      if (!focus.groupName) setState({ path: [name] });
-      else if (state.path.length === 1) setState({ path: [focus.groupName, name] });
+      const it = (focus.node.items || []).find((x) => x.name === name)
+      if (!branches(it)) return // nothing to show one level down
+      setHover(null)
+      if (!focus.groupName) setState({ path: [name] })
+      else if (state.path.length === 1) setState({ path: [focus.groupName, name] })
     },
     [focus, state.path],
-  );
+  )
 
   const ctx = useMemo<ReportCtx>(
     () => ({ data, d, state, pal, focus, reqs, amt, drill }),
     [data, d, state, pal, focus, reqs, amt, drill],
-  );
+  )
 
   const scope = [
     `${d.sessions} sessions`,
@@ -403,7 +403,7 @@ export function Report({
     `${count(d.requests)} requests`,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" · ")
 
   return (
     <ReportContext.Provider value={ctx}>
@@ -465,5 +465,5 @@ export function Report({
         <Footnotes />
       </div>
     </ReportContext.Provider>
-  );
+  )
 }

@@ -5,72 +5,72 @@
    is now a document rather than a string, so structural claims are asked of the DOM --
    "no button inside a button" is a selector, not a scan for a substring. */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { analyze } from "../engine.ts";
-import { Report } from "../Report.tsx";
-import { getHover, getState, resetState, setHover, setState, type ViewState } from "../store.ts";
-import { corpus } from "./fixture.ts";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { act } from "react"
+import { createRoot, type Root } from "react-dom/client"
+import { analyze } from "../engine.ts"
+import { Report } from "../Report.tsx"
+import { getHover, getState, resetState, setHover, setState, type ViewState } from "../store.ts"
+import { corpus } from "./fixture.ts"
 
-const data = analyze(corpus(process.env.TRANSCRIPT_DIR));
-const d = data.datasets["1h"];
+const data = analyze(corpus(process.env.TRANSCRIPT_DIR))
+const d = data.datasets["1h"]
 
 /** A stable identity, so the report is not handed a fresh callback per render. */
-const noop = (): void => {};
+const noop = (): void => {}
 
-let container: HTMLElement;
-let root: Root;
+let container: HTMLElement
+let root: Root
 
 beforeAll(() => {
-  (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
-  container = document.createElement("div");
-  document.body.appendChild(container);
-  root = createRoot(container);
+  ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+  container = document.createElement("div")
+  document.body.appendChild(container)
+  root = createRoot(container)
   act(() => {
-    root.render(<Report data={data} onReset={noop} />);
-  });
-});
+    root.render(<Report data={data} onReset={noop} />)
+  })
+})
 
 afterAll(() => {
   act(() => {
-    root.unmount();
-  });
-});
+    root.unmount()
+  })
+})
 
 beforeEach(() => {
   act(() => {
-    resetState();
-  });
-});
+    resetState()
+  })
+})
 
 const show = (patch: Partial<ViewState>): void => {
   act(() => {
-    setState(patch);
-  });
-};
-const html = (): string => container.innerHTML;
+    setState(patch)
+  })
+}
+const html = (): string => container.innerHTML
 
 /** The invariants every state has to hold, whatever it is showing. */
 function expectClean(): void {
-  const markup = html();
-  expect(markup.length).toBeGreaterThan(500);
+  const markup = html()
+  expect(markup.length).toBeGreaterThan(500)
 
   // A formatting hole reaches the page as one of these, never as an exception.
   for (const rot of ["undefined", "NaN", "[object Object]"])
-    expect(markup, `markup contains ${rot}`).not.toContain(rot);
+    expect(markup, `markup contains ${rot}`).not.toContain(rot)
 
   // A <button> inside a <button> is invalid and swallows clicks.
-  expect(container.querySelectorAll("button button")).toHaveLength(0);
+  expect(container.querySelectorAll("button button")).toHaveLength(0)
 
   // Every colour must resolve to a real token.
   for (const el of container.querySelectorAll<HTMLElement>("[style]"))
-    expect(el.getAttribute("style")).not.toMatch(/var\(\s*(undefined|--undefined)/);
+    expect(el.getAttribute("style")).not.toMatch(/var\(\s*(undefined|--undefined)/)
 
   /* The card always holds a chart, and whichever one it is keeps its own overflow: the
      mosaic scrolls sideways in its own box, the sunburst scales to the space it is given.
      Either way the body never scrolls sideways. */
-  expect(container.querySelector(".mosaicwrap, .sun")).not.toBeNull();
+  expect(container.querySelector(".mosaicwrap, .sun")).not.toBeNull()
 }
 
 describe("view states", () => {
@@ -88,15 +88,15 @@ describe("view states", () => {
     ["query miss · panels", { query: "zzzzzznope" }],
     ["query miss · sunburst", { chart: "sun", query: "zzzzzznope" }],
     ["query miss · table", { view: "table", query: "zzzzzznope" }],
-  ];
+  ]
   for (const [label, patch] of states)
     it(label, () => {
-      show(patch);
-      expectClean();
-    });
+      show(patch)
+      expectClean()
+    })
 
   it("hover readout", () => {
-    const g = d.groups[0];
+    const g = d.groups[0]
     act(() => {
       setHover({
         key: `${g.name}›${g.name}`,
@@ -104,63 +104,63 @@ describe("view states", () => {
         cost: g.cost,
         under: null,
         group: g.name,
-      });
-    });
-    expectClean();
-    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1");
-    expect(container.querySelector(".hoverbar .txt")?.textContent).toContain(g.name);
-  });
-});
+      })
+    })
+    expectClean()
+    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1")
+    expect(container.querySelector(".hoverbar .txt")?.textContent).toContain(g.name)
+  })
+})
 
 describe("drill-down", () => {
   for (const g of d.groups) {
     it(`→ ${g.name}`, () => {
-      show({ path: [g.name] });
-      expectClean();
-      expect(container.querySelector(".crumbs")?.textContent).toContain(g.name);
+      show({ path: [g.name] })
+      expectClean()
+      expect(container.querySelector(".crumbs")?.textContent).toContain(g.name)
 
-      const kid = (g.items || []).find((i) => i.children && i.children.length > 1);
+      const kid = (g.items || []).find((i) => i.children && i.children.length > 1)
       if (kid) {
-        show({ path: [g.name, kid.name] });
-        expectClean();
-        expect(container.querySelector(".crumbs")?.textContent).toContain(kid.name);
+        show({ path: [g.name, kid.name] })
+        expectClean()
+        expect(container.querySelector(".crumbs")?.textContent).toContain(kid.name)
       }
-    });
+    })
   }
-});
+})
 
 describe("interaction", () => {
   const click = (el: Element | null): void => {
-    expect(el).not.toBeNull();
+    expect(el).not.toBeNull()
     act(() => {
-      el!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-  };
+      el!.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    })
+  }
   const byLabel = (sel: string, text: string): Element | null =>
-    [...container.querySelectorAll(sel)].find((e) => e.textContent?.trim() === text) || null;
+    [...container.querySelectorAll(sel)].find((e) => e.textContent?.trim() === text) || null
 
   it("the view switch is a real control", () => {
-    click(byLabel("button", "Table"));
-    expect(getState().view).toBe("table");
-    expect(container.querySelector("table")).not.toBeNull();
-  });
+    click(byLabel("button", "Table"))
+    expect(getState().view).toBe("table")
+    expect(container.querySelector("table")).not.toBeNull()
+  })
 
   it("the chart toggle swaps the card's chart, and only that", () => {
-    const total = container.querySelector(".total")?.textContent;
-    click(byLabel("button", "Sunburst"));
-    expect(getState().chart).toBe("sun");
-    expect(container.querySelector(".mosaic")).toBeNull();
-    expect(container.querySelector("svg .sunarc")).not.toBeNull();
+    const total = container.querySelector(".total")?.textContent
+    click(byLabel("button", "Sunburst"))
+    expect(getState().chart).toBe("sun")
+    expect(container.querySelector(".mosaic")).toBeNull()
+    expect(container.querySelector("svg .sunarc")).not.toBeNull()
     // Same tree, same money: swapping the picture must not move a number.
-    expect(container.querySelector(".total")?.textContent).toBe(total);
-    click(byLabel("button", "Mosaic"));
-    expect(getState().chart).toBe("mosaic");
-    expect(container.querySelector(".mosaic")).not.toBeNull();
-  });
+    expect(container.querySelector(".total")?.textContent).toBe(total)
+    click(byLabel("button", "Mosaic"))
+    expect(getState().chart).toBe("mosaic")
+    expect(container.querySelector(".mosaic")).not.toBeNull()
+  })
 
   it("the sunburst reads from the same hover store, and its legend drills", () => {
-    show({ chart: "sun" });
-    const g = d.groups.find((x) => (x.items || []).length > 1) || d.groups[0];
+    show({ chart: "sun" })
+    const g = d.groups.find((x) => (x.items || []).length > 1) || d.groups[0]
     act(() => {
       setHover({
         key: `${g.name}›${g.name}`,
@@ -168,86 +168,86 @@ describe("interaction", () => {
         cost: g.cost,
         under: null,
         group: g.name,
-      });
-    });
+      })
+    })
     // The hovered branch lights up -- and only it.
-    const lit = container.querySelectorAll('path.sunarc[data-on="1"]');
-    expect(lit.length).toBeGreaterThan(0);
-    expect(lit.length).toBeLessThan(container.querySelectorAll("path.sunarc").length);
+    const lit = container.querySelectorAll('path.sunarc[data-on="1"]')
+    expect(lit.length).toBeGreaterThan(0)
+    expect(lit.length).toBeLessThan(container.querySelectorAll("path.sunarc").length)
     // Arcs carry no labels, so the hole is the readout.
-    expect(container.querySelector(".suncore .s")?.textContent).toContain(g.name);
-    expect(container.querySelector(".suncore .v")?.textContent).toMatch(/^\$[\d,.]+$/);
+    expect(container.querySelector(".suncore .s")?.textContent).toContain(g.name)
+    expect(container.querySelector(".suncore .v")?.textContent).toMatch(/^\$[\d,.]+$/)
 
-    click(byLabel(".legrow button", g.name));
-    expect(getState().path).toEqual([g.name]);
-    expectClean();
-  });
+    click(byLabel(".legrow button", g.name))
+    expect(getState().path).toEqual([g.name])
+    expectClean()
+  })
 
   /* React synthesises enter/leave from `mouseover`/`mouseout` and their relatedTarget, so
      that pair is what these dispatch: a bare `mouseleave` would reach no handler at all. */
   const pointerTo = (from: Element | null, to: Element | null): void => {
-    expect(from).not.toBeNull();
-    expect(to).not.toBeNull();
+    expect(from).not.toBeNull()
+    expect(to).not.toBeNull()
     act(() => {
-      from!.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: to }));
-      to!.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, relatedTarget: from }));
-    });
-  };
+      from!.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: to }))
+      to!.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, relatedTarget: from }))
+    })
+  }
 
   it("leaving the mosaic drops the highlight", () => {
-    const seg = container.querySelector(".segb");
-    pointerTo(container.querySelector(".colhead"), seg);
-    expect(getHover()).not.toBeNull();
-    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1");
+    const seg = container.querySelector(".segb")
+    pointerTo(container.querySelector(".colhead"), seg)
+    expect(getHover()).not.toBeNull()
+    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("1")
 
     // Out of the chart but still inside the shell: the mosaic itself has to clear.
-    pointerTo(seg, container.querySelector(".hoverbar"));
-    expect(getHover()).toBeNull();
-    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("0");
-    expect(container.querySelector('.col[data-dim="1"]')).toBeNull();
-  });
+    pointerTo(seg, container.querySelector(".hoverbar"))
+    expect(getHover()).toBeNull()
+    expect(container.querySelector(".hoverbar .txt")?.getAttribute("data-on")).toBe("0")
+    expect(container.querySelector('.col[data-dim="1"]')).toBeNull()
+  })
 
   it("leaving a sunburst arc drops the highlight, hole or corner", () => {
-    show({ chart: "sun" });
-    const arcs = [...container.querySelectorAll("path.sunarc")];
-    const arc = arcs[0];
+    show({ chart: "sun" })
+    const arcs = [...container.querySelectorAll("path.sunarc")]
+    const arc = arcs[0]
 
     // Into the hole, which is a readout of the hover and so cannot keep an arc lit behind it.
-    pointerTo(arcs[arcs.length - 1], arc);
-    expect(getHover()).not.toBeNull();
-    pointerTo(arc, container.querySelector(".suncore > *"));
-    expect(getHover()).toBeNull();
+    pointerTo(arcs[arcs.length - 1], arc)
+    expect(getHover()).not.toBeNull()
+    pointerTo(arc, container.querySelector(".suncore > *"))
+    expect(getHover()).toBeNull()
 
     // Into the empty margin around the rings, caught by the backdrop under them.
-    pointerTo(container.querySelector(".legrow"), arc);
-    expect(getHover()).not.toBeNull();
-    pointerTo(arc, container.querySelector("svg > rect"));
-    expect(getHover()).toBeNull();
-    expect(container.querySelectorAll('path.sunarc[data-on="1"]')).toHaveLength(0);
-  });
+    pointerTo(container.querySelector(".legrow"), arc)
+    expect(getHover()).not.toBeNull()
+    pointerTo(arc, container.querySelector("svg > rect"))
+    expect(getHover()).toBeNull()
+    expect(container.querySelectorAll('path.sunarc[data-on="1"]')).toHaveLength(0)
+  })
 
   /* The breakdown reports a hover the same way the charts do, so it has to drop one the same
      way: the readout is shared, and a highlight left standing after the pointer has moved on
      describes a row nobody is looking at. Both views, because both bind the hover. */
   it("leaving the breakdown drops the highlight, panels or table", () => {
-    const out = (): Element | null => container.querySelector(".reconline");
+    const out = (): Element | null => container.querySelector(".reconline")
 
-    const pan = container.querySelector(".pan button");
-    pointerTo(out(), pan);
-    expect(getHover()).not.toBeNull();
-    pointerTo(pan, out());
-    expect(getHover()).toBeNull();
-    expect(container.querySelector('.pi[data-on="1"]')).toBeNull();
+    const pan = container.querySelector(".pan button")
+    pointerTo(out(), pan)
+    expect(getHover()).not.toBeNull()
+    pointerTo(pan, out())
+    expect(getHover()).toBeNull()
+    expect(container.querySelector('.pi[data-on="1"]')).toBeNull()
 
-    show({ view: "table" });
-    const row = container.querySelector("tbody tr");
-    pointerTo(out(), row);
-    expect(getHover()).not.toBeNull();
+    show({ view: "table" })
+    const row = container.querySelector("tbody tr")
+    pointerTo(out(), row)
+    expect(getHover()).not.toBeNull()
     // Down into the footer, which is inside the table but is not one of the rows.
-    pointerTo(row, container.querySelector("tfoot td"));
-    expect(getHover()).toBeNull();
-    expect(container.querySelector('tbody tr[data-on="1"]')).toBeNull();
-  });
+    pointerTo(row, container.querySelector("tfoot td"))
+    expect(getHover()).toBeNull()
+    expect(container.querySelector('tbody tr[data-on="1"]')).toBeNull()
+  })
 
   /* The dead space *inside* a view is the case a per-container clear cannot see, and the
      panels are full of it: card padding, the price beside a panel's title, the bar under it,
@@ -255,123 +255,123 @@ describe("interaction", () => {
      those, so what has to hold is that arriving anywhere unmarked drops the highlight --
      not merely leaving some container that happens to be tiled edge to edge. */
   it("the highlight drops in a view's own dead space, not just on the way out", () => {
-    const item = container.querySelector(".pi");
-    pointerTo(container.querySelector(".reconline"), item);
-    expect(getHover()).not.toBeNull();
-    expect(container.querySelector('.pi[data-on="1"]')).not.toBeNull();
+    const item = container.querySelector(".pi")
+    pointerTo(container.querySelector(".reconline"), item)
+    expect(getHover()).not.toBeNull()
+    expect(container.querySelector('.pi[data-on="1"]')).not.toBeNull()
 
     // Ten pixels up, onto the panel's own price. Inside `.panels`, and not a hover source.
-    pointerTo(item, container.querySelector(".pantop .pc"));
-    expect(getHover()).toBeNull();
-    expect(container.querySelector('.pi[data-on="1"]')).toBeNull();
-  });
+    pointerTo(item, container.querySelector(".pantop .pc"))
+    expect(getHover()).toBeNull()
+    expect(container.querySelector('.pi[data-on="1"]')).toBeNull()
+  })
 
   /* Focus is the other way in, so it has to be a way out too: `hoverBind` reports on focus,
      and tabbing off the last control in a view has to drop what it reported. */
   it("tabbing out of the breakdown drops the highlight", () => {
-    show({ view: "table" });
-    const tog = container.querySelector<HTMLElement>("tbody .tog");
-    const away = container.querySelector<HTMLElement>("#q");
-    expect(tog).not.toBeNull();
+    show({ view: "table" })
+    const tog = container.querySelector<HTMLElement>("tbody .tog")
+    const away = container.querySelector<HTMLElement>("#q")
+    expect(tog).not.toBeNull()
     act(() => {
-      tog!.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
-    });
-    expect(getHover()).not.toBeNull();
+      tog!.dispatchEvent(new FocusEvent("focusin", { bubbles: true }))
+    })
+    expect(getHover()).not.toBeNull()
 
     act(() => {
-      tog!.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: away }));
-    });
-    expect(getHover()).toBeNull();
-  });
+      tog!.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: away }))
+    })
+    expect(getHover()).toBeNull()
+  })
 
   /* One hover store, so a row and its block in the chart have to name the same thing. A
      child row's key used to be group-plus-name with no parent in it, which named nothing on
      the chart at all -- and the chart's prefix test was loose enough to light the parent
      column anyway, so it looked right while agreeing about nothing. */
   it("a child row and its block in the chart are the same hover", () => {
-    show({ view: "table" });
-    const child = [...container.querySelectorAll("tbody tr")].find((tr) => tr.className === "d1");
-    expect(child, "the corpus should open a top-level row with children").not.toBeUndefined();
-    pointerTo(container.querySelector(".reconline"), child ?? null);
+    show({ view: "table" })
+    const child = [...container.querySelectorAll("tbody tr")].find((tr) => tr.className === "d1")
+    expect(child, "the corpus should open a top-level row with children").not.toBeUndefined()
+    pointerTo(container.querySelector(".reconline"), child ?? null)
 
     // The readout names the parent, which a row that published no parent could not do.
-    expect(container.querySelector(".hoverbar .txt")?.textContent).toContain("›");
+    expect(container.querySelector(".hoverbar .txt")?.textContent).toContain("›")
     // And exactly one column reads as hovered: the one this row lives in.
-    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1);
-  });
+    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1)
+  })
 
   /* `startsWith` on the key alone let a sibling whose name is a prefix of another's read as
      hovered -- `docker` lighting up under `docker-compose`, `pip` under `pip3`. The separator
      is what makes the test a path test rather than a string test. */
   it("a hover inside one column does not light the column whose name it starts with", () => {
-    const first = container.querySelector<HTMLElement>(".col .colhead");
-    pointerTo(container.querySelector(".hoverbar"), first);
-    const real = getHover();
-    expect(real).not.toBeNull();
-    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1);
+    const first = container.querySelector<HTMLElement>(".col .colhead")
+    pointerTo(container.querySelector(".hoverbar"), first)
+    const real = getHover()
+    expect(real).not.toBeNull()
+    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1)
 
     // The same key with more name on the end: a different line item, and nobody's parent.
     act(() => {
-      setHover({ ...real!, key: real!.key + "-zzz" });
-    });
-    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(0);
-  });
+      setHover({ ...real!, key: real!.key + "-zzz" })
+    })
+    expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(0)
+  })
 
   it("the eye masks the total, and unmasks it again", () => {
-    const eye = container.querySelector('button[aria-label="Hide dollar amounts"]');
-    const real = container.querySelector(".total")?.textContent;
-    click(eye);
-    expect(getState().pctOnly).toBe(true);
-    expect(container.querySelector(".total")?.getAttribute("data-hidden")).toBe("1");
+    const eye = container.querySelector('button[aria-label="Hide dollar amounts"]')
+    const real = container.querySelector(".total")?.textContent
+    click(eye)
+    expect(getState().pctOnly).toBe(true)
+    expect(container.querySelector(".total")?.getAttribute("data-hidden")).toBe("1")
     // Covered, not blank: the figure's place is still held, so the layout does not collapse.
-    expect(container.querySelector(".total")?.textContent).toMatch(/^\*+$/);
+    expect(container.querySelector(".total")?.textContent).toMatch(/^\*+$/)
     // The same button is the way back -- there is no second one to press.
-    expect(eye?.getAttribute("aria-pressed")).toBe("true");
-    click(eye);
-    expect(getState().pctOnly).toBe(false);
-    expect(container.querySelector(".total")?.textContent).toBe(real);
-  });
+    expect(eye?.getAttribute("aria-pressed")).toBe("true")
+    click(eye)
+    expect(getState().pctOnly).toBe(false)
+    expect(container.querySelector(".total")?.textContent).toBe(real)
+  })
 
   it("the TTL switch recomputes the page", () => {
-    const before = container.querySelector(".total")?.textContent;
-    click(byLabel("button", "5m"));
-    expect(getState().ttl).toBe("5m");
-    expect(container.querySelector(".billed")?.textContent).toContain("5m");
+    const before = container.querySelector(".total")?.textContent
+    click(byLabel("button", "5m"))
+    expect(getState().ttl).toBe("5m")
+    expect(container.querySelector(".billed")?.textContent).toContain("5m")
     // The two lenses can legitimately agree to the cent; the label must still move.
-    expect(typeof before).toBe("string");
-  });
+    expect(typeof before).toBe("string")
+  })
 
   /* The pressed state of a segmented control is a pill that travels, so the thing to assert
      is that every such control has exactly one of them and that adding it did not cost the
      buttons their names -- the pill is decoration, and says so. */
   it("every lens switch carries one pill, and its options still read as buttons", () => {
     for (const seg of container.querySelectorAll(".seg.t-tabs")) {
-      expect(seg.querySelectorAll(".t-tabs-pill")).toHaveLength(1);
-      expect(seg.querySelector(".t-tabs-pill")?.getAttribute("aria-hidden")).toBe("true");
-      expect(seg.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+      expect(seg.querySelectorAll(".t-tabs-pill")).toHaveLength(1)
+      expect(seg.querySelector(".t-tabs-pill")?.getAttribute("aria-hidden")).toBe("true")
+      expect(seg.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1)
     }
-    expect(byLabel(".t-tab", "Sunburst")).not.toBeNull();
-    expect(byLabel(".t-tab", "5m")).not.toBeNull();
-  });
+    expect(byLabel(".t-tab", "Sunburst")).not.toBeNull()
+    expect(byLabel(".t-tab", "5m")).not.toBeNull()
+  })
 
   /* The total re-enters character by character when the lens or the mask changes it. The
      figure is split across spans to do that, so what has to hold is that it is still one
      number: the same characters, in order, and no digit left out. */
   it("the total is a row of digits, and stays the whole figure", () => {
     const digits = (): string[] =>
-      [...container.querySelectorAll(".total .t-digit")].map((el) => el.textContent || "");
-    expect(digits().join("")).toBe(container.querySelector(".total")?.textContent);
-    expect(digits().length).toBeGreaterThan(3);
+      [...container.querySelectorAll(".total .t-digit")].map((el) => el.textContent || "")
+    expect(digits().join("")).toBe(container.querySelector(".total")?.textContent)
+    expect(digits().length).toBeGreaterThan(3)
     // The last two characters ride behind the rest, which is what makes cents feel alive.
     expect(
       [...container.querySelectorAll(".total .t-digit[data-stagger]")].map((el) =>
         el.getAttribute("data-stagger"),
       ),
-    ).toEqual(["1", "2"]);
+    ).toEqual(["1", "2"])
 
-    show({ pctOnly: true });
-    expect(digits().join("")).toMatch(/^\*+$/);
-  });
+    show({ pctOnly: true })
+    expect(digits().join("")).toMatch(/^\*+$/)
+  })
 
   /* The picture is the biggest thing on the page and the frame around it is a different shape
      for each chart, so the switch has two jobs. What has to hold structurally is that the
@@ -380,41 +380,41 @@ describe("interaction", () => {
      column it fills, since neither the mosaic's scroller nor the sunburst's disc has a height
      of its own to fall back on. */
   it("each chart arrives in a fresh panel, inside a frame that resizes", () => {
-    expect(container.querySelector(".card.t-resize")).not.toBeNull();
-    const slot = (): Element | null => container.querySelector(".chartslot.t-panel-slide");
-    const before = slot();
-    expect(before?.querySelector(".mosaicwrap")).not.toBeNull();
+    expect(container.querySelector(".card.t-resize")).not.toBeNull()
+    const slot = (): Element | null => container.querySelector(".chartslot.t-panel-slide")
+    const before = slot()
+    expect(before?.querySelector(".mosaicwrap")).not.toBeNull()
 
-    show({ chart: "sun" });
-    expect(slot()).not.toBe(before);
-    expect(slot()?.querySelector(".sun")).not.toBeNull();
+    show({ chart: "sun" })
+    expect(slot()).not.toBe(before)
+    expect(slot()?.querySelector(".sun")).not.toBeNull()
     // Still the card's own child, so `flex: 1` is measured against the card.
-    expect(slot()?.parentElement?.classList.contains("card")).toBe(true);
-  });
+    expect(slot()?.parentElement?.classList.contains("card")).toBe(true)
+  })
 
   it("a ledger row collapses", () => {
-    show({ view: "table" });
-    const rows = () => container.querySelectorAll("tbody tr").length;
-    const open = rows();
-    click(container.querySelector("tbody .tog[aria-expanded='true']"));
-    expect(rows()).toBeLessThan(open);
-    expectClean();
-  });
+    show({ view: "table" })
+    const rows = () => container.querySelectorAll("tbody tr").length
+    const open = rows()
+    click(container.querySelector("tbody .tog[aria-expanded='true']"))
+    expect(rows()).toBeLessThan(open)
+    expectClean()
+  })
 
   it("typing in the search box keeps focus", () => {
-    const input = container.querySelector<HTMLInputElement>("#q");
-    expect(input).not.toBeNull();
-    input!.focus();
+    const input = container.querySelector<HTMLInputElement>("#q")
+    expect(input).not.toBeNull()
+    input!.focus()
     act(() => {
       /* React tracks the input's value behind a property descriptor and ignores an event
          whose value it believes it already has, so type through the native setter. */
-      const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
-      native!.set!.call(input, "git");
-      input!.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(getState().query).toBe("git");
+      const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
+      native!.set!.call(input, "git")
+      input!.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    expect(getState().query).toBe("git")
     // The old renderer replaced the whole subtree on every keystroke and had to restore
     // the caret by hand; the input is now a stable node, so focus simply survives.
-    expect(document.activeElement).toBe(container.querySelector("#q"));
-  });
-});
+    expect(document.activeElement).toBe(container.querySelector("#q"))
+  })
+})
