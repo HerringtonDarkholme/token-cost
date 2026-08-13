@@ -31,7 +31,7 @@ import {
   useViewState,
   type ViewState,
 } from "./store.ts"
-import { Seg } from "./Seg.tsx"
+import { Seg, type SegOption } from "./Seg.tsx"
 import { Toolbar } from "./Toolbar.tsx"
 import { HoverBar, Mosaic } from "./Mosaic.tsx"
 import { Panels } from "./Panels.tsx"
@@ -61,14 +61,15 @@ function useUrlSync(state: ViewState): void {
   }, [])
 }
 
-const VIEWS: ReadonlyArray<readonly [ViewState["view"], string]> = [
-  ["panels", "Panels"],
-  ["table", "Table"],
+/* No hints on these two: the words are the whole explanation. */
+const VIEWS: ReadonlyArray<SegOption<ViewState["view"]>> = [
+  { value: "panels", label: "Panels" },
+  { value: "table", label: "Table" },
 ]
 
-const CHARTS: ReadonlyArray<readonly [ViewState["chart"], string]> = [
-  ["mosaic", "Mosaic"],
-  ["sun", "Sunburst"],
+const CHARTS: ReadonlyArray<SegOption<ViewState["chart"]>> = [
+  { value: "mosaic", label: "Mosaic" },
+  { value: "sun", label: "Sunburst" },
 ]
 
 /* Written once rather than closed over per render: a pick is a write to the store, which is a

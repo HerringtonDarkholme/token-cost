@@ -229,6 +229,7 @@ file tool under any name gets the same treatment.
 | `src/Panels.tsx` | the same data ranked and labelled instead of packed |
 | `src/Ledger.tsx` | the table, where identity does not rest on colour |
 | `src/Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X |
+| `src/Seg.tsx`, `src/Tip.tsx` | the segmented control every lens switch is made of, with its travelling pill; and the hint the controls whose face is a symbol hang off |
 | `src/Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with a caption written |
 | `src/snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |
 | `src/style.css` | tokens and layout |

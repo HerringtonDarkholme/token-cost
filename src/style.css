@@ -166,8 +166,20 @@ button {
   background: var(--ink);
   color: var(--paper);
 }
+/* An option drawn as a picture rather than a word. The box keeps the control's height and
+   the glyph centres in it, so the pill still travels between boxes of one row. */
+.seg button[data-icon] {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px;
+}
 /* A label that names what the buttons beside it choose, so "TTL" is said once instead of
-   twice. Not a button, and ruled off from them, so it never reads as a third option. */
+   twice. Not a button, and ruled off from them, so it never reads as a third option. It is
+   the hover target for the control's own hint, where there is one -- hence the cursor that
+   asks rather than points, conditioned on the hint actually following it. */
+.seglbl:has(+ .t-tt) {
+  cursor: help;
+}
 .seglbl {
   display: flex;
   align-items: center;
@@ -188,7 +200,9 @@ button {
 .eyeamt {
   font-size: 12px;
 }
-.eyeicon {
+/* Every stroked mark in a control -- the eye, the sun, the display, the moon -- at one
+   weight and one size, in `currentColor` so it inverts under the pill. */
+.glyph {
   width: 14px;
   height: 14px;
   fill: none;
@@ -1270,14 +1284,14 @@ h1.big-title em {
 /* ─────────────────────────────────────────────────────────────────────────────
    Motion — transitions.dev
 
-   Four transitions from the skill, each still reading from its own semantic
+   Six transitions from the skill, each still reading from its own semantic
    variables so it can be retuned here rather than in the rule. The variables
    are pointed at the shared motion scale above wherever the scale has a token
-   for that usage, so the page has one motion vocabulary instead of four sets
-   of literals; the two values with no matching usage -- the digits' bouncy
-   curve and their 70ms stagger -- stay literal, and the panel's travel is the
-   one value tuned for this page, since the reference's 100px is the height of
-   its own demo panel.
+   for that usage, so the page has one motion vocabulary instead of six sets
+   of literals; the three values with no matching usage -- the digits' bouncy
+   curve, their 70ms stagger and the hint's 50ms disappear -- stay literal, and
+   the panel's travel is the one value tuned for this page, since the
+   reference's 100px is the height of its own demo panel.
    ───────────────────────────────────────────────────────────────────────────── */
 :root {
   /* Motion tokens — the shared scale every transition below reads from. */
@@ -1337,6 +1351,19 @@ h1.big-title em {
   --panel-translate-y: 24px;
   --panel-blur: var(--blur-small);
   --panel-ease: var(--ease-smooth-out);
+
+  /* Tooltip open / close. The scale names an 80ms tooltip delay and a 150ms appear, so those
+     two come off it; the 50ms disappear has no usage on the scale and stays literal, which is
+     the point of it -- a hint that waits before arriving must not wait before leaving. The
+     chip is ink on paper inverted, the same treatment the pressed pill gets. */
+  --tt-in-dur: var(--duration-quick);
+  --tt-out-dur: 50ms;
+  --tt-delay: var(--duration-micro);
+  --tt-scale: var(--scale-small);
+  --tt-in-ease: var(--ease-out);
+  --tt-out-ease: var(--ease-out);
+  --tt-bg: var(--ink);
+  --tt-fg: var(--paper);
 }
 
 /* Tabs sliding — the pressed state of every segmented control, as one pill that
@@ -1379,6 +1406,60 @@ h1.big-title em {
 @media (prefers-reduced-motion: reduce) {
   .t-tabs-pill,
   .t-tab {
+    transition: none !important;
+  }
+}
+
+/* Tooltip open/close — the hint on the controls whose label is a symbol or an abbreviation.
+   Two departures from the reference, both because of where this toolbar sits. It opens
+   downward: the bar is the first thing on the page, so a hint above it would open off the
+   top of the window. And it hangs from its control's right edge rather than centred on it,
+   because the bar is flush right, and a centred hint on the rightmost control would run off
+   that edge instead.
+
+   The trigger's own container is the positioning context -- `.seg.t-tabs` already is one for
+   the pill, and a control without one says so with `.t-tt-host`. */
+.t-tt-host {
+  position: relative;
+}
+.t-tt {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 270px;
+  padding: 7px 9px;
+  background: var(--tt-bg);
+  color: var(--tt-fg);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  text-align: left;
+  text-transform: none;
+  transform: scale(var(--tt-scale));
+  transform-origin: 100% 0;
+  opacity: 0;
+  pointer-events: none;
+  /* Default rule controls the LEAVE state. transition-delay
+     stays unset so leaving plays without delay. */
+  transition:
+    opacity var(--tt-out-dur) var(--tt-out-ease),
+    transform var(--tt-out-dur) var(--tt-out-ease);
+}
+/* The delay belongs ONLY to the hover rule so leaving the trigger snaps the delay back to 0
+   and the disappear plays immediately. */
+.t-tt-trigger:hover + .t-tt,
+.t-tt-trigger:focus-visible + .t-tt {
+  opacity: 1;
+  transform: scale(1);
+  transition-duration: var(--tt-in-dur);
+  transition-timing-function: var(--tt-in-ease);
+  transition-delay: var(--tt-delay);
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-tt {
     transition: none !important;
   }
 }

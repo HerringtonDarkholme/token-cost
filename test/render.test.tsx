@@ -354,6 +354,36 @@ describe("interaction", () => {
     expect(byLabel(".t-tab", "5m")).not.toBeNull()
   })
 
+  /* The controls whose face is a symbol -- the eye over the dollars, "1h", the three theme
+     glyphs -- say what they do in a hint, and the hint has to be the words a screen reader
+     gets as well as the ones a pointer gets. So: a glyph button carries a name, its hint is
+     what describes it, and the hint is the trigger's own next sibling, since that adjacency
+     is the whole of what makes the CSS show it. The ids come from `useId`, which is exactly
+     the kind of link that comes undone in a refactor with no symptom on screen. */
+  it("a control drawn as a symbol is named, and its hint describes it", () => {
+    const tips = new Map(
+      [...container.querySelectorAll('[role="tooltip"]')].map((t) => [t.id, t] as const),
+    )
+    const described = [...container.querySelectorAll("[aria-describedby]")]
+    // The eye, the two TTL options, the three themes.
+    expect(described).toHaveLength(6)
+    for (const el of described) {
+      const tip = tips.get(el.getAttribute("aria-describedby") || "")
+      expect(tip, `hint for ${el.getAttribute("aria-label") || el.textContent}`).toBeDefined()
+      expect(tip!.textContent!.length).toBeGreaterThan(12)
+      expect(el.nextElementSibling).toBe(tip)
+    }
+
+    const glyphs = [...container.querySelectorAll("button[data-icon]")]
+    expect(glyphs).toHaveLength(3)
+    for (const b of glyphs) {
+      // A picture instead of the word, so the word has to be the name.
+      expect(b.textContent).toBe("")
+      expect(b.querySelector(".glyph")).not.toBeNull()
+      expect(b.getAttribute("aria-label")).toMatch(/theme/)
+    }
+  })
+
   /* The total re-enters character by character when the lens or the mask changes it. The
      figure is split across spans to do that, so what has to hold is that it is still one
      number: the same characters, in order, and no digit left out. */
