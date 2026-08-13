@@ -17,7 +17,8 @@ open cost-report.html          # standalone build — no server needed
 Transcripts are parsed in the page. Nothing is uploaded, and the app makes no network
 request with your data. It reads only the files you hand it through the picker or a drop —
 it has no filesystem access of its own, and **nothing here points at or serves your
-transcripts.**
+transcripts.** Handing over a folder hands over its contents to *the page*, not to a server:
+the build gate fails if anything in here reaches the network at all.
 
 The one thing that ever leaves is what you choose to post. *Share to X* renders the card to
 your clipboard and opens a composer with a caption already written — one of six, drawn at
@@ -137,14 +138,17 @@ One `.jsonl` per session, one folder per project, under `~/.claude/projects/`. B
 du -sh ~/.claude/projects/*/ | sort -rh | head
 ```
 
-Drop a whole project folder onto the page, or pick individual `.jsonl` files. Multiple files
-are combined into one report.
+The page asks for the whole `~/.claude/projects` folder, or one project's folder inside it —
+everything you hand it is combined into a single report. Loose `.jsonl` files dragged in still
+work; there just isn't a button for it, because picking files means defeating a hidden dotfile
+*and* multi-selecting dozens of identically-named transcripts.
 
 **The folder is hidden**, so file pickers won't show it until you name it. In the Finder
 dialog press <kbd>⇧⌘G</kbd> and paste `~/.claude/projects` (or <kbd>⇧⌘.</kbd> to reveal
-hidden files); on Windows type `%USERPROFILE%\.claude\projects` into the *File name* box; on
-Linux press <kbd>Ctrl</kbd>+<kbd>L</kbd>. Or run `open ~/.claude/projects` and drag a project
-onto the page. The empty card repeats these, since that's where you need them.
+hidden files); on Windows type `%USERPROFILE%\.claude\projects` into the *Folder* box; on
+Linux press <kbd>Ctrl</kbd>+<kbd>L</kbd>. Or run `open ~/.claude/projects` and drag the folder
+onto the page. The empty card carries whichever of those three applies to you, beside the
+button that opens the dialog it describes.
 
 ## What it computes, and why it isn't just token counts
 
@@ -224,7 +228,7 @@ file tool under any name gets the same treatment.
 | `src/App.tsx` | the turn: which face the card shows, and the exit phase in between; owns the theme attribute |
 | `src/Page.tsx` | the page itself — shell, toolbar, card, header — which outlives both faces, so the frame can tween rather than being replaced |
 | `src/Motion.tsx` | the three transition primitives: the panel that slides in, the figure that re-enters digit by digit, the copy that swaps |
-| `src/Upload.tsx` | the empty face: picker, folder drop, hand-off to the engine; and the help for finding the transcripts |
+| `src/Upload.tsx` | the empty face: folder picker, drop target, hand-off to the engine; the per-platform way into the hidden folder, and the help under the card |
 | `src/Report.tsx` | the full face: thesis strip, the picture, breakdown section, footnotes |
 | `src/Mosaic.tsx` | the primary chart — column width = share of bill — and the hover readout |
 | `src/Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |

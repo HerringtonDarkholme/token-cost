@@ -8,14 +8,103 @@
    the card's interior, so the frame the reader aims at is the frame that lights up. See
    `.card:has([data-over="1"])`.
 
-   The copy about *where* transcripts live is not decoration. `.claude` is a dotfile, so
-   every file picker hides it by default, and a reader who cannot find their transcripts
-   never sees the report at all. */
+   The copy about *where* the transcripts live is not decoration, and it is inside the card for
+   the same reason the ask is a folder rather than files: `.claude` is a dotfile, so the picker
+   this page is about to open hides the very folder it just asked for. A reader who cannot get
+   there never sees a report at all, and help that stands below the fold assumes they will go
+   looking for it. */
 
 import { useRef, useState, type ReactNode } from "react"
 import { analyze, type Analysis, type RawFile } from "./engine.ts"
+import { TextSwap } from "./Motion.tsx"
+import { Seg, type SegOption } from "./Seg.tsx"
 
 const MAX_LISTED = 60
+
+type Os = "mac" | "win" | "linux"
+
+/* The three platforms as marks rather than words, drawn to the same recipe as the theme glyphs:
+   one 16-unit box, stroked in `currentColor` at one weight, so each inverts under the pill
+   instead of needing a second colour -- and so the row reads as one control rather than as three
+   logos pasted in. Filled silhouettes were the obvious way to draw these and the wrong one: a
+   solid shape cannot invert, and at 14px a filled penguin is a pear. */
+function AppleMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M10.55 8.35c0-1.35.95-2 1-2.05-.55-.8-1.4-.9-1.7-.9-.75-.05-1.45.4-1.85.4-.4 0-.98-.4-1.6-.4-.85 0-1.6.5-2.05 1.25-.85 1.5-.2 3.7.6 4.9.4.6.9 1.25 1.55 1.25.6-.03.85-.4 1.6-.4.75 0 .95.4 1.6.4.65-.02 1.1-.6 1.5-1.2.35-.5.5-1 .5-1.05-.05 0-1.15-.45-1.15-1.8Z" />
+      <path d="M9.35 4.15c.35-.4.55-.95.5-1.5-.5.02-1.1.32-1.45.72-.32.37-.6.95-.52 1.5.55.05 1.12-.28 1.47-.72Z" />
+    </svg>
+  )
+}
+
+function WindowsMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <rect x="2.1" y="2.1" width="5.1" height="5.1" />
+      <rect x="8.8" y="2.1" width="5.1" height="5.1" />
+      <rect x="2.1" y="8.8" width="5.1" height="5.1" />
+      <rect x="8.8" y="8.8" width="5.1" height="5.1" />
+    </svg>
+  )
+}
+
+/** A penguin, which is the one of the three that has to be *drawn* rather than traced: body,
+ *  eyes, beak, feet, and nothing else, because every further line closes up at this size. The
+ *  first attempt read as a vase -- the body has to widen to the floor and the feet have to break
+ *  the outline, or the silhouette is a pear with two dots in it. */
+function TuxMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M8 1.5c1.45 0 2.35 1.15 2.35 2.6 0 .45-.06.85-.06 1.15 0 .45.62.85 1.15 1.7.62.95 1.05 2.2 1.15 3.2.1 1-.35 1.75-1.1 2.2-.85.5-2.05.75-3.49.75s-2.64-.25-3.49-.75c-.75-.45-1.2-1.2-1.1-2.2.1-1 .53-2.25 1.15-3.2.53-.85 1.15-1.25 1.15-1.7 0-.3-.06-.7-.06-1.15C5.65 2.65 6.55 1.5 8 1.5Z" />
+      <path d="M7.15 4.3h.01M8.85 4.3h.01" />
+      <path d="m7.4 5.35.6.65.6-.65" />
+      <path d="M6.2 13.1c-.55.75-1.5 1.15-2.35 1M9.8 13.1c.55.75 1.5 1.15 2.35 1" />
+    </svg>
+  )
+}
+
+const PLATFORMS: ReadonlyArray<SegOption<Os>> = [
+  { value: "mac", label: "macOS", icon: <AppleMark />, tip: "The Finder dialog’s way in" },
+  { value: "win", label: "Windows", icon: <WindowsMark />, tip: "The Explorer dialog’s way in" },
+  { value: "linux", label: "Linux", icon: <TuxMark />, tip: "The GTK dialog’s way in" },
+]
+
+/** Which dialog the reader is about to meet. A guess from the user agent rather than a question,
+ *  because two of the three answers are wrong for any given reader and the tabs are right there
+ *  when the guess is. Linux is the fallback: its instruction is the GTK dialog's, which is also
+ *  the least harmful thing to show someone whose browser reports something unrecognisable. */
+function guessOs(): Os {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent
+  if (/Mac|iPhone|iPad/.test(ua)) return "mac"
+  if (/Win/.test(ua)) return "win"
+  return "linux"
+}
+
+/** One line per platform, and it is the keystrokes rather than prose about them: this is read
+ *  with a file dialog already open on top of it. Each was two sentences once, with the
+ *  show-hidden-files route as a second line -- but a reader stuck at a dialog needs one way
+ *  through it, not a choice of two. The rest is in the help below the card. */
+const HOW: Record<Os, ReactNode> = {
+  mac: (
+    <>
+      In the dialog press <kbd>⇧</kbd>
+      <kbd>⌘</kbd>
+      <kbd>G</kbd>, paste <code>~/.claude/projects</code>, press <kbd>return</kbd>.
+    </>
+  ),
+  win: (
+    <>
+      Type <code>%USERPROFILE%\.claude\projects</code> into the dialog’s <em>Folder</em> box, press{" "}
+      <kbd>Enter</kbd>.
+    </>
+  ),
+  linux: (
+    <>
+      In the dialog press <kbd>Ctrl</kbd>
+      <kbd>L</kbd>, type <code>~/.claude/projects</code>, press <kbd>Enter</kbd>.
+    </>
+  ),
+}
 
 interface Status {
   node: ReactNode
@@ -55,7 +144,7 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
   const [status, setStatus] = useState<Status | null>(null)
   const [names, setNames] = useState<string[] | null>(null)
   const [over, setOver] = useState(false)
-  const filePicker = useRef<HTMLInputElement>(null)
+  const [os, setOs] = useState<Os>(guessOs)
   const dirPicker = useRef<HTMLInputElement>(null)
 
   const say = (node: ReactNode, err = false): void => setStatus({ node, err })
@@ -168,25 +257,58 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       }}
     >
       {/* Three bands, standing where the report's three stand: the lede on the strip's line, the
-          invitation on the picture's, the privacy note on the rule that closes the card. */}
+          invitation on the picture's, the privacy note on the rule that closes the card.
+
+          One line, and it took three tries to get there. It was the method first -- per-request
+          billing, re-billed context, the definition of carry cost -- which is the right paragraph
+          in the wrong place: it argued for numbers to a reader who had not seen any. Then it was a
+          promise and a row of three things you get, one of which ("by project, by session") the
+          engine does not do: nothing here groups by project, and sessions are counted rather than
+          broken out. What survives is the offer and the claim the report can actually keep. */}
       <p className="lede">
-        Drop in your Claude Code transcripts to itemise every dollar down to the subcommand. Billing
-        is per request and each request re-bills the whole context, so what you get back is{" "}
-        <strong>carry cost</strong> — what each source cost across every request it survived in, not
-        its face value.
+        Drop the folder in and the bill comes back itemised — which tools, which subcommands, and
+        what each one cost on every request it stayed in.
       </p>
       <div className="invite">
+        {/* The ask is the folder, not the files. `.jsonl` is a detail of the format that a reader
+            has no reason to know, and asking for files put them in a picker with a hidden dotfile
+            to defeat and dozens of identically-named transcripts to multi-select; asking for the
+            one folder is a single pick that catches everything under it. Loose files dragged in
+            still work -- the filter above does not care how they arrived -- there is just no
+            longer a button that recommends it. */}
         <h2>
-          Drop <code>.jsonl</code> transcripts here
+          Drop your <code>~/.claude/projects</code> folder here
         </h2>
-        <p>Or pick a whole project folder. Multiple files are combined into one report.</p>
         <div className="picks">
-          <button className="btn primary" type="button" onClick={() => filePicker.current?.click()}>
-            Choose files
-          </button>
-          <button className="btn" type="button" onClick={() => dirPicker.current?.click()}>
+          <button className="btn primary" type="button" onClick={() => dirPicker.current?.click()}>
             Choose folder
           </button>
+        </div>
+        {/* And the way in, in the card rather than under it. This used to stand in the help below
+            the fold, which assumed the reader would go looking: `.claude` is a dotfile, so the
+            picker they are about to open hides the folder this page just asked for, and a reader
+            who cannot get there never sees a report at all. It is one line because only one
+            platform's line applies -- theirs is picked for them, and the tabs are for when the
+            guess is wrong. */}
+        <div className="howto">
+          {/* Two rows on a rule, rather than one row of label, sentence and switch run together:
+              the switch decides *which* instruction is drawn, so it belongs above the line it
+              governs, not inline with it where it reads as the end of the sentence.
+
+              No path in the label: it is set in mono caps, which would print a dotfile's name as
+              `.CLAUDE`, and the path is already the loudest thing in the heading above. Why the
+              folder is hidden is in the help below the card; what a reader stuck at a dialog needs
+              is the keystrokes. */}
+          <div className="howhead">
+            <span className="howlbl">The folder is hidden</span>
+            <Seg options={PLATFORMS} value={os} onPick={setOs} nosnap />
+          </div>
+          {/* Keyed on the platform, so switching plays the same swap the report's figures do
+              rather than substituting the words underneath the reader. Inside the paragraph
+              rather than around it: `TextSwap` is a span, and a span may not hold a `<p>`. */}
+          <p>
+            <TextSwap token={os}>{HOW[os]}</TextSwap>
+          </p>
         </div>
         <div className="status" data-err={status?.err ? "1" : "0"}>
           {status?.node}
@@ -199,16 +321,6 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
           </div>
         ) : null}
       </div>
-      <input
-        ref={filePicker}
-        type="file"
-        multiple
-        accept=".jsonl"
-        className="hidden"
-        onChange={(e) => {
-          void handle(e.target.files)
-        }}
-      />
       <input
         ref={dirPicker}
         type="file"
@@ -228,23 +340,31 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
 /** The help that stands under the empty card, where the breakdown and the footnotes stand under
  *  a full one -- so it holds the same ground: two columns on the same rule, across the width of
  *  the shell. It is the one block with no counterpart in the report, which is why it is here
- *  rather than something the report's own footnotes grow out of. */
+ *  rather than something the report's own footnotes grow out of.
+ *
+ *  What it is *not* any more is the way in. The per-platform route to the hidden folder moved
+ *  into the card, next to the button that opens the dialog it describes; what is left down here
+ *  is what the folder holds, the terminal way round, and the answer to the question a page that
+ *  asks for a whole folder of transcripts has to answer. */
 export function Where(): React.JSX.Element {
   return (
     <div className="where">
       <div>
         <p className="whead">
-          <strong>Where your transcripts live</strong>
+          <strong>What you are handing over</strong>
         </p>
         <p>
           One <code>.jsonl</code> file per session, in one folder per project, under{" "}
-          <code>~/.claude/projects/</code>.
+          <code>~/.claude/projects/</code> — a dotfile, which is why every file picker hides it
+          until you ask for it by name. Everything you pick is combined into a single report — the
+          breakdown is by what spent the money, not by which folder it was spent in, so pick one
+          project&apos;s folder if that is the bill you want.
         </p>
         <p className="whead">
           <strong>Prefer the terminal?</strong>
         </p>
         <p>
-          Open the folder in your file manager, then drag a project onto the card above:{" "}
+          Open the folder in your file manager, then drag it onto the card above:{" "}
           <code>open ~/.claude/projects</code>
         </p>
         <p>
@@ -253,36 +373,20 @@ export function Where(): React.JSX.Element {
       </div>
       <div>
         <p className="whead">
-          <strong>Getting there — the folder is hidden</strong>
+          <strong>Nothing is uploaded</strong>
         </p>
         <p>
-          <code>.claude</code> starts with a dot, so file pickers hide it by default. It is still
-          reachable; you just have to ask for it by name.
+          The files are read and the bill worked out in this page: there is no server to send a
+          transcript to, and the build fails if anything in here reaches the network. Save the page
+          and it works the same from disk.
         </p>
-        <ul className="steps">
-          <li>
-            <b>macOS</b> — click <em>Choose folder</em> above, then in the Finder dialog press{" "}
-            <kbd>⇧</kbd>
-            <kbd>⌘</kbd>
-            <kbd>G</kbd>, paste <code>~/.claude/projects</code>, hit <kbd>return</kbd>, and pick a
-            project folder.
-            <span className="alt">
-              <kbd>⇧</kbd>
-              <kbd>⌘</kbd>
-              <kbd>.</kbd> also toggles hidden files into view, in the dialog and in Finder.
-            </span>
-          </li>
-          <li>
-            <b>Windows</b> — type <code>%USERPROFILE%\.claude\projects</code> into the dialog&apos;s{" "}
-            <em>File name</em> box and press <kbd>Enter</kbd>.
-          </li>
-          <li>
-            <b>Linux</b> — press <kbd>Ctrl</kbd>
-            <kbd>L</kbd> in the GTK dialog and type <code>~/.claude/projects</code>, or{" "}
-            <kbd>Ctrl</kbd>
-            <kbd>H</kbd> to show hidden files.
-          </li>
-        </ul>
+        <p className="whead">
+          <strong>A shared link carries the view, not the bill</strong>
+        </p>
+        <p>
+          The address records which lens and which block you are looking at — never the numbers.
+          Whoever opens it gets an empty card and drops their own transcripts in.
+        </p>
       </div>
     </div>
   )

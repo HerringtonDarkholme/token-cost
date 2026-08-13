@@ -1152,6 +1152,17 @@ tfoot .n {
 .dropzone[data-over="1"] {
   background: var(--accent-soft);
 }
+/* Two classes deep on purpose: `.dropzone p` below is a class *and* a type, so it outranks a
+   bare `.lede` however far down the file that is written -- which is how the old lede ended up
+   quietly taking the small size it was meant to override. */
+.dropzone > .lede {
+  color: var(--ink2);
+  max-width: 74ch;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
 /* The middle band takes the slack, so the invitation sits on the card's centre line whatever
    the window has done to the two bands around it. */
 .invite {
@@ -1181,6 +1192,107 @@ tfoot .n {
   gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
+}
+/* The way into the hidden folder: sunk rather than outlined, so it reads as a note attached to
+   the button above it rather than a second thing to decide about. Two rows, and the split is the
+   point -- what the switch does is choose the line below it, so running label, switch and
+   sentence together in one row made the platform read as the end of the instruction. */
+.howto {
+  width: 100%;
+  max-width: 62ch;
+  text-align: left;
+  background: var(--sunk);
+  border: 1px solid var(--hair);
+  padding: 9px 13px 11px;
+}
+.howhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hair);
+  margin-bottom: 9px;
+}
+.howlbl {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+/* Overriding `.dropzone p`, which is a class and a type and so outranks a bare class however
+   far below it this is written. */
+.howto p {
+  margin: 0;
+  max-width: none;
+  font-size: 13px;
+  color: var(--ink2);
+  text-wrap: pretty;
+}
+/* The platform marks, given depth rather than a pointer-tracked parallax: the picked one stands
+   a pixel forward at full size and full ink, the other two sit back, smaller and faded. Nothing
+   else in this instrument follows the cursor -- the hover marks answer *what is under the
+   pointer*, not where it is -- so a mouse-driven parallax would be the one gesture here that
+   does. What is in character is layers moving at their own rates, which is what this is: the
+   pill slides at `--tabs-dur` while the marks rise and fall at their own, slower, so the row
+   resolves in two beats instead of one. */
+.howto .glyph {
+  /* Two pixels over the toolbar's 14: a penguin has a face in it, and the toolbar's size closes
+     the eyes up into the head. */
+  width: 16px;
+  height: 16px;
+  transition:
+    transform var(--osmark-dur) var(--osmark-ease),
+    opacity var(--osmark-dur) var(--osmark-ease);
+}
+.howto .t-tab[aria-pressed="false"] .glyph {
+  transform: translateY(1.5px) scale(var(--osmark-back));
+  /* Held above a half rather than at 0.45: the same fade over a dark panel is a mark you have to
+     look for, and these are the control's only affordance. */
+  opacity: 0.55;
+}
+.howto .t-tab[aria-pressed="true"] .glyph {
+  transform: translateY(-1px) scale(var(--osmark-fore));
+}
+/* Hovering one of the far marks brings it part of the way forward -- the answer to "can I press
+   this", given in the same dimension the control is already using. */
+.howto .t-tab:hover .glyph {
+  opacity: 0.85;
+  transform: translateY(0) scale(0.95);
+}
+.howto .t-tab[aria-pressed="true"]:hover .glyph {
+  opacity: 1;
+  transform: translateY(-1px) scale(var(--osmark-fore));
+}
+@media (prefers-reduced-motion: reduce) {
+  .howto .glyph {
+    transition: none;
+  }
+}
+.howto code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  padding: 2px 5px;
+  color: var(--ink);
+  user-select: all;
+}
+.howto em {
+  font-style: normal;
+  color: var(--ink);
+  font-weight: 500;
+}
+/* The path is the ask, so it is set in the heading rather than described under it -- at the
+   heading's own size, in mono, with no box around it: a bordered chip inside a 27px line reads
+   as a button. */
+.dropzone h2 code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  letter-spacing: -0.01em;
+  user-select: all;
 }
 .btn {
   border: 1px solid var(--rule);
@@ -1278,31 +1390,6 @@ tfoot .n {
 .where .whead:first-child {
   margin-top: 0;
 }
-.where .steps {
-  margin: 2px 0 4px;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.where .steps li {
-  line-height: 1.6;
-}
-.where .steps b {
-  color: var(--ink);
-  font-weight: 600;
-}
-.where .steps em {
-  font-style: normal;
-  color: var(--ink);
-  font-weight: 500;
-}
-.where .alt {
-  display: block;
-  color: var(--ink3);
-  font-size: 12.5px;
-  margin-top: 2px;
-}
 kbd {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -1316,13 +1403,6 @@ kbd {
   border-bottom-width: 2px;
   border-radius: 3px;
   vertical-align: baseline;
-}
-.lede {
-  color: var(--ink2);
-  max-width: 68ch;
-  margin: 0 auto;
-  font-size: 14.5px;
-  text-wrap: pretty;
 }
 .scopebar {
   display: flex;
@@ -1395,6 +1475,12 @@ kbd {
   --tabs-text-muted: var(--ink2);
   --tabs-text-active: var(--ink);
   --tabs-pill-bg: var(--ink);
+  /* Platform marks — depth on pick. Deliberately slower than the pill they sit on: two rates
+     is the whole effect, and matching `--tabs-dur` would collapse it back into one move. */
+  --osmark-dur: var(--duration-slow);
+  --osmark-ease: var(--ease-smooth-out);
+  --osmark-back: 0.84; /* the two not picked: smaller, and a pixel and a half further away */
+  --osmark-fore: 1.06; /* the picked one, standing forward of them */
   /* Number pop-in */
   --digit-dur: var(--duration-very-slow);
   --digit-distance: var(--distance-base);

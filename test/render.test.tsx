@@ -493,6 +493,23 @@ describe("the card's two faces", () => {
     // The figure's place is held by a dash, so the bill has somewhere to arrive.
     expect(box.querySelector(".total")?.textContent).toBe("—")
     expect(box.querySelector(".total")?.getAttribute("data-empty")).toBe("1")
+    /* One way in, and it is the folder: `webkitdirectory` is what makes a file input a folder
+       picker, and asking for files instead meant a hidden dotfile to defeat and dozens of
+       identically-named transcripts to multi-select. */
+    const inputs = [...box.querySelectorAll(".dropzone input")]
+    expect(inputs).toHaveLength(1)
+    expect(inputs[0].getAttribute("webkitdirectory")).toBe("")
+    expect(box.querySelectorAll(".picks .btn")).toHaveLength(1)
+    /* And the route into that hidden folder is inside the card, beside the button that opens the
+       dialog it describes, rather than in the help below the fold. */
+    expect(box.querySelector(".invite .howto p")?.textContent).toMatch(/claude/)
+    /* Three marks and exactly one pressed: the platform is guessed from the user agent rather
+       than asked for, and the other two are there for when the guess is wrong. Each is a picture,
+       so each has to carry the word as its name. */
+    const marks = [...box.querySelectorAll(".howto button[data-icon]")]
+    expect(marks.map((b) => b.getAttribute("aria-label"))).toEqual(["macOS", "Windows", "Linux"])
+    expect(box.querySelectorAll('.howto button[aria-pressed="true"]')).toHaveLength(1)
+    for (const b of marks) expect(b.querySelector(".glyph")).not.toBeNull()
     /* One control, and it is the last one in the bar: the theme switch is the anchor
        everything else grows leftward from, so it must not have anything to its right. */
     const bar = [...box.querySelectorAll(".toolbar > *")]
