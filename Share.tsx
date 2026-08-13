@@ -18,7 +18,7 @@
    -- anything that silently copies and then reports "shared" has lied about the one step
    the reader still has to take. */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useReport } from "./context.ts";
 import { postText } from "./model.ts";
 import { download, snapshot } from "./snapshot.ts";
@@ -89,6 +89,59 @@ const SHARE: Record<Outcome, string> = {
   failed: "Could not render the image",
 };
 
+/** How long the label's exit leg runs, read off the stylesheet so the swap's three phases
+ *  stay in step with the CSS that draws them. */
+function swapMs(): number {
+  const dur = getComputedStyle(document.documentElement).getPropertyValue("--text-swap-dur");
+  return parseFloat(dur) || 150;
+}
+
+/** These buttons say what just happened -- "Copy chart" becomes "Rendering…" becomes "Chart
+ *  copied" in the same eight millimetres of toolbar -- so the label is swapped rather than
+ *  replaced: the old words leave upward through a blur and the new ones arrive from below.
+ *
+ *  The reference drives this by writing `textContent`; here the phase is React state, so the
+ *  words React renders change on the same beat as the class that moves them, and the new
+ *  label can be a fragment with the X mark in it rather than a string.
+ *
+ *  `token` is what identifies the label, because the label itself is fresh JSX every render.
+ */
+function TextSwap({ token, children }: { token: string; children: ReactNode }): React.JSX.Element {
+  const el = useRef<HTMLSpanElement>(null);
+  const [shown, setShown] = useState<{ token: string; body: ReactNode }>({ token, body: children });
+  const [phase, setPhase] = useState<"" | "exit" | "enter">("");
+
+  /* Read through a ref rather than a dependency: the children are a new element on every
+     render of the parent, and a dependency on them would restart the exit leg mid-flight. */
+  const latest = useRef(children);
+  latest.current = children;
+
+  useEffect(() => {
+    if (token === shown.token) return;
+    setPhase("exit");
+    const t = setTimeout(() => {
+      setShown({ token, body: latest.current });
+      setPhase("enter");
+    }, swapMs());
+    return () => clearTimeout(t);
+  }, [token, shown.token]);
+
+  /* `is-enter-start` puts the new label below its resting place with the transition
+     suspended, so it needs the reflow before the class comes off again -- that read is what
+     makes the return a transition rather than a second jump. Same single task as the
+     reference's `void el.offsetHeight`, since a layout effect commits before paint. */
+  useLayoutEffect(() => {
+    if (phase !== "enter") return;
+    void el.current?.offsetHeight;
+    setPhase("");
+  }, [phase]);
+
+  return (
+    <span ref={el} className={`t-text-swap${phase === "exit" ? " is-exit" : ""}`
+      + `${phase === "enter" ? " is-enter-start" : ""}`}>{shown.body}</span>
+  );
+}
+
 /** The X mark, filled with `currentColor` so it inverts with the button like the eye does.
  *  It stands in for the word at the end of the label rather than leading it as an icon --
  *  the sentence is "share to X", and X is a logo, not a letter. */
@@ -106,7 +159,7 @@ export function CopyChartButton(): React.JSX.Element {
   return (
     <button type="button" className="linkish" data-on={at && at !== "busy" ? 1 : 0}
       disabled={at === "busy"} onClick={() => { void run(); }}>
-      {at ? COPY[at] : "Copy chart"}
+      <TextSwap token={at || "idle"}>{at ? COPY[at] : "Copy chart"}</TextSwap>
     </button>
   );
 }
@@ -134,7 +187,7 @@ export function ShareButton(): React.JSX.Element {
   return (
     <button type="button" className="linkish" data-on={at && at !== "busy" ? 1 : 0}
       disabled={at === "busy"} onClick={share} aria-label={at ? SHARE[at] : "Share to X"}>
-      {at ? SHARE[at] : <>Share to<XMark /></>}
+      <TextSwap token={at || "idle"}>{at ? SHARE[at] : <>Share to<XMark /></>}</TextSwap>
     </button>
   );
 }

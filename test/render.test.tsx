@@ -216,6 +216,35 @@ describe("interaction", () => {
     expect(typeof before).toBe("string");
   });
 
+  /* The pressed state of a segmented control is a pill that travels, so the thing to assert
+     is that every such control has exactly one of them and that adding it did not cost the
+     buttons their names -- the pill is decoration, and says so. */
+  it("every lens switch carries one pill, and its options still read as buttons", () => {
+    for (const seg of container.querySelectorAll(".seg.t-tabs")) {
+      expect(seg.querySelectorAll(".t-tabs-pill")).toHaveLength(1);
+      expect(seg.querySelector(".t-tabs-pill")?.getAttribute("aria-hidden")).toBe("true");
+      expect(seg.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+    }
+    expect(byLabel(".t-tab", "Sunburst")).not.toBeNull();
+    expect(byLabel(".t-tab", "5m")).not.toBeNull();
+  });
+
+  /* The total re-enters character by character when the lens or the mask changes it. The
+     figure is split across spans to do that, so what has to hold is that it is still one
+     number: the same characters, in order, and no digit left out. */
+  it("the total is a row of digits, and stays the whole figure", () => {
+    const digits = (): string[] =>
+      [...container.querySelectorAll(".total .t-digit")].map(el => el.textContent || "");
+    expect(digits().join("")).toBe(container.querySelector(".total")?.textContent);
+    expect(digits().length).toBeGreaterThan(3);
+    // The last two characters ride behind the rest, which is what makes cents feel alive.
+    expect([...container.querySelectorAll(".total .t-digit[data-stagger]")]
+      .map(el => el.getAttribute("data-stagger"))).toEqual(["1", "2"]);
+
+    show({ pctOnly: true });
+    expect(digits().join("")).toMatch(/^\*+$/);
+  });
+
   it("a ledger row collapses", () => {
     show({ view: "table" });
     const rows = () => container.querySelectorAll("tbody tr").length;

@@ -8,13 +8,14 @@
    still read the one hover key from the one place, which is what lets the mosaic, the
    panels and the table stay a single instrument. */
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Analysis } from "./engine.ts";
 import { ReportContext, useReport, type ReportCtx } from "./context.ts";
 import {
   branches, count, focusOf, FOLD_MIN, ledger, money, palette, pctOf, type Ledger,
 } from "./model.ts";
 import { hashFor, readHash, setHover, setState, useViewState, type ViewState } from "./store.ts";
+import { Seg } from "./Seg.tsx";
 import { Toolbar } from "./Toolbar.tsx";
 import { HoverBar, Mosaic } from "./Mosaic.tsx";
 import { Panels } from "./Panels.tsx";
@@ -40,6 +41,69 @@ function useUrlSync(state: ViewState): void {
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+}
+
+const VIEWS: ReadonlyArray<readonly [ViewState["view"], string]> =
+  [["panels", "Panels"], ["table", "Table"]];
+
+const CHARTS: ReadonlyArray<readonly [ViewState["chart"], string]> =
+  [["mosaic", "Mosaic"], ["sun", "Sunburst"]];
+
+/** How long a digit pop-in runs, read off the stylesheet so the two cannot drift: the last
+ *  two characters ride one and two stagger offsets behind the rest of the figure. */
+function popMs(): number {
+  const css = getComputedStyle(document.documentElement);
+  const ms = (name: string, fallback: number): number =>
+    parseFloat(css.getPropertyValue(name)) || fallback;
+  return ms("--digit-dur", 500) + ms("--digit-stagger", 70) * 2 + 40;
+}
+
+/** A figure that re-enters character by character when it changes. Switching the TTL lens
+ *  and covering the amount both put a different number in the same place, and a number that
+ *  changes without moving is a number the reader can miss.
+ *
+ *  The group is keyed on a beat rather than mutated in place: a remount is what replays a CSS
+ *  animation, which is the same thing the reference's remove-reflow-re-add dance buys. The
+ *  beat drops back to 0 when the animation is over, which is what takes `.is-animating` off
+ *  again -- the PNG rasterises this markup in a fresh document, where a live animation would
+ *  be caught at its first frame with the digits still invisible. */
+function PopNumber({ value, className }: {
+  value: string; className?: string;
+}): React.JSX.Element {
+  const [beat, setBeat] = useState(0);
+  const shown = useRef(value);
+
+  useEffect(() => {
+    if (shown.current === value) return;
+    shown.current = value;
+    setBeat(n => n + 1);
+    const t = setTimeout(() => setBeat(0), popMs());
+    return () => clearTimeout(t);
+  }, [value]);
+
+  const chars = [...value];
+  return (
+    <span key={beat}
+      className={`t-digit-group${beat ? " is-animating" : ""}${className ? " " + className : ""}`}>
+      {chars.map((ch, i) => (
+        <span key={i} className="t-digit"
+          data-stagger={i === chars.length - 2 ? 1 : i === chars.length - 1 ? 2 : undefined}>{ch}</span>
+      ))}
+    </span>
+  );
+}
+
+/** The panel the breakdown's two views arrive in. Mounted closed and opened on the next
+ *  frame, because the open state needs a painted closed state to travel from; keyed on the
+ *  view from outside, so switching lists mounts a fresh panel rather than reopening this one.
+ */
+function Reveal({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return <div className="t-panel-slide" data-open={open ? "true" : "false"}>{children}</div>;
 }
 
 function Crumbs(): React.JSX.Element {
@@ -117,15 +181,12 @@ function Breakdown({ L }: { L: Ledger }): React.JSX.Element {
           <label htmlFor="q">Find</label>
           <input id="q" type="search" value={state.query} placeholder="git diff, thinking, schema…"
                  onChange={e => setState({ query: e.target.value })} />
-          <span className="seg">
-            <button type="button" aria-pressed={state.view === "panels"}
-              onClick={() => setState({ view: "panels" })}>Panels</button>
-            <button type="button" aria-pressed={state.view === "table"}
-              onClick={() => setState({ view: "table" })}>Table</button>
-          </span>
+          <Seg options={VIEWS} value={state.view} onPick={view => setState({ view })} />
         </div>
       </div>
-      {state.view === "panels" ? <Panels /> : <LedgerTable L={L} />}
+      <Reveal key={state.view}>
+        {state.view === "panels" ? <Panels /> : <LedgerTable L={L} />}
+      </Reveal>
       <div className="reconline">
         <span>{note}</span>
         <span>Reconciled: <strong>{amt(L.recon)}</strong></span>
@@ -242,7 +303,8 @@ export function Report({ data, onReset }: {
                 Billed · {state.pctOnly ? "amount hidden · " : ""}{state.ttl} cache TTL
               </div>
               <div className="total" data-hidden={state.pctOnly ? 1 : 0}>
-                {state.pctOnly ? <span className="mask">****</span> : money(d.total)}
+                <PopNumber value={state.pctOnly ? "****" : money(d.total)}
+                           className={state.pctOnly ? "mask" : undefined} />
               </div>
             </div>
           </header>
@@ -261,12 +323,7 @@ export function Report({ data, onReset }: {
               breadcrumb, which addresses one block inside it. */}
           <div className="cardfoot">
             <HoverBar />
-            <span className="seg" data-nosnap>
-              <button type="button" aria-pressed={state.chart === "mosaic"}
-                onClick={() => setState({ chart: "mosaic" })}>Mosaic</button>
-              <button type="button" aria-pressed={state.chart === "sun"}
-                onClick={() => setState({ chart: "sun" })}>Sunburst</button>
-            </span>
+            <Seg options={CHARTS} value={state.chart} onPick={chart => setState({ chart })} nosnap />
           </div>
         </section>
         <Breakdown L={L} />

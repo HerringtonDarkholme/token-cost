@@ -1,15 +1,16 @@
 /* The instrument's controls. Every one of them is a real button with `aria-pressed`, so
    the current lens is announced rather than only coloured. */
 
+import type { TtlAssumption } from "./engine.ts";
 import { useReport } from "./context.ts";
+import { Seg } from "./Seg.tsx";
 import { CopyChartButton, ShareButton } from "./Share.tsx";
 import { setState, type ThemeChoice } from "./store.ts";
 
-function Toggle({ on, label, onClick }: {
-  on: boolean; label: string; onClick: () => void;
-}): React.JSX.Element {
-  return <button type="button" aria-pressed={on} onClick={onClick}>{label}</button>;
-}
+const THEMES: ReadonlyArray<readonly [ThemeChoice, string]> =
+  [["light", "Light"], ["system", "System"], ["dark", "Dark"]];
+
+const TTLS: ReadonlyArray<readonly [TtlAssumption, string]> = [["1h", "1h"], ["5m", "5m"]];
 
 /** The eye every brokerage app puts over its balance. Stroked in `currentColor` so it
  *  inverts with the button rather than needing a second colour for the pressed state. */
@@ -49,8 +50,6 @@ function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
 export function Toolbar({ onReset }: { onReset: () => void }): React.JSX.Element {
   const { state } = useReport();
 
-  const themes: Array<[ThemeChoice, string]> = [["light", "Light"], ["system", "System"], ["dark", "Dark"]];
-
   return (
     <div className="toolbar">
       <span className="tick" />
@@ -59,17 +58,8 @@ export function Toolbar({ onReset }: { onReset: () => void }): React.JSX.Element
       <span className="seg">
         <MaskToggle on={state.pctOnly} />
       </span>
-      <span className="seg">
-        <span className="seglbl">TTL</span>
-        <Toggle on={state.ttl === "1h"} label="1h" onClick={() => setState({ ttl: "1h" })} />
-        <Toggle on={state.ttl === "5m"} label="5m" onClick={() => setState({ ttl: "5m" })} />
-      </span>
-      <span className="seg">
-        {themes.map(([value, label]) => (
-          <Toggle key={value} on={state.theme === value} label={label}
-                  onClick={() => setState({ theme: value })} />
-        ))}
-      </span>
+      <Seg label="TTL" options={TTLS} value={state.ttl} onPick={ttl => setState({ ttl })} />
+      <Seg options={THEMES} value={state.theme} onPick={theme => setState({ theme })} />
       <span className="seg">
         <button type="button" onClick={onReset}>New file</button>
       </span>
@@ -80,16 +70,10 @@ export function Toolbar({ onReset }: { onReset: () => void }): React.JSX.Element
 /** The upload screen carries the same theme control and nothing else, so it gets its own
  *  small toolbar rather than a stripped-down copy of the report's. */
 export function ThemeBar({ theme }: { theme: ThemeChoice }): React.JSX.Element {
-  const themes: Array<[ThemeChoice, string]> = [["light", "Light"], ["system", "System"], ["dark", "Dark"]];
   return (
     <div className="toolbar">
       <span className="tick" />
-      <span className="seg">
-        {themes.map(([value, label]) => (
-          <Toggle key={value} on={theme === value} label={label}
-                  onClick={() => setState({ theme: value })} />
-        ))}
-      </span>
+      <Seg options={THEMES} value={theme} onPick={t => setState({ theme: t })} />
     </div>
   );
 }
