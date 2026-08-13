@@ -10,7 +10,7 @@
 
 import { analyze, type Dataset } from "../engine.ts";
 import {
-  fold, focusOf, ledger, palette, rowIsOpen, sunburst, SUN_RINGS, type CostNode,
+  fold, focusOf, kidsOf, ledger, palette, rowIsOpen, sunburst, SUN_RINGS, type CostNode,
 } from "../model.ts";
 import { corpus } from "./fixture.ts";
 
@@ -20,6 +20,8 @@ const sum = (l: CostNode[]): number => l.reduce((a, n) => a + n.cost, 0);
 /** Folding rounds its "other" row to the cent, and the engine's own split carries a little
  *  float noise, so equality is to the cent plus a hair proportional to the magnitude. */
 const near = (a: number, b: number): boolean => Math.abs(a - b) <= 0.02 + Math.abs(b) * 0.001;
+/** Angles are computed, not accumulated from the data, so they compare exactly. */
+const closeDeg = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6;
 
 const data = analyze(corpus(process.argv[2]));
 console.log(`\n== model · ${data.requests} requests · ${data.filesUsed} file(s) ==`);
@@ -67,6 +69,36 @@ for (const ttl of ["1h", "5m"] as const) {
   }
   ok(reconOk, `children sum to parent (${checked} parent rows across ${paths.length} drill paths)`);
 
+  /* 3b. A level that says nothing its parent did not is never drawn. The fused preamble is
+         the standing case: one child carrying 100% of the group and splitting no further,
+         so a chevron, a ring or a segment for it promises a breakdown and delivers the row
+         again. A lone child that *does* split is kept -- it names which one thing the money
+         went to, and the level below it is real. Asserted on the ledger and the sunburst
+         together: they are two renderings of the one `kidsOf` answer, and a regression that
+         reaches only one of them is exactly the kind that ships. */
+  let leafOk = true;
+  const restated = (where: string, what: string): void => {
+    leafOk = false;
+    console.log(`     ${where} :: ${what}`);
+  };
+  for (const path of paths) {
+    const where = path.join(" › ") || "all";
+    for (const r of ledger(d, path, {}, "").rows) {
+      const k = kidsOf(r.node);
+      if (k && k.length === 1 && !kidsOf(k[0])) restated(where, `row ${r.node.name} — lone leaf ${k[0].name}`);
+    }
+    for (const b of sunburst(focusOf(d, path))) {
+      for (const a of b.arcs) {
+        const kids = b.arcs.filter(x => x.ring === a.ring + 1 && x.key === a.key + "›" + x.name);
+        if (kids.length !== 1) continue;
+        const grand = b.arcs.some(x => x.ring === a.ring + 2 && x.key.startsWith(kids[0].key + "›"));
+        if (!grand && closeDeg(kids[0].a1 - kids[0].a0, a.a1 - a.a0))
+          restated(where, `arc ${a.name} — ring ${a.ring + 1} restates it and stops`);
+      }
+    }
+  }
+  ok(leafOk, "a lone child is drawn only when it splits further");
+
   /* 4. A path from an edited URL or a stale bookmark degrades, never throws. */
   ok(focusOf(d, ["no such group"]).groupName === null, "unknown drill path falls back to the root");
   ok(focusOf(d, [d.groups[0].name, "no such item"]).node.name === d.groups[0].name,
@@ -99,7 +131,6 @@ for (const ttl of ["1h", "5m"] as const) {
         the node's share of the circle, and a ring has to tile the ring inside it exactly.
         A gap or an overlap would be a claim about money that no other view makes. */
   let sunOk = true, arcs = 0;
-  const closeDeg = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6;
   for (const path of paths) {
     const at = focusOf(d, path);
     const tree = sunburst(at);

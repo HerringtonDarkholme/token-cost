@@ -165,10 +165,15 @@ file tool under any name gets the same treatment.
 
 ### Two rows that need care
 
-- **`system prompt + tool schemas`** is one inseparable block. Transcripts record only its
-  combined token count — nothing here can split it. Run `/context` in Claude Code for the
-  real boundary. It is measured once per session, at the first request, and held fixed;
-  recomputing it every turn makes it absorb all estimation error and grow without bound.
+- **`system prompt + tool schemas`** is one inseparable block. It is not measured but
+  inferred: the residual after everything the transcript *does* record, which carries no
+  seam between the two halves — no record type holds the system prompt or a tool schema.
+  Run `/context` in Claude Code for the real boundary. It is measured once per session, at
+  the first request, and held fixed; recomputing it every turn makes it absorb all
+  estimation error and grow without bound. Being fused, it does not open: `kidsOf` in
+  `model.ts` withholds a lone child that splits no further, so the mosaic column, the
+  sunburst ring, the panel and the chevron all decline together rather than promising a
+  breakdown and re-printing the row at 100%.
 - **`assistant prose`** appears twice on purpose: once as generation cost, once (far larger)
   as the same prose re-billed as input on later turns. The ratio is carry cost in miniature.
 

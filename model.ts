@@ -63,6 +63,18 @@ export function branches(node: CostNode | null | undefined): boolean {
   return k.length > 1 || (k.length === 1 && ((k[0].items || k[0].children) || []).length > 1);
 }
 
+/** The same question, answered with the list: the children worth drawing as a level of
+ *  their own, or null. A lone child that does not itself branch is the parent restated
+ *  under a second name -- the fused preamble row is the standing case -- so every view
+ *  treats such a node as the leaf it is instead of repeating it at 100%. Routing all four
+ *  views through one predicate is what keeps the mosaic's flat column, the sunburst's
+ *  missing ring, the panel's "no further breakdown" and the ledger's absent chevron from
+ *  ever disagreeing about which rows are worth opening. */
+export function kidsOf(node: CostNode | null | undefined): CostNode[] | null {
+  if (!node || !branches(node)) return null;
+  return node.items || node.children || null;
+}
+
 /* ---------- palette ---------- */
 
 /** Colour follows the group's stable ID from the engine, in the engine's declared order --
@@ -183,7 +195,7 @@ export function sunburst(focus: Focus, rings: number = SUN_RINGS): SunBranch[] {
                   key: string, under: string | null): void => {
       arcs.push({ key, name: node.name, cost: node.cost, ring, a0, a1: a0 + span, under });
       if (ring + 1 >= rings || span < SUN_MIN_SPLIT) return;
-      const kids = fold(node.items || node.children || [], node.cost);
+      const kids = fold(kidsOf(node) || [], node.cost);
       if (!kids.length) return;
       /* Scaled by what the children actually sum to, so the ring fills its parent's sweep
          even where rounding leaves the two a cent apart. */
@@ -201,7 +213,7 @@ export function sunburst(focus: Focus, rings: number = SUN_RINGS): SunBranch[] {
     at += span;
     out.push({
       key: group + "›" + n.name, name: n.name, group, cost: n.cost,
-      items: (n.items || n.children || []).length, folded: !!n.folded, arcs,
+      items: (kidsOf(n) || []).length, folded: !!n.folded, arcs,
     });
   }
   return out;
@@ -243,7 +255,7 @@ export function ledger(d: Dataset, path: string[], open: Record<string, boolean>
     const parentCost = list.reduce((s, n) => s + n.cost, 0) || 1;
     fold(list, parentCost, depth === 0 && !at.groupName).forEach(n => {
       const g = (depth === 0 && !at.groupName) ? n.name : inherit;
-      const kids = n.items || n.children || null;
+      const kids = kidsOf(n);
       const key = g + "›" + n.name + "›" + depth;
       const match = !q || n.name.toLowerCase().includes(q);
       const kidMatch = kids ? kids.some(k => k.name.toLowerCase().includes(q)

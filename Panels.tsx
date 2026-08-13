@@ -4,7 +4,7 @@
 
 import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
-import { fold, maxCost, pctOf, type CostNode } from "./model.ts";
+import { fold, kidsOf, maxCost, pctOf, type CostNode } from "./model.ts";
 import { hoverBind } from "./Mosaic.tsx";
 import { useHover } from "./store.ts";
 
@@ -23,7 +23,7 @@ const Panel = memo(function Panel({ panel, gname, maxPanel, kids, hit, anyHover 
   /* Two different footers, and the difference matters: a panel with no children is a
      genuine leaf, while one whose children sum short of it has been filtered by the query
      and must say so rather than appear to under-count. */
-  const kidsAll = panel.items || panel.children || [];
+  const kidsAll = kidsOf(panel) || [];
   const shown = kids.reduce((a, k) => a + k.cost, 0);
   const foot = !kidsAll.length
     ? "single line item · no further breakdown"
@@ -89,7 +89,7 @@ export function Panels(): React.JSX.Element {
     return {
       maxPanel: maxCost(src),
       panels: src.map(p => {
-        const kids = fold(p.items || p.children || [], p.cost)
+        const kids = fold(kidsOf(p) || [], p.cost)
           .filter(k => !q || k.name.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
         return { p, kids };
       }).filter(({ kids }) => !q || kids.length),

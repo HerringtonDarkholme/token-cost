@@ -4,7 +4,7 @@
 
 import { memo, useMemo } from "react";
 import { useReport } from "./context.ts";
-import { branches, fold, pctOf, type CostNode } from "./model.ts";
+import { branches, fold, kidsOf, pctOf, type CostNode } from "./model.ts";
 import { setHover, useHover, type HoverTarget } from "./store.ts";
 
 /** Hover *and* keyboard focus report the same target, so tabbing through the mosaic gives
@@ -17,8 +17,8 @@ export function hoverBind(t: HoverTarget): { onMouseEnter: () => void; onFocus: 
 /** A column's blocks: its children, or one block standing for the column itself when it
  *  has no breakdown. */
 function segmentsOf(node: CostNode): CostNode[] {
-  const kids = node.items || node.children;
-  return (kids && kids.length)
+  const kids = kidsOf(node);
+  return kids
     ? fold(kids, node.cost)
     : [{ name: node.name, cost: node.cost, children: null, self: true }];
 }
