@@ -1,5 +1,5 @@
-import * as E from "../engine.ts"
-import type { Dataset, RawFile, Usage } from "../engine.ts"
+import * as E from "../src/engine.ts"
+import type { Dataset, RawFile, Usage } from "../src/engine.ts"
 import fs from "node:fs"
 import path from "node:path"
 

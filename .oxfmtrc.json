@@ -3,11 +3,9 @@
   // exclusion without its reason written down is one somebody deletes in six months.
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
 
-  // oxfmt formats TypeScript here and nothing else. Everything it is pointed away from
-  // below is hand-composed in a shape the formatter would flatten:
+  // oxfmt formats the TypeScript and the stylesheet under `src/`. What it is pointed away
+  // from below is hand-composed in a shape the formatter would flatten:
   //
-  //   *.css   -- `style.css` is one declaration per line, packed. Reformatted it is 280
-  //              lines becoming 1271, and the palette blocks stop reading as tables.
   //   *.md    -- README and DESIGN_BRIEF are wrapped by hand to a measure; oxfmt also
   //              rewrites `*emphasis*` as `_emphasis_`.
   //   *.html  -- `index.html` is the shell the build inlines into, and is nearly all
@@ -18,7 +16,7 @@
   //   .agents -- a vendored skill, not ours to format. `.oxlintrc.json` skips it too.
   //
   // `dist`, `cost-report.html` and `node_modules` need no entry: oxfmt reads `.gitignore`.
-  "ignorePatterns": ["*.css", "*.md", "*.html", "*.json", "*.yaml", ".agents"],
+  "ignorePatterns": ["*.md", "*.html", "*.json", "*.yaml", ".agents"],
 
   // No statement-ending semicolons. oxfmt still writes a leading one on the few lines that
   // would otherwise be swallowed by the line above (a statement opening with `(`, `[`, `` ` ``,

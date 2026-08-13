@@ -34,7 +34,7 @@ imports. Vite provides one, with Fast Refresh:
 ```sh
 pnpm install
 pnpm dev              # http://127.0.0.1:8000
-pnpm format           # oxfmt, which owns the .ts/.tsx and nothing else
+pnpm format           # oxfmt, which owns everything under src/
 pnpm typecheck        # tsc --noEmit, the only thing that judges types
 pnpm build            # bundle + inline everything into dist/ and cost-report.html
 pnpm check            # format, lint, typecheck, build, then all three test suites
@@ -74,7 +74,7 @@ suites runnable as plain `node` scripts. Relative imports carry their real `.ts`
 extension for the same reason: Node does no extension guessing, so `./engine.ts` is the one
 specifier both it and Vite accept.
 
-The split between `model.ts` and the components is the one worth knowing about. Everything
+The split between `src/model.ts` and the components is the one worth knowing about. Everything
 that has to *reconcile* — folding, drill-down, the ledger walk — is plain functions with no
 React and no DOM, so it can be asserted directly and run against a real transcript
 directory with nothing in between. The `.tsx` files only draw.
@@ -216,22 +216,22 @@ file tool under any name gets the same treatment.
 |---|---|
 | `index.html` | document shell and Vite entry (needs the dev server) |
 | `vercel.json` | the deploy: `pnpm build`, serve `dist/` |
-| `engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
-| `model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
-| `store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
-| `context.ts` | the one context the report's components read: dataset, state, palette, formatters |
-| `main.tsx` | entry: mounts `<App>` |
-| `App.tsx` | upload screen until an analysis exists, report after; owns the theme attribute |
-| `Upload.tsx` | picker, folder drop, hand-off to the engine |
-| `Report.tsx` | header, thesis strip, breakdown section, footnotes |
-| `Mosaic.tsx` | the primary chart — column width = share of bill — and the hover readout |
-| `Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |
-| `Panels.tsx` | the same data ranked and labelled instead of packed |
-| `Ledger.tsx` | the table, where identity does not rest on colour |
-| `Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X |
-| `Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with a caption written |
-| `snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |
-| `style.css` | tokens and layout |
+| `src/engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
+| `src/model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
+| `src/store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
+| `src/context.ts` | the one context the report's components read: dataset, state, palette, formatters |
+| `src/main.tsx` | entry: mounts `<App>` |
+| `src/App.tsx` | upload screen until an analysis exists, report after; owns the theme attribute |
+| `src/Upload.tsx` | picker, folder drop, hand-off to the engine |
+| `src/Report.tsx` | header, thesis strip, breakdown section, footnotes |
+| `src/Mosaic.tsx` | the primary chart — column width = share of bill — and the hover readout |
+| `src/Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |
+| `src/Panels.tsx` | the same data ranked and labelled instead of packed |
+| `src/Ledger.tsx` | the table, where identity does not rest on colour |
+| `src/Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X |
+| `src/Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with a caption written |
+| `src/snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |
+| `src/style.css` | tokens and layout |
 | `vite.config.ts` | build: bundles and inlines everything into `cost-report.html`, and asserts it is self-contained |
 | `vitest.config.ts` | the render suite only — deliberately without the build plugins, so tests can never write the deliverable |
 | `tsconfig.json` | type-checking only — `noEmit`; Vite and Node do the erasing |
@@ -246,7 +246,7 @@ so a few lines get you any view of the data you want.
 node --input-type=module -e '
   import { readdirSync, readFileSync } from "node:fs";
   import { join } from "node:path";
-  import { analyze } from "./engine.ts";
+  import { analyze } from "./src/engine.ts";
   const dir = process.argv[1];
   const files = readdirSync(dir).filter(f => f.endsWith(".jsonl"))
     .map(name => ({ name, text: readFileSync(join(dir, name), "utf8") }));

@@ -8,7 +8,7 @@
      node test/model.test.ts ~/.claude/projects/<project>
 */
 
-import { analyze, type Dataset } from "../engine.ts"
+import { analyze, type Dataset } from "../src/engine.ts"
 import {
   fold,
   focusOf,
@@ -24,7 +24,7 @@ import {
   SUN_RINGS,
   vouched,
   type CostNode,
-} from "../model.ts"
+} from "../src/model.ts"
 import { corpus } from "./fixture.ts"
 
 let fails = 0

@@ -8,9 +8,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { analyze } from "../engine.ts"
-import { Report } from "../Report.tsx"
-import { getHover, getState, resetState, setHover, setState, type ViewState } from "../store.ts"
+import { analyze } from "../src/engine.ts"
+import { Report } from "../src/Report.tsx"
+import { getHover, getState, resetState, setHover, setState, type ViewState } from "../src/store.ts"
 import { corpus } from "./fixture.ts"
 
 const data = analyze(corpus(process.env.TRANSCRIPT_DIR))
