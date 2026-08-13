@@ -76,7 +76,7 @@ const Column = memo(function Column({ node, gname, cumFrom, cumTo, width, hit, a
           );
         })}
       </div>
-      <button type="button" className="colhead" style={{ borderTop: `2px solid ${h}` }}
+      <button type="button" className="colhead"
         onClick={() => drill(node.name)}
         {...hoverBind({ key, name: node.name, cost: node.cost, under: null, group: gname })}>
         <span className="cn" style={{ fontSize: width < 0.08 ? "10.5px" : "11.5px" }}>
