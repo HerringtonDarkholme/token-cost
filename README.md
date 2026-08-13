@@ -220,8 +220,8 @@ file tool under any name gets the same treatment.
 | `Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |
 | `Panels.tsx` | the same data ranked and labelled instead of packed |
 | `Ledger.tsx` | the table, where identity does not rest on colour |
-| `Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy link, copy summary |
-| `Share.tsx` | share the chart on X: card → PNG on the clipboard (or on disk), composer opened with the caption |
+| `Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X |
+| `Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with the caption written |
 | `snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |
 | `style.css` | tokens and layout |
 | `vite.config.ts` | build: bundles and inlines everything into `cost-report.html`, and asserts it is self-contained |

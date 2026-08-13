@@ -273,48 +273,48 @@ export function ledger(d: Dataset, path: string[], open: Record<string, boolean>
   return { rows, recon: +recon.toFixed(2), rootCost: at.node.cost || 1 };
 }
 
-/* ---------- summary text ---------- */
+/* ---------- the post ---------- */
 
-/** The clipboard summary. Text, not markup, so it belongs to the model rather than to the
- *  button that copies it. */
-export function summaryText(d: Dataset, pctOnly: boolean, amt: (c: number) => string): string {
-  const I = d.insights;
-  const top = d.groups[0] || { name: "—", cost: 0 };
-  const head = pctOnly
-    ? `${d.days || "?"} days of Claude Code, itemised:`
-    : `${money(d.total)} of Claude Code in ${d.days || "?"} days, itemised:`;
-  return [
-    head,
-    `· ${top.name} ${amt(top.cost)} — the largest single driver`,
-    `· thinking ${amt(I.thinking)} — ${(I.thinking / (d.output || 1) * 100).toFixed(0)}% of output tokens, `
-      + `${(I.thinking / (d.total || 1) * 100).toFixed(1)}% of the bill`,
-    `· prompt + schemas ${amt(I.fixed)} fixed, paid on all ${count(d.requests)} requests`,
-    `· my typing ${amt(I.typed)} (${(I.typed / (d.total || 1) * 100).toFixed(1)}%)`,
-    "",
-    "Cost is carry cost: every token is re-billed on every request it survives.",
-  ].join("\n");
-}
-
-/** How long a post can be before the composer starts refusing it. Nothing here is close to
- *  it, but a line item is a name from someone else's transcript, so the ceiling is enforced
- *  rather than assumed. */
+/** How long a post can be before the composer starts refusing it. Nothing written here is
+ *  close to it, but a group name is a heading someone else's transcript decides the length
+ *  of, so the ceiling is enforced rather than assumed. */
 export const POST_MAX = 280;
 
-/** The caption that travels with the shared image. Deliberately short and free of figures
- *  the picture already carries: the image is the evidence, the text is the claim.
+/** How a group is said out loud. The chart's names are column headings -- "Tools · content
+ *  read in" -- and a heading dropped into a sentence reads as a spreadsheet. A post is a
+ *  sentence, so each group gets a phrase. Anything unmapped falls back to the heading. */
+const SAID: Partial<Record<GroupId, string>> = {
+  shell: "shell commands",
+  ingest: "what tools read into the context",
+  emit: "what tools wrote back out",
+  twoway: "tool traffic, both directions",
+  output: "the model's own output",
+  preamble: "the system prompt and tool schemas",
+  harness: "harness scaffolding and reminders",
+  media: "images and attachments",
+  typed: "the part I actually typed",
+};
+
+/** The caption that travels with the shared image.
+ *
+ *  Written as a post, not as a summary: the image is already the evidence, so the text gets
+ *  one number worth stopping on and the claim that number is there to support. Every figure
+ *  the picture carries anyway is left to the picture.
  *
  *  It honours the masked lens for the same reason the header does -- a reader who covered
  *  the dollars to share a screen has said they do not want the total published. */
 export function postText(d: Dataset, pctOnly: boolean): string {
-  const top = d.groups[0] || { name: "—", cost: 0 };
-  const name = top.name.length > 40 ? top.name.slice(0, 39).trimEnd() + "…" : top.name;
+  const top = d.groups[0];
+  const heading = top ? (SAID[top.id] || top.name.toLowerCase()) : "—";
+  const said = heading.length > 44 ? heading.slice(0, 43).trimEnd() + "…" : heading;
   const scope = d.days ? `${d.days} day${d.days === 1 ? "" : "s"}`
                        : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`;
   const out = [
-    pctOnly ? `${scope} of Claude Code, itemised.`
-            : `${money(d.total)} of Claude Code across ${scope}, itemised.`,
-    `Biggest line: ${name}, ${pctOf(top.cost, d.total).toFixed(0)}% of the bill.`,
-    "It's a carry bill, not a usage bill — every request re-bills the whole context.",
+    pctOnly ? `Itemised ${scope} of my Claude Code bill.`
+            : `Itemised my Claude Code bill: ${money(d.total)} over ${scope}.`,
+    `Biggest line: ${said}, ${pctOf(top ? top.cost : 0, d.total).toFixed(0)}% of it.`,
+    "You don't pay for what the model writes. You pay rent on your context — "
+      + "every request re-bills the whole thing.",
   ].join("\n\n");
   return out.length > POST_MAX ? out.slice(0, POST_MAX - 1).trimEnd() + "…" : out;
 }
