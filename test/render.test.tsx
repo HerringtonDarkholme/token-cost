@@ -503,13 +503,18 @@ describe("the card's two faces", () => {
     /* And the route into that hidden folder is inside the card, beside the button that opens the
        dialog it describes, rather than in the help below the fold. */
     expect(box.querySelector(".invite .howto p")?.textContent).toMatch(/claude/)
-    /* Three marks and exactly one pressed: the platform is guessed from the user agent rather
-       than asked for, and the other two are there for when the guess is wrong. Each is a picture,
-       so each has to carry the word as its name. */
-    const marks = [...box.querySelectorAll(".howto button[data-icon]")]
-    expect(marks.map((b) => b.getAttribute("aria-label"))).toEqual(["macOS", "Windows", "Linux"])
-    expect(box.querySelectorAll('.howto button[aria-pressed="true"]')).toHaveLength(1)
-    for (const b of marks) expect(b.querySelector(".glyph")).not.toBeNull()
+    /* One platform on show, not three: it is guessed from the user agent, and a row of all three
+       spends the space on the two that are wrong for any given reader. The face is the platform
+       it is on, so what has to say the thing is pressable at all is the hint -- and pressing has
+       to walk to the next one. */
+    const sw = box.querySelector<HTMLButtonElement>(".howto .osbtn")
+    expect(box.querySelectorAll(".howto button")).toHaveLength(1)
+    expect(["macOS", "Windows", "Linux"]).toContain(sw!.textContent!.trim())
+    const tip = box.querySelector<HTMLElement>('.howto [role="tooltip"]')
+    expect(sw!.getAttribute("aria-describedby")).toBe(tip!.id)
+    const before = tip!.textContent
+    act(() => sw!.click())
+    expect(tip!.textContent).not.toBe(before)
     /* One control, and it is the last one in the bar: the theme switch is the anchor
        everything else grows leftward from, so it must not have anything to its right. */
     const bar = [...box.querySelectorAll(".toolbar > *")]

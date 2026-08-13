@@ -148,7 +148,8 @@ dialog press <kbd>⇧⌘G</kbd> and paste `~/.claude/projects` (or <kbd>⇧⌘.<
 hidden files); on Windows type `%USERPROFILE%\.claude\projects` into the *Folder* box; on
 Linux press <kbd>Ctrl</kbd>+<kbd>L</kbd>. Or run `open ~/.claude/projects` and drag the folder
 onto the page. The empty card carries whichever of those three applies to you, beside the
-button that opens the dialog it describes.
+button that opens the dialog it describes — it guesses from the user agent and shows that one
+line, and the platform beside it is a button that walks to the next when the guess is wrong.
 
 ## What it computes, and why it isn't just token counts
 

@@ -1164,7 +1164,12 @@ tfoot .n {
   text-wrap: pretty;
 }
 /* The middle band takes the slack, so the invitation sits on the card's centre line whatever
-   the window has done to the two bands around it. */
+   the window has done to the two bands around it.
+
+   The gap is the ask's own rhythm -- heading to button -- and nothing else uses it: everything
+   here sat one flat 16px apart, which put the heading, the button and the help in a single clump
+   with a hundred pixels of empty card around it. Air between the *groups* is what separates
+   them; air inside a group is what holds it together, and the two cannot be the same number. */
 .invite {
   flex: 1;
   min-height: 0;
@@ -1172,8 +1177,14 @@ tfoot .n {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 18px;
   width: 100%;
+  /* The status line below the group is empty until a folder is picked, and an empty line still
+     takes its 22px and the gap above it -- so centring on the flow box sat the whole visible
+     group half of that above the middle of the card, which is the lopsided look. The padding
+     hands that space back to the top. It goes the other way while a status *is* showing, which
+     is the right trade: one is the state every reader sees, the other lasts a few seconds. */
+  padding-top: 40px;
 }
 .dropzone h2 {
   font-size: clamp(21px, 2.4vw, 27px);
@@ -1193,27 +1204,27 @@ tfoot .n {
   justify-content: center;
   flex-wrap: wrap;
 }
-/* The way into the hidden folder: sunk rather than outlined, so it reads as a note attached to
-   the button above it rather than a second thing to decide about. Two rows, and the split is the
-   point -- what the switch does is choose the line below it, so running label, switch and
-   sentence together in one row made the platform read as the end of the instruction. */
+/* The way into the hidden folder. No panel, no border, no rule between the rows: it was a sunk
+   grey box with a hairline, inside a card that is already a frame, which made two lines of help
+   read as a second thing to decide about. Space separates it now -- the only thing here that is
+   drawn is the switch, because the switch is the only thing you can press. */
 .howto {
   width: 100%;
-  max-width: 62ch;
-  text-align: left;
-  background: var(--sunk);
-  border: 1px solid var(--hair);
-  padding: 9px 13px 11px;
+  /* A shade under the heading's own measure, so the block below it lines up with the block
+     above rather than introducing a third width down the middle of the card. */
+  max-width: 58ch;
+  text-align: center;
+  /* The step from the ask to the help: on top of the band's own 18, so the button and the note
+     under it are two things rather than one stack of four evenly spaced rows. */
+  margin: 16px 0 0;
 }
 .howhead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 6px 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--hair);
-  margin-bottom: 9px;
+  gap: 4px 9px;
+  margin-bottom: 7px;
 }
 .howlbl {
   font-family: var(--mono);
@@ -1222,54 +1233,63 @@ tfoot .n {
   text-transform: uppercase;
   color: var(--ink3);
 }
+/* The platform, and the way to the next one. A chip rather than a bare word: a word set in the
+   same ink as the label beside it is not obviously pressable, and this is the control a reader
+   only reaches for when the guess about their machine was wrong -- so it has to look pressable
+   before they know they need it. Sized off the longest name so walking the three does not shunt
+   the row about. */
+.osbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 8px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  color: var(--ink2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-smooth-out),
+    border-color var(--duration-fast) var(--ease-smooth-out);
+}
+.osbtn:hover,
+.osbtn:focus-visible {
+  color: var(--ink);
+  border-color: var(--rule);
+}
+.osname {
+  min-width: 7ch;
+  text-align: left;
+}
+.oscaret {
+  width: 9px;
+  height: 9px;
+  color: var(--ink3);
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.osbtn:hover .oscaret {
+  transform: translateY(1px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .oscaret {
+    transition: none;
+  }
+}
 /* Overriding `.dropzone p`, which is a class and a type and so outranks a bare class however
    far below it this is written. */
+/* `balance` rather than `pretty`: this is a two-line centred block, which is the case the two
+   algorithms disagree on -- `pretty` only protects the last line from being a runt, and a
+   centred pair of lines wants both the same length. */
 .howto p {
   margin: 0;
   max-width: none;
   font-size: 13px;
+  line-height: 1.7;
   color: var(--ink2);
-  text-wrap: pretty;
-}
-/* The platform marks, given depth rather than a pointer-tracked parallax: the picked one stands
-   a pixel forward at full size and full ink, the other two sit back, smaller and faded. Nothing
-   else in this instrument follows the cursor -- the hover marks answer *what is under the
-   pointer*, not where it is -- so a mouse-driven parallax would be the one gesture here that
-   does. What is in character is layers moving at their own rates, which is what this is: the
-   pill slides at `--tabs-dur` while the marks rise and fall at their own, slower, so the row
-   resolves in two beats instead of one. */
-.howto .glyph {
-  /* Two pixels over the toolbar's 14: a penguin has a face in it, and the toolbar's size closes
-     the eyes up into the head. */
-  width: 16px;
-  height: 16px;
-  transition:
-    transform var(--osmark-dur) var(--osmark-ease),
-    opacity var(--osmark-dur) var(--osmark-ease);
-}
-.howto .t-tab[aria-pressed="false"] .glyph {
-  transform: translateY(1.5px) scale(var(--osmark-back));
-  /* Held above a half rather than at 0.45: the same fade over a dark panel is a mark you have to
-     look for, and these are the control's only affordance. */
-  opacity: 0.55;
-}
-.howto .t-tab[aria-pressed="true"] .glyph {
-  transform: translateY(-1px) scale(var(--osmark-fore));
-}
-/* Hovering one of the far marks brings it part of the way forward -- the answer to "can I press
-   this", given in the same dimension the control is already using. */
-.howto .t-tab:hover .glyph {
-  opacity: 0.85;
-  transform: translateY(0) scale(0.95);
-}
-.howto .t-tab[aria-pressed="true"]:hover .glyph {
-  opacity: 1;
-  transform: translateY(-1px) scale(var(--osmark-fore));
-}
-@media (prefers-reduced-motion: reduce) {
-  .howto .glyph {
-    transition: none;
-  }
+  text-wrap: balance;
 }
 .howto code {
   font-family: var(--mono);
@@ -1475,12 +1495,6 @@ kbd {
   --tabs-text-muted: var(--ink2);
   --tabs-text-active: var(--ink);
   --tabs-pill-bg: var(--ink);
-  /* Platform marks — depth on pick. Deliberately slower than the pill they sit on: two rates
-     is the whole effect, and matching `--tabs-dur` would collapse it back into one move. */
-  --osmark-dur: var(--duration-slow);
-  --osmark-ease: var(--ease-smooth-out);
-  --osmark-back: 0.84; /* the two not picked: smaller, and a pixel and a half further away */
-  --osmark-fore: 1.06; /* the picked one, standing forward of them */
   /* Number pop-in */
   --digit-dur: var(--duration-very-slow);
   --digit-distance: var(--distance-base);

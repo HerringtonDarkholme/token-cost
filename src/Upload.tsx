@@ -14,63 +14,61 @@
    there never sees a report at all, and help that stands below the fold assumes they will go
    looking for it. */
 
-import { useRef, useState, type ReactNode } from "react"
+import { useId, useRef, useState, type ReactNode } from "react"
 import { analyze, type Analysis, type RawFile } from "./engine.ts"
 import { TextSwap } from "./Motion.tsx"
-import { Seg, type SegOption } from "./Seg.tsx"
+import { Tip } from "./Tip.tsx"
 
 const MAX_LISTED = 60
 
 type Os = "mac" | "win" | "linux"
 
-/* The three platforms as marks rather than words, drawn to the same recipe as the theme glyphs:
-   one 16-unit box, stroked in `currentColor` at one weight, so each inverts under the pill
-   instead of needing a second colour -- and so the row reads as one control rather than as three
-   logos pasted in. Filled silhouettes were the obvious way to draw these and the wrong one: a
-   solid shape cannot invert, and at 14px a filled penguin is a pear. */
-function AppleMark(): React.JSX.Element {
-  return (
-    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <path d="M10.55 8.35c0-1.35.95-2 1-2.05-.55-.8-1.4-.9-1.7-.9-.75-.05-1.45.4-1.85.4-.4 0-.98-.4-1.6-.4-.85 0-1.6.5-2.05 1.25-.85 1.5-.2 3.7.6 4.9.4.6.9 1.25 1.55 1.25.6-.03.85-.4 1.6-.4.75 0 .95.4 1.6.4.65-.02 1.1-.6 1.5-1.2.35-.5.5-1 .5-1.05-.05 0-1.15-.45-1.15-1.8Z" />
-      <path d="M9.35 4.15c.35-.4.55-.95.5-1.5-.5.02-1.1.32-1.45.72-.32.37-.6.95-.52 1.5.55.05 1.12-.28 1.47-.72Z" />
-    </svg>
-  )
-}
-
-function WindowsMark(): React.JSX.Element {
-  return (
-    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <rect x="2.1" y="2.1" width="5.1" height="5.1" />
-      <rect x="8.8" y="2.1" width="5.1" height="5.1" />
-      <rect x="2.1" y="8.8" width="5.1" height="5.1" />
-      <rect x="8.8" y="8.8" width="5.1" height="5.1" />
-    </svg>
-  )
-}
-
-/** A penguin, which is the one of the three that has to be *drawn* rather than traced: body,
- *  eyes, beak, feet, and nothing else, because every further line closes up at this size. The
- *  first attempt read as a vase -- the body has to widen to the floor and the feet have to break
- *  the outline, or the silhouette is a pear with two dots in it. */
-function TuxMark(): React.JSX.Element {
-  return (
-    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <path d="M8 1.5c1.45 0 2.35 1.15 2.35 2.6 0 .45-.06.85-.06 1.15 0 .45.62.85 1.15 1.7.62.95 1.05 2.2 1.15 3.2.1 1-.35 1.75-1.1 2.2-.85.5-2.05.75-3.49.75s-2.64-.25-3.49-.75c-.75-.45-1.2-1.2-1.1-2.2.1-1 .53-2.25 1.15-3.2.53-.85 1.15-1.25 1.15-1.7 0-.3-.06-.7-.06-1.15C5.65 2.65 6.55 1.5 8 1.5Z" />
-      <path d="M7.15 4.3h.01M8.85 4.3h.01" />
-      <path d="m7.4 5.35.6.65.6-.65" />
-      <path d="M6.2 13.1c-.55.75-1.5 1.15-2.35 1M9.8 13.1c.55.75 1.5 1.15 2.35 1" />
-    </svg>
-  )
-}
-
-const PLATFORMS: ReadonlyArray<SegOption<Os>> = [
-  { value: "mac", label: "macOS", icon: <AppleMark />, tip: "The Finder dialog’s way in" },
-  { value: "win", label: "Windows", icon: <WindowsMark />, tip: "The Explorer dialog’s way in" },
-  { value: "linux", label: "Linux", icon: <TuxMark />, tip: "The GTK dialog’s way in" },
+/* The three platforms as their names, in the order the switch walks them. Drawn as logos once --
+   an apple, four panes, a penguin -- which was a worse control on every count: three marks where
+   two are always wrong, a penguin that is illegible at the size a control wants, and a row of
+   borrowed trademarks in a page that otherwise draws its own glyphs. A word says which platform
+   with no drawing at all. */
+const PLATFORMS: ReadonlyArray<{ value: Os; label: string }> = [
+  { value: "mac", label: "macOS" },
+  { value: "win", label: "Windows" },
+  { value: "linux", label: "Linux" },
 ]
 
+/** The one platform, and the way to the next. Not a segmented control: two of the three options
+ *  are wrong for any given reader, and a row that shows all three spends the space on the two
+ *  that do not apply. The guess is right nearly always, so the odd reader it fails is served by
+ *  a click rather than by a permanent row -- press it and it walks to the next platform. */
+function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JSX.Element {
+  const tip = useId()
+  const at = PLATFORMS.findIndex((p) => p.value === os)
+  const next = PLATFORMS[(at + 1) % PLATFORMS.length]
+  return (
+    <span className="t-tt-host">
+      <button
+        type="button"
+        className="osbtn t-tt-trigger"
+        aria-describedby={tip}
+        onClick={() => onPick(next.value)}
+      >
+        <span className="osname">
+          <TextSwap token={os}>{PLATFORMS[at].label}</TextSwap>
+        </span>
+        {/* The one mark left on this control, and it is about the control rather than about any
+            platform: a chevron is what says "there are others behind this". Same glyph recipe as
+            the toolbar's, at the size a caret wants. */}
+        <svg className="glyph oscaret" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="m3.6 6.2 4.4 4.4 4.4-4.4" />
+        </svg>
+      </button>
+      <Tip id={tip}>
+        Not {PLATFORMS[at].label}? Press for the {next.label} route.
+      </Tip>
+    </span>
+  )
+}
+
 /** Which dialog the reader is about to meet. A guess from the user agent rather than a question,
- *  because two of the three answers are wrong for any given reader and the tabs are right there
+ *  because two of the three answers are wrong for any given reader and the switch is right there
  *  when the guess is. Linux is the fallback: its instruction is the GTK dialog's, which is also
  *  the least harmful thing to show someone whose browser reports something unrecognisable. */
 function guessOs(): Os {
@@ -81,15 +79,20 @@ function guessOs(): Os {
 }
 
 /** One line per platform, and it is the keystrokes rather than prose about them: this is read
- *  with a file dialog already open on top of it. Each was two sentences once, with the
- *  show-hidden-files route as a second line -- but a reader stuck at a dialog needs one way
- *  through it, not a choice of two. The rest is in the help below the card. */
+ *  with a file dialog already open on top of it.
+ *
+ *  macOS gets both routes because they answer different questions. ⇧⌘. unhides every dotfile in
+ *  the dialog, which is the one to reach for when you want to see where you are going; ⇧⌘G takes
+ *  a typed path and skips the looking entirely. The other two have only the typed route -- their
+ *  dialogs have a location box, so unhiding is not a separate trick. */
 const HOW: Record<Os, ReactNode> = {
   mac: (
     <>
       In the dialog press <kbd>⇧</kbd>
       <kbd>⌘</kbd>
-      <kbd>G</kbd>, paste <code>~/.claude/projects</code>, press <kbd>return</kbd>.
+      <kbd>.</kbd> to reveal hidden folders. Or <kbd>⇧</kbd>
+      <kbd>⌘</kbd>
+      <kbd>G</kbd> and paste <code>~/.claude/projects</code>.
     </>
   ),
   win: (
@@ -288,12 +291,17 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
             the fold, which assumed the reader would go looking: `.claude` is a dotfile, so the
             picker they are about to open hides the folder this page just asked for, and a reader
             who cannot get there never sees a report at all. It is one line because only one
-            platform's line applies -- theirs is picked for them, and the tabs are for when the
+            platform's line applies -- theirs is picked for them, and the switch is for when the
             guess is wrong. */}
         <div className="howto">
-          {/* Two rows on a rule, rather than one row of label, sentence and switch run together:
-              the switch decides *which* instruction is drawn, so it belongs above the line it
-              governs, not inline with it where it reads as the end of the sentence.
+          {/* Two rows, rather than one row of label, sentence and switch run together: the switch
+              decides *which* instruction is drawn, so it belongs above the line it governs, not
+              inline with it where it reads as the end of the sentence.
+
+              No box around it any more. Sunk panel, hairline, rule between the rows -- three
+              pieces of chrome for two lines of help, sitting inside a card that is itself a
+              frame, which made the way in look like a second thing to decide about rather than
+              the answer to the heading above it. What separates it now is the space around it.
 
               No path in the label: it is set in mono caps, which would print a dotfile's name as
               `.CLAUDE`, and the path is already the loudest thing in the heading above. Why the
@@ -301,7 +309,7 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
               is the keystrokes. */}
           <div className="howhead">
             <span className="howlbl">The folder is hidden</span>
-            <Seg options={PLATFORMS} value={os} onPick={setOs} nosnap />
+            <OsSwitch os={os} onPick={setOs} />
           </div>
           {/* Keyed on the platform, so switching plays the same swap the report's figures do
               rather than substituting the words underneath the reader. Inside the paragraph
