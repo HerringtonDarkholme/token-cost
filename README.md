@@ -151,6 +151,15 @@ onto the page. The empty card carries whichever of those three applies to you, b
 button that opens the dialog it describes — it guesses from the user agent and shows that one
 line, and the platform beside it is a button that walks to the next when the guess is wrong.
 
+**The pick is the answer, and the page never asks about it twice.** Where a folder came from is
+read off the paths — a `.claude/projects` on the way down, or a directory named the way Claude
+Code names a project's — so a folder that turns out to hold nothing billable is told what it is
+rather than asked. The button goes through the File System Access API where the browser has it
+(Chrome, Edge, over https), whose prompt asks for permission to *read* the folder; a plain file
+input ends with the browser asking whether to "upload" a thousand files to a page that has no
+server in it. Firefox, Safari and the saved `file://` copy have no such API and fall back to the
+input, and to that wording — the files still never leave the page either way.
+
 ## What it computes, and why it isn't just token counts
 
 Billing is **per request**, and each request bills the *entire* input prefix — as fresh input,

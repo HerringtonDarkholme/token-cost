@@ -226,6 +226,43 @@ export function originOf(paths: readonly string[]): Origin {
   return { root: roots.size === 1 && !roots.has("") ? [...roots][0] : null, claude }
 }
 
+/** Walk a folder handed over by `showDirectoryPicker`. Depth-first, the whole tree, because a
+ *  transcript sits two levels down from the store: `projects/<project>/<session>.jsonl`.
+ *
+ *  `getFile()` is asked for every leaf rather than only the `.jsonl` ones, and that is not
+ *  waste: it hands back a lazy handle, not the bytes, and it is what lets the count of *what
+ *  was in the folder* survive down to the message that has to say the folder held no
+ *  transcripts. Reading happens later, and only for the files that got through the filter. */
+async function walkDir(dir: FileSystemDirectoryHandle, at: string, out: Picked[]): Promise<void> {
+  for await (const kid of dir.values()) {
+    const path = `${at}/${kid.name}`
+    if (kid.kind === "directory") await walkDir(kid, path, out)
+    else out.push({ file: await kid.getFile(), path })
+  }
+}
+
+/** The folder picker that does not say "upload".
+ *
+ *  A `<input webkitdirectory>` pick ends in a browser confirmation — "Upload 1,234 files to this
+ *  site?" — which is a fair warning about what a file input normally means and a false statement
+ *  about this page: there is no server here, nothing is sent, and the reader has just answered
+ *  that exact question in the dialog behind it. `showDirectoryPicker` asks for the one thing that
+ *  is actually happening, which is permission to *read* the folder.
+ *
+ *  It is not everywhere, though, and the fallback is not an edge case: Firefox and Safari have
+ *  none of this, and the API is refused outright on `file://` — which is how the saved
+ *  single-file page is meant to be opened. So the input stays, and this is the better road when
+ *  there is one. `null` means the reader closed the dialog: nothing to say about that.
+ *
+ *  `id` is what makes the second visit open where the first one ended, which matters more here
+ *  than it looks -- the folder this asks for is hidden, so arriving at it is the expensive part. */
+async function pickFolder(): Promise<Picked[] | null> {
+  const dir = await showDirectoryPicker({ id: "claude-projects", mode: "read" })
+  const out: Picked[] = []
+  await walkDir(dir, dir.name, out)
+  return out
+}
+
 /** Walk a dropped folder. `webkitGetAsEntry` is non-standard and the DOM types declare it
  *  as always present, but it is the entry point that makes dropping a *directory* work at
  *  all, so it stays feature-detected rather than assumed. */
@@ -265,6 +302,26 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
   const dirPicker = useRef<HTMLInputElement>(null)
 
   const say = (node: ReactNode, err = false): void => setStatus({ node, err })
+
+  /** Pressing the button. The good road first, the input behind it -- and the fall back happens
+   *  on the failure rather than on a guess about which browser this is, because the thing that
+   *  decides it is not the browser at all: the same Chrome that has the picker refuses it on a
+   *  `file://` page. */
+  async function choose(): Promise<void> {
+    if (typeof showDirectoryPicker === "function") {
+      try {
+        const picked = await pickFolder()
+        if (picked) await handle(picked)
+        return
+      } catch (e) {
+        /* Closing the dialog is not a failure and gets no message -- the same silence a
+           cancelled file input leaves. `AbortError` is also what a folder the browser judges
+           too sensitive comes back as, and it says so itself before it gets here. */
+        if ((e as DOMException).name === "AbortError") return
+      }
+    }
+    dirPicker.current?.click()
+  }
 
   async function handle(picked: Picked[]): Promise<void> {
     const files = picked.filter((p) => p.file.name.endsWith(".jsonl"))
@@ -434,7 +491,13 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
             One line that fits on one line: a subtitle that wraps is a paragraph. */}
         <p className="lede">Chart your bill: every tool, every subcommand, every dollar.</p>
         <div className="picks">
-          <button className="btn primary" type="button" onClick={() => dirPicker.current?.click()}>
+          <button
+            className="btn primary"
+            type="button"
+            onClick={() => {
+              void choose()
+            }}
+          >
             <FolderMark />
             Choose folder
           </button>

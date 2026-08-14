@@ -528,6 +528,69 @@ describe("the card's two faces", () => {
     expect(box.querySelector('button[aria-label="New analysis"]')).toBeNull()
   })
 
+  /* Which of the two roads the button takes.
+
+     The file input is the one that works everywhere and the one that ends in a browser asking
+     whether to "upload" a thousand files to a page that has no server in it. `showDirectoryPicker`
+     asks for what is actually happening -- permission to read a folder -- so it is tried first
+     and the input is what is left when it is not there. Which is not a rare case: Firefox and
+     Safari do not have it, and Chrome itself refuses it on the `file://` page this build is
+     meant to be saved as. So what has to hold is that the input is still reachable when the
+     picker is missing *and* when it fails, and that a closed dialog is not treated as either. */
+  describe("the way into a folder", () => {
+    const picker = (
+      impl: ((...args: unknown[]) => Promise<unknown>) | undefined,
+    ): (() => number) => {
+      const g = globalThis as unknown as Record<string, unknown>
+      if (impl) g.showDirectoryPicker = impl
+      else delete g.showDirectoryPicker
+      turn(null)
+      const input = box.querySelector<HTMLInputElement>(".dropzone input")!
+      let clicks = 0
+      input.addEventListener("click", () => clicks++)
+      return () => clicks
+    }
+    const press = async (): Promise<void> => {
+      const btn = box.querySelector<HTMLButtonElement>(".picks .btn")!
+      await act(async () => {
+        btn.click()
+      })
+    }
+    const fail = (name: string) => (): Promise<never> =>
+      Promise.reject(Object.assign(new Error(name), { name }))
+
+    afterAll(() => {
+      delete (globalThis as unknown as Record<string, unknown>).showDirectoryPicker
+    })
+
+    it("falls back to the input when the browser has no picker", async () => {
+      const clicks = picker(undefined)
+      await press()
+      expect(clicks()).toBe(1)
+    })
+
+    it("falls back when the picker is there but refused, as on a file:// page", async () => {
+      // `SecurityError` is what a `file://` origin comes back with: the road exists, not here.
+      const clicks = picker(fail("SecurityError"))
+      await press()
+      expect(clicks()).toBe(1)
+    })
+
+    it("takes the picker when there is one, and lets a closed dialog be", async () => {
+      let asked = 0
+      const clicks = picker(() => {
+        asked++
+        return fail("AbortError")()
+      })
+      await press()
+      expect(asked).toBe(1)
+      /* Nothing behind it: a dismissed dialog is the reader saying no, and re-opening a second
+         one on top of it -- the one that says "upload" -- would be the page arguing. */
+      expect(clicks()).toBe(0)
+      expect(box.querySelector(".status")?.textContent).toBe("")
+    })
+  })
+
   it("a file changes what the card holds, not the card", () => {
     turn(null)
     const card = box.querySelector(".card")
