@@ -1206,6 +1206,12 @@ tfoot .n {
   gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
+  /* On top of the band's own 18, because the button is not one of the lines around it: the
+     heading and the lede are a sentence in two parts and belong together at 18, and the help
+     below already stands off by 34. At the band's flat gap the button read as the third line of
+     the ask rather than as the thing the ask is asking for -- and it is the one control on the
+     page that has to be pressed, so it gets the room a target wants around it. */
+  margin: 12px 0 0;
 }
 /* The way into the hidden folder. No panel, no border, no rule between the rows: it was a sunk
    grey box with a hairline, inside a card that is already a frame, which made two lines of help
