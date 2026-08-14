@@ -1508,11 +1508,17 @@ tfoot .n {
 .where .whead:first-child {
   margin-top: 0;
 }
+/* Set at the size of the sentence around it rather than a point under it. A key cap is mostly
+   box, and the two that matter most here are ⇧ and ⌘ -- symbols the font draws well inside their
+   em, so a smaller size leaves a glyph rattling around in a chip. Centred and floored at a
+   near-square width, so a single character is a key rather than a sliver. */
 kbd {
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 13px;
   line-height: 1;
   display: inline-block;
+  min-width: 1.05em;
+  text-align: center;
   padding: 3px 5px;
   margin: 0 1px;
   color: var(--ink);
