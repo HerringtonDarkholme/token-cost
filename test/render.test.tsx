@@ -589,6 +589,59 @@ describe("the card's two faces", () => {
       expect(clicks()).toBe(0)
       expect(box.querySelector(".status")?.textContent).toBe("")
     })
+
+    /* And what a pick does to the card: the note about the hidden folder is help for a dialog
+       that has closed, so the transcripts take its place in the same box -- and give it back
+       when the folder turns out to be the wrong one, because a reader who has to pick again
+       needs the route rather than the names of the files that failed. */
+    it("puts the transcripts where the way in was, and takes them back on a bad folder", async () => {
+      let open!: () => void
+      const gate = new Promise<void>((ready) => {
+        open = ready
+      })
+      /* A transcript that is held open: the assertions in the middle are about the state the
+         page is in *while* it reads, which is over in a microtask if nothing holds it. */
+      const file = { name: "0f2c9a.jsonl", text: () => gate.then(() => "") }
+      const dir = {
+        name: "-Users-me-code-thing",
+        values: () =>
+          (async function* () {
+            yield { kind: "file", name: file.name, getFile: () => Promise.resolve(file) }
+          })(),
+      }
+      picker(() => Promise.resolve(dir))
+      const btn = box.querySelector<HTMLButtonElement>(".picks .btn")!
+      await act(async () => {
+        btn.click()
+        await new Promise((done) => setTimeout(done, 0))
+      })
+
+      const swap = box.querySelector(".swap")!
+      expect(swap.getAttribute("data-face")).toBe("files")
+      // Both faces are in the box; only one of them is on show.
+      expect(swap.querySelector(".howto")?.getAttribute("data-on")).toBe("0")
+      const found = swap.querySelector(".found")!
+      expect(found.getAttribute("data-on")).toBe("1")
+      expect(found.getAttribute("data-busy")).toBe("1")
+      expect([...found.querySelectorAll(".filenm")].map((e) => e.textContent)).toEqual([
+        "0f2c9a.jsonl",
+      ])
+      // The head of the list is what narrates the work, so nothing is said twice.
+      expect(found.querySelector(".foundlbl")?.textContent).toMatch(/Reading 1 transcript/)
+      expect(box.querySelector(".status")?.textContent).toBe("")
+
+      /* An empty transcript is a folder with nothing billed in it, which is the road back: the
+         list retreats, the way in returns, and the reason names the folder that was picked. */
+      await act(async () => {
+        open()
+        await new Promise((done) => setTimeout(done, 600))
+      })
+      expect(swap.getAttribute("data-face")).toBe("how")
+      expect(swap.querySelector(".howto")?.getAttribute("data-on")).toBe("1")
+      expect(found.getAttribute("data-on")).toBe("0")
+      expect(box.querySelector(".status")?.textContent).toMatch(/-Users-me-code-thing/)
+      expect(box.querySelector(".status")?.textContent).toMatch(/has been billed/)
+    })
   })
 
   it("a file changes what the card holds, not the card", () => {

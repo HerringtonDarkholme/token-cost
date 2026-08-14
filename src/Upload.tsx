@@ -19,14 +19,29 @@
    back with "are these really your transcripts?" is asking a question it can answer itself. It
    can, because every file arrives with the path it sat at inside the chosen folder -- see
    `originOf` -- so when a pick turns out to be empty or unbilled, what is said back names the
-   folder that was picked and whether it was the transcript store at all. */
+   folder that was picked and whether it was the transcript store at all.
+
+   And the moment it has been chosen, the route into the hidden folder is answered rather than
+   left standing: the keystrokes are help for a dialog that is no longer open, and the thing the
+   reader now wants to see is what came back out. So the two share one box -- the note leaves and
+   the transcripts arrive in the same place, the box growing into the taller job as they cross --
+   and the list says out loud that work is happening, because the parse behind it is seconds of
+   synchronous main thread and a page that goes still reads as a page that has died. Everything
+   that moves while it is working moves on the compositor -- transform and opacity, never a
+   background position -- for exactly that reason: those keep running while the parse holds the
+   thread, and a paint-driven animation would freeze on its first frame. */
 
 import { useId, useRef, useState, type ReactNode } from "react"
 import { analyze, type Analysis, type RawFile } from "./engine.ts"
-import { TextSwap } from "./Motion.tsx"
+import { cssMs, TextSwap } from "./Motion.tsx"
 import { Tip } from "./Tip.tsx"
 
 const MAX_LISTED = 60
+
+/** How many rows are dealt in with a stagger of their own before the rest share the last one.
+ *  A little more than the box shows at once, so the deal is still running when it reaches the
+ *  fold; a folder of six hundred transcripts must not spend twenty seconds laying itself out. */
+const STAGGERED = 11
 
 type Os = "mac" | "win" | "linux"
 
@@ -179,9 +194,19 @@ const HOW: Record<Os, ReactNode> = {
   ),
 }
 
-interface Status {
+/** What the intake is doing with the pick, as the head of the list says it. A token as well as a
+ *  line, because the two phases are swapped rather than substituted -- see `TextSwap`. */
+interface Phase {
+  token: string
   node: ReactNode
-  err: boolean
+}
+
+/** The transcripts a pick came back with, as far as the list shows them. `id` counts the picks
+ *  rather than naming them: it is what remounts the rows, so a second pick deals itself out
+ *  again instead of quietly re-lettering the list that is already there. */
+interface Found {
+  id: number
+  names: string[]
 }
 
 /** A file, and where it sat inside the folder that was chosen. A `File` on its own cannot say:
@@ -295,13 +320,25 @@ function walkEntry(entry: FileSystemEntry, out: Picked[]): Promise<void> {
 }
 
 export function Intake({ onData }: { onData: (data: Analysis) => void }): React.JSX.Element {
-  const [status, setStatus] = useState<Status | null>(null)
-  const [names, setNames] = useState<string[] | null>(null)
+  const [err, setErr] = useState<ReactNode>(null)
+  const [found, setFound] = useState<Found | null>(null)
+  const [phase, setPhase] = useState<Phase>({ token: "read", node: null })
+  const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const [os, setOs] = useState<Os>(guessOs)
   const dirPicker = useRef<HTMLInputElement>(null)
+  const picks = useRef(0)
 
-  const say = (node: ReactNode, err = false): void => setStatus({ node, err })
+  /** Stop, with something to say. The list goes back down and the way into the folder comes back
+   *  up with it: every one of these ends with the reader picking again, and what a reader who has
+   *  to pick again needs is the route, not the names of the files that were wrong.
+   *
+   *  The list is not thrown away, only hidden -- it is mid-flight when this is called, and a face
+   *  emptied on the frame it starts leaving has nothing left to animate. */
+  const stop = (node: ReactNode): void => {
+    setBusy(false)
+    setErr(node)
+  }
 
   /** Pressing the button. The good road first, the input behind it -- and the fall back happens
    *  on the failure rather than on a guess about which browser this is, because the thing that
@@ -330,7 +367,7 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
        standing right here. */
     const where = originOf(picked.map((p) => p.path))
     if (!files.length) {
-      say(
+      stop(
         !picked.length ? (
           "No files selected."
         ) : where.root ? (
@@ -343,22 +380,29 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
             None of those {picked.length} file(s) are <code>.jsonl</code> transcripts.
           </>
         ),
-        true,
       )
       return
     }
 
-    say(
-      <>
-        Reading <b>{files.length}</b> file{files.length > 1 ? "s" : ""}…
-      </>,
-    )
-    setNames(
-      files
+    /* The pick answers the note, so the note goes: what stands in its place is the transcripts
+       that came back, counted in the head and named in the list. */
+    setErr(null)
+    setPhase({
+      token: "read",
+      node: (
+        <>
+          Reading <b>{files.length}</b> transcript{files.length > 1 ? "s" : ""}
+        </>
+      ),
+    })
+    setFound({
+      id: ++picks.current,
+      names: files
         .slice(0, MAX_LISTED)
         .map((p) => p.file.name)
         .concat(files.length > MAX_LISTED ? [`… +${files.length - MAX_LISTED} more`] : []),
-    )
+    })
+    setBusy(true)
 
     let payload: RawFile[]
     try {
@@ -366,26 +410,32 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
         files.map(async (p) => ({ name: p.file.name, text: await p.file.text() })),
       )
     } catch (e) {
-      say(`Could not read the files: ${(e as Error).message}`, true)
+      stop(`Could not read the files: ${(e as Error).message}`)
       return
     }
 
     const bytes = payload.reduce((a, b) => a + b.text.length, 0)
-    say(
-      <>
-        Analyzing <b>{(bytes / 1e6).toFixed(1)} MB</b>…
-      </>,
-    )
-    /* Let that status actually paint before the parse takes the main thread: a multi-hundred
-       megabyte corpus is seconds of synchronous work, and a page that goes silent first
-       reads as hung. */
-    await new Promise((r) => setTimeout(r, 16))
+    setPhase({
+      token: "parse",
+      node: (
+        <>
+          Analyzing <b>{(bytes / 1e6).toFixed(1)} MB</b>
+        </>
+      ),
+    })
+    /* Let the swap finish before the parse takes the main thread. A multi-hundred megabyte corpus
+       is seconds of synchronous work, and everything the box is in the middle of when that lands
+       -- the note leaving, the list arriving, the box growing, the head changing what it says --
+       is a transition that would be caught mid-stride and finish in one jump on the far side.
+       The wait is read off the same token the transitions are timed by, so the two cannot drift;
+       a third of a second bought against seconds of parse is not a cost worth arguing about. */
+    await new Promise((r) => setTimeout(r, cssMs("--intake-swap-dur", 250) + 60))
 
     let data: Analysis
     try {
       data = analyze(payload)
     } catch (e) {
-      say(`Analysis failed: ${(e as Error).message}`, true)
+      stop(`Analysis failed: ${(e as Error).message}`)
       console.error(e)
       return
     }
@@ -394,7 +444,7 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
          Code's and simply have nothing billed in them are a fact about the sessions; files that
          came from somewhere else entirely are a wrong turn, and the folder's own name is the
          quickest way to show which one happened. */
-      say(
+      stop(
         where.claude ? (
           <>
             Read {payload.length} transcript{payload.length > 1 ? "s" : ""} from{" "}
@@ -415,7 +465,6 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
             <code>~/.claude/projects</code>, which is where Claude Code keeps its transcripts.
           </>
         ),
-        true,
       )
       return
     }
@@ -508,41 +557,81 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
             who cannot get there never sees a report at all. It is one line because only one
             platform's line applies -- theirs is picked for them, and the switch is for when the
             guess is wrong. */}
-        <div className="howto">
-          {/* Two rows, rather than one row of label, sentence and switch run together: the switch
-              decides *which* instruction is drawn, so it belongs above the line it governs, not
-              inline with it where it reads as the end of the sentence.
+        {/* One box, two faces, and only ever one of them on show. The pair is stacked in a single
+            grid cell rather than swapped in and out of the flow: they have to cross -- one leaving
+            upward as the other arrives from below -- and two things that take turns in the flow
+            cannot cross, they shove. What does move is the box's height, which grows into the
+            taller job as they pass. See `.swap`. */}
+        <div className="swap" data-face={busy ? "files" : "how"}>
+          <div className="howto" data-on={busy ? "0" : "1"}>
+            {/* Two rows, rather than one row of label, sentence and switch run together: the switch
+                decides *which* instruction is drawn, so it belongs above the line it governs, not
+                inline with it where it reads as the end of the sentence.
 
-              No box around it any more. Sunk panel, hairline, rule between the rows -- three
-              pieces of chrome for two lines of help, sitting inside a card that is itself a
-              frame, which made the way in look like a second thing to decide about rather than
-              the answer to the heading above it. What separates it now is the space around it.
+                No box around it any more. Sunk panel, hairline, rule between the rows -- three
+                pieces of chrome for two lines of help, sitting inside a card that is itself a
+                frame, which made the way in look like a second thing to decide about rather than
+                the answer to the heading above it. What separates it now is the space around it.
 
-              No path in the label: it is set in mono caps, which would print a dotfile's name as
-              `.CLAUDE`, and the path is already the loudest thing in the heading above. Why the
-              folder is hidden is in the help below the card; what a reader stuck at a dialog needs
-              is the keystrokes. */}
-          <div className="howhead">
-            <span className="howlbl">The folder is hidden</span>
-            <OsSwitch os={os} onPick={setOs} />
+                No path in the label: it is set in mono caps, which would print a dotfile's name
+                as `.CLAUDE`, and the path is already the loudest thing in the heading above. Why
+                the folder is hidden is in the help below the card; what a reader stuck at a
+                dialog needs is the keystrokes. */}
+            <div className="howhead">
+              <span className="howlbl">The folder is hidden</span>
+              <OsSwitch os={os} onPick={setOs} />
+            </div>
+            {/* Keyed on the platform, so switching plays the same swap the report's figures do
+                rather than substituting the words underneath the reader. Inside the paragraph
+                rather than around it: `TextSwap` is a span, and a span may not hold a `<p>`. */}
+            <p>
+              <TextSwap token={os}>{HOW[os]}</TextSwap>
+            </p>
           </div>
-          {/* Keyed on the platform, so switching plays the same swap the report's figures do
-              rather than substituting the words underneath the reader. Inside the paragraph
-              rather than around it: `TextSwap` is a span, and a span may not hold a `<p>`. */}
-          <p>
-            <TextSwap token={os}>{HOW[os]}</TextSwap>
-          </p>
+          {/* The other face. Mounted from the first pick onward rather than only while the work
+              runs, because a face that is unmounted the moment it stops being current has nothing
+              left on screen to play its exit -- `data-on` is what shows it, `data-busy` what makes
+              it look busy. */}
+          {found ? (
+            <div className="found" data-on={busy ? "1" : "0"} data-busy={busy ? "1" : "0"}>
+              {/* The count stands where "The folder is hidden" stood, in the same mono caps on the
+                  same line, and changes tense the way every other figure on this page does: the
+                  two phases are swapped, not substituted. Announced politely, since it is the only
+                  thing that says the page is working to a reader who cannot see it working. */}
+              <div className="foundhead" aria-live="polite">
+                <span className="foundlbl">
+                  <TextSwap token={phase.token}>{phase.node}</TextSwap>
+                </span>
+              </div>
+              {/* Keyed on the pick, so a second folder deals its rows out again rather than
+                  re-lettering the ones already lying there. */}
+              <div className="foundbox">
+                <div className="filelist" key={found.id}>
+                  {found.names.map((n, i) => (
+                    <div
+                      key={n}
+                      className="fileline"
+                      /* The stagger is a position, so it is written here rather than in the
+                         stylesheet -- but the beat it counts in is the stylesheet's, which is why
+                         this is a `calc` on the shared token and not a number. */
+                      style={{
+                        animationDelay: `calc(var(--duration-stagger) * ${Math.min(i, STAGGERED)})`,
+                      }}
+                    >
+                      <span className="filedot" />
+                      <span className="filenm">{n}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
-        <div className="status" data-err={status?.err ? "1" : "0"}>
-          {status?.node}
-        </div>
-        {names ? (
-          <div className="filelist">
-            {names.map((n) => (
-              <div key={n}>{n}</div>
-            ))}
-          </div>
-        ) : null}
+        {/* Errors only, now that the progress is narrated by the list's own head -- which is why
+            this line is set in the accent throughout rather than colouring itself in when
+            something goes wrong. It keeps its ground either way: an empty line here is what stops
+            the group jumping when a pick comes back with something to say. */}
+        <div className="status">{err}</div>
       </div>
       <input
         ref={dirPicker}

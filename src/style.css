@@ -1213,26 +1213,85 @@ tfoot .n {
      page that has to be pressed, so it gets the room a target wants around it. */
   margin: 12px 0 0;
 }
-/* The way into the hidden folder. No panel, no border, no rule between the rows: it was a sunk
-   grey box with a hairline, inside a card that is already a frame, which made two lines of help
-   read as a second thing to decide about. Space separates it now -- the only thing here that is
-   drawn is the switch, because the switch is the only thing you can press. */
-.howto {
-  /* The hint's containing block, which is the whole point: see `.howto .t-tt`. */
-  position: relative;
+/* The box under the button, and the two faces it takes: the way into the hidden folder before a
+   pick, the transcripts that came back after one. They are stacked in one grid cell, which is
+   what lets them cross -- the note leaving upward as the list arrives from below -- instead of
+   taking turns in the flow and shoving each other on the way past.
+
+   The height is the one thing that travels. `min-height` rather than `height`, twice: a floor
+   under the note, a taller floor under the list, and either way a note that wraps to three lines
+   on a narrow window is still allowed to be three lines tall. Transitioned, so the box grows into
+   the taller job rather than jumping into it -- and it grows against the empty card the invite is
+   centred in, which is slack this face has plenty of.
+
+   Both faces are always as wide as the box, so the row of the grid is sized by whichever is
+   taller. That is only ever the floor or the note, because the list's own scroller has no
+   intrinsic height to contribute -- see `.foundbox`. */
+.swap {
+  display: grid;
   width: 100%;
   /* A shade under the heading's own measure, so the block below it lines up with the block
      above rather than introducing a third width down the middle of the card. */
   max-width: 58ch;
-  text-align: center;
+  min-height: 74px;
   /* The step from the ask to the help: on top of the band's own 18, so the button and the note
      under it are two things rather than one stack of four evenly spaced rows.
      It was 32 for a while, to hold the platform hint when that opened upward -- 50px of empty
      card between a button and the note under it, spent entirely on a chip that is only there
      while a pointer rests on the switch. Moving the hint below the block bought that back. */
   margin: 16px 0 0;
+  transition: min-height var(--intake-swap-dur) var(--intake-swap-ease);
 }
-.howhead {
+.swap[data-face="files"] {
+  min-height: 168px;
+}
+/* The stack, and the state both faces rest in when they are not the one on show: away from the
+   middle, blurred out, and gone from the tab order. Which direction "away" is belongs to each
+   face below -- the note goes back the way it came, the list goes down where it came from. */
+.swap > * {
+  grid-area: 1 / 1;
+  opacity: 0;
+  filter: blur(var(--blur-small));
+  /* Held visible for the length of the exit and dropped on its last frame: a face that turned
+     invisible on the first would have nothing left to fade. It is `visibility` rather than
+     `pointer-events` because the thing that has to stop being reachable is a button, and a
+     button you cannot see must not still be a tab stop. */
+  visibility: hidden;
+  transition:
+    opacity var(--intake-swap-dur) var(--intake-swap-ease),
+    transform var(--intake-swap-dur) var(--intake-swap-ease),
+    filter var(--intake-swap-dur) var(--intake-swap-ease),
+    visibility 0s linear var(--intake-swap-dur);
+}
+.swap > [data-on="1"] {
+  opacity: 1;
+  filter: blur(0);
+  visibility: visible;
+  transform: translateY(0);
+  transition:
+    opacity var(--intake-swap-dur) var(--intake-swap-ease),
+    transform var(--intake-swap-dur) var(--intake-swap-ease),
+    filter var(--intake-swap-dur) var(--intake-swap-ease),
+    visibility 0s linear 0s;
+}
+/* The way into the hidden folder. No panel, no border, no rule between the rows: it was a sunk
+   grey box with a hairline, inside a card that is already a frame, which made two lines of help
+   read as a second thing to decide about. Space separates it now -- the only thing here that is
+   drawn is the switch, because the switch is the only thing you can press.
+
+   Centred in the box rather than stretched to it, so it keeps its own height whatever the box is
+   doing: `100%` of a stretched note is the bottom of the box, and that is what the platform hint
+   hangs off on a narrow window. */
+.howto {
+  /* The hint's containing block, which is the whole point: see `.howto .t-tt`. */
+  position: relative;
+  align-self: center;
+  text-align: center;
+  /* Upward, because it is being answered: the note is the question the pick has just settled. */
+  transform: translateY(-10px);
+}
+.howhead,
+.foundhead {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1240,12 +1299,147 @@ tfoot .n {
   gap: 4px 9px;
   margin-bottom: 7px;
 }
-.howlbl {
+.howlbl,
+.foundlbl {
   font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink3);
+}
+/* The count and the megabytes, which are the only part of that line that changes: one step up
+   the ink rather than two, because a label set in caps at 10.5px cannot carry full contrast on
+   part of itself without reading as two labels. */
+.foundlbl b {
+  color: var(--ink2);
+}
+/* The transcripts that came back. A column, because the head sits on the note's line and the
+   panel under it takes whatever the box has left -- which is what makes the list grow with the
+   box rather than the box grow with the list. */
+.found {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Up from below, the way an answer arrives. */
+  transform: translateY(14px);
+}
+/* The panel the names scroll in, and the frame the sweep is clipped to. Two elements rather than
+   one: the scan has to stay put while the list scrolls under it, and a pseudo-element on the
+   scroller would scroll away with the rows. */
+.foundbox {
+  position: relative;
+  flex: 1;
+  /* Both halves of "take the room you are given and no more": the flex minimum that would
+     otherwise be the rows' own height, and the scroller that would otherwise ask the grid for
+     all sixty of them. */
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  /* Sunk, where the note it replaced is drawn on the card's own paper. The note is prose and had
+     to stop looking like a second decision; this is a readout of what the machine found, and a
+     readout is the one thing on this face that earns a well to sit in. */
+  background: var(--sunk);
+}
+/* The work, said as light rather than as words: a soft band with an accent line down its middle,
+   travelling the height of the panel on a loop. Transform and opacity only, which is the whole
+   reason it is drawn this way -- the parse behind it holds the main thread for seconds at a time,
+   and a composited animation keeps running through that while anything paint-driven would freeze
+   on the frame the parse started. */
+@keyframes t-scan {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+.foundbox::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(to bottom, transparent 49.5%, var(--accent) 50%, transparent 50.5%),
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      var(--accent-soft) 42%,
+      var(--accent-soft) 58%,
+      transparent 100%
+    );
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.found[data-busy="1"] .foundbox::after {
+  opacity: 0.62;
+  animation: t-scan var(--intake-scan-dur) var(--ease-linear) infinite;
+}
+.filelist {
+  height: 100%;
+  overflow: auto;
+  padding: 7px 10px;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+/* Dealt in from the left, one after another, because that is what a list of things being read
+   looks like. The delay per row is inline -- a stagger is a position, and a position is the
+   markup's to know -- and it counts in the shared beat. */
+@keyframes t-file-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--distance-base) * -1));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fileline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.75;
+  animation: t-file-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+.filenm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* One square per transcript, on the grid every other mark on this page is drawn on. They pulse
+   in fours while the work runs -- a wave down the column rather than sixty squares blinking
+   together, and four rules rather than sixty because a wave is a thing that repeats. */
+@keyframes t-file-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.filedot {
+  flex: none;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  opacity: 0.45;
+  transition: background var(--duration-quick) var(--ease-out);
+}
+.found[data-busy="1"] .filedot {
+  background: var(--accent);
+  animation: t-file-pulse var(--intake-scan-dur) var(--ease-in-out) infinite;
+}
+.found[data-busy="1"] .fileline:nth-child(4n + 2) .filedot {
+  animation-delay: calc(var(--intake-scan-dur) / -4);
+}
+.found[data-busy="1"] .fileline:nth-child(4n + 3) .filedot {
+  animation-delay: calc(var(--intake-scan-dur) / -2);
+}
+.found[data-busy="1"] .fileline:nth-child(4n + 4) .filedot {
+  animation-delay: calc(var(--intake-scan-dur) * -0.75);
 }
 /* The platform, and the way to the next one. A chip rather than a bare word: a word set in the
    same ink as the label beside it is not obviously pressable, and this is the control a reader
@@ -1451,27 +1645,18 @@ tfoot .n {
   border-top: 1px solid var(--hair);
   padding: 10px 0;
 }
+/* What went wrong, and only that: the progress a pick makes is narrated by the head of its own
+   list now, so this line no longer has two jobs and two colours. It holds its ground while there
+   is nothing to say, which is what keeps the group above it still when there is. */
 .status {
   font-size: 13px;
-  color: var(--ink2);
+  color: var(--accent);
   min-height: 22px;
 }
+/* The folder's name inside the message, which is emphasis rather than a second colour: the line
+   is already the accent, and ink on an accent line reads as a correction to it. */
 .status b {
-  color: var(--ink);
-}
-.status[data-err="1"] {
-  color: var(--accent);
-}
-.filelist {
-  font-size: 11.5px;
-  color: var(--ink3);
-  font-family: var(--mono);
-  max-height: 88px;
-  overflow: auto;
-  text-align: left;
-  border: 1px solid var(--rule);
-  padding: 8px 10px;
-  background: var(--panel);
+  font-weight: 600;
 }
 /* Two columns on the same rule the report's footnotes sit on, and the full width of the shell:
    this is what stands under the empty card, so it holds the same ground the breakdown and the
@@ -1633,6 +1818,17 @@ kbd {
   --panel-exit-y: calc(var(--panel-translate-y) * -1);
   --panel-blur: var(--blur-small);
   --panel-ease: var(--ease-smooth-out);
+
+  /* The intake's two faces. One duration for the crossfade and for the height the box grows
+     through, so the note leaving, the list arriving and the box resizing are one movement rather
+     than three that end at three different moments. It is read back in `Upload.tsx`, which waits
+     it out before handing the main thread to the parse.
+     The scan's own period is the one value here with no usage on the scale: 1.5s is slow enough
+     to read as a sweep rather than a strobe, and it is what the dots' pulse counts in too, so the
+     light travelling down the panel and the squares lighting up beside it keep the same time. */
+  --intake-swap-dur: var(--duration-fast);
+  --intake-swap-ease: var(--ease-smooth-out);
+  --intake-scan-dur: 1500ms;
 
   /* Controls growing into the toolbar. Sideways rather than up, because they emerge from
      beside the theme switch, which does not move; and out faster than in, because arriving is
