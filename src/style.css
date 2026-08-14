@@ -1268,20 +1268,60 @@ tfoot .n {
   color: var(--ink);
   border-color: var(--rule);
 }
-/* This one hint hangs off the *block* rather than off its own control -- the switch's span is the
-   only trigger on the page without `t-tt-host`, so the nearest positioned ancestor is `.howto`.
-   Everywhere else a tip drops straight out of the control it describes, which is right in the
-   toolbar. Here the thing immediately under the control is the instruction the control chooses,
-   and a hint that covers it answers a question by hiding the answer; upward is the gap to the
-   button, and holding a 50px gap open all the time for a chip that appears on hover is paying
-   for it in the layout every reader sees. Under the block is empty card. Still off the right
-   edge, so it can only ever grow leftward into the card and never off it. */
+/* This one hint goes beside its control rather than under it. Everywhere else a tip drops
+   straight out of the control it describes, which is right in the toolbar; here the thing
+   immediately below is the instruction the switch chooses, and a hint that covers it answers a
+   question by hiding the answer. Upward is the gap to the button -- holding 16px of layout open
+   permanently so a hover chip clears a black button is a cost every reader pays for something
+   almost none of them see. Sideways is the card's own slack, which is doing nothing at all.
+   It was under the whole block for a version, anchored to `.howto`: that covered nothing, but a
+   hint 50px from the chip and lined up with the instruction reads as a note about the
+   instruction. A hint has to look like it belongs to the thing under the pointer. */
 .howto .t-tt {
-  top: calc(100% + 9px);
+  top: 50%;
+  right: auto;
+  left: calc(100% + 10px);
+  transform-origin: 0 50%;
+  transform: translateY(-50%) scale(var(--tt-scale));
 }
+.howto .t-tt-trigger:hover + .t-tt,
+.howto .t-tt-trigger:focus-visible + .t-tt {
+  transform: translateY(-50%) scale(1);
+}
+/* Below about 900px there is no longer 280px of card to the right of the chip, so the hint goes
+   back under the block, where the only thing it can cover is empty card. The switch's own span
+   stops being the containing block for it; `.howto` takes over. */
+@media (max-width: 900px) {
+  .howto .t-tt-host {
+    position: static;
+  }
+  .howto .t-tt {
+    top: calc(100% + 9px);
+    right: 0;
+    left: auto;
+    transform-origin: 100% 0;
+    transform: scale(var(--tt-scale));
+  }
+  .howto .t-tt-trigger:hover + .t-tt,
+  .howto .t-tt-trigger:focus-visible + .t-tt {
+    transform: scale(1);
+  }
+}
+/* Sized off the longest name, so walking the three does not shunt the row about. */
 .osname {
-  min-width: 7ch;
+  min-width: 9.6ch;
   text-align: left;
+}
+.osface {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+/* A hair under the chip's own line, so the mark sits inside the cap height rather than pushing
+   the chip taller than the label beside it. */
+.osface .glyph {
+  width: 13px;
+  height: 13px;
 }
 .oscaret {
   width: 9px;

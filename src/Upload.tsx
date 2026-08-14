@@ -23,15 +23,52 @@ const MAX_LISTED = 60
 
 type Os = "mac" | "win" | "linux"
 
-/* The three platforms as their names, in the order the switch walks them. Drawn as logos once --
-   an apple, four panes, a penguin -- which was a worse control on every count: three marks where
-   two are always wrong, a penguin that is illegible at the size a control wants, and a row of
-   borrowed trademarks in a page that otherwise draws its own glyphs. A word says which platform
-   with no drawing at all. */
-const PLATFORMS: ReadonlyArray<{ value: Os; label: string }> = [
-  { value: "mac", label: "macOS" },
-  { value: "win", label: "Windows" },
-  { value: "linux", label: "Linux" },
+/* The three platforms, each a mark and a word. Same recipe as every other glyph on the page: one
+   16-unit box, stroked in `currentColor` at one weight, no fills -- a solid silhouette could not
+   follow the chip's ink the way these do, and at this size a filled penguin is a pear.
+   These were a row of three once, as the whole face of a segmented control, which is what made
+   them a problem: three logos where two are always wrong, carrying the entire job of saying which
+   platform you were on at 14px. One mark, beside the word that already says it, is a different
+   job -- the word carries the meaning and the mark is what the eye finds first. */
+function AppleMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M10.55 8.35c0-1.35.95-2 1-2.05-.55-.8-1.4-.9-1.7-.9-.75-.05-1.45.4-1.85.4-.4 0-.98-.4-1.6-.4-.85 0-1.6.5-2.05 1.25-.85 1.5-.2 3.7.6 4.9.4.6.9 1.25 1.55 1.25.6-.03.85-.4 1.6-.4.75 0 .95.4 1.6.4.65-.02 1.1-.6 1.5-1.2.35-.5.5-1 .5-1.05-.05 0-1.15-.45-1.15-1.8Z" />
+      <path d="M9.35 4.15c.35-.4.55-.95.5-1.5-.5.02-1.1.32-1.45.72-.32.37-.6.95-.52 1.5.55.05 1.12-.28 1.47-.72Z" />
+    </svg>
+  )
+}
+
+function WindowsMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <rect x="2.1" y="2.1" width="5.1" height="5.1" />
+      <rect x="8.8" y="2.1" width="5.1" height="5.1" />
+      <rect x="2.1" y="8.8" width="5.1" height="5.1" />
+      <rect x="8.8" y="8.8" width="5.1" height="5.1" />
+    </svg>
+  )
+}
+
+/** A penguin, which is the one of the three that has to be *drawn* rather than traced: body,
+ *  eyes, beak, feet, and nothing else, because every further line closes up at this size. An
+ *  earlier one read as a vase -- the body has to widen to the floor and the feet have to break
+ *  the outline, or the silhouette is a pear with two dots in it. */
+function TuxMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M8 1.5c1.45 0 2.35 1.15 2.35 2.6 0 .45-.06.85-.06 1.15 0 .45.62.85 1.15 1.7.62.95 1.05 2.2 1.15 3.2.1 1-.35 1.75-1.1 2.2-.85.5-2.05.75-3.49.75s-2.64-.25-3.49-.75c-.75-.45-1.2-1.2-1.1-2.2.1-1 .53-2.25 1.15-3.2.53-.85 1.15-1.25 1.15-1.7 0-.3-.06-.7-.06-1.15C5.65 2.65 6.55 1.5 8 1.5Z" />
+      <path d="M7.15 4.3h.01M8.85 4.3h.01" />
+      <path d="m7.4 5.35.6.65.6-.65" />
+      <path d="M6.2 13.1c-.55.75-1.5 1.15-2.35 1M9.8 13.1c.55.75 1.5 1.15 2.35 1" />
+    </svg>
+  )
+}
+
+const PLATFORMS: ReadonlyArray<{ value: Os; label: string; mark: React.JSX.Element }> = [
+  { value: "mac", label: "macOS", mark: <AppleMark /> },
+  { value: "win", label: "Windows", mark: <WindowsMark /> },
+  { value: "linux", label: "Linux", mark: <TuxMark /> },
 ]
 
 /** A folder, on the button that opens a folder picker. Decoration in the strict sense -- the
@@ -59,24 +96,29 @@ function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JS
   const tip = useId()
   const at = PLATFORMS.findIndex((p) => p.value === os)
   const next = PLATFORMS[(at + 1) % PLATFORMS.length]
-  /* No `t-tt-host` on this span, deliberately: the hint positions against `.howto` instead, which
-     is the nearest positioned ancestor, so it hangs under the whole block rather than off the
-     chip. See the CSS -- the space under the block is empty, and the space around the chip is
-     the instruction the chip chooses. */
+  /* `t-tt-host` carries the hint's placement, and where it lands is a question of room -- see
+     `.howto .t-tt`. Beside the chip where there is width for it, under the block where there is
+     not, and never over the instruction the chip chooses. */
   return (
-    <span>
+    <span className="t-tt-host">
       <button
         type="button"
         className="osbtn t-tt-trigger"
         aria-describedby={tip}
         onClick={() => onPick(next.value)}
       >
+        {/* Mark and word swap together, as one face: the platform is one fact, and a logo that
+            changed a beat before its name would read as two controls arguing. */}
         <span className="osname">
-          <TextSwap token={os}>{PLATFORMS[at].label}</TextSwap>
+          <TextSwap token={os}>
+            <span className="osface">
+              {PLATFORMS[at].mark}
+              {PLATFORMS[at].label}
+            </span>
+          </TextSwap>
         </span>
-        {/* The one mark left on this control, and it is about the control rather than about any
-            platform: a chevron is what says "there are others behind this". Same glyph recipe as
-            the toolbar's, at the size a caret wants. */}
+        {/* The mark that is about the control rather than about any platform: a chevron is what
+            says "there are others behind this". Same glyph recipe, at the size a caret wants. */}
         <svg className="glyph oscaret" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <path d="m3.6 6.2 4.4 4.4 4.4-4.4" />
         </svg>

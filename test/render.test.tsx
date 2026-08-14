@@ -510,6 +510,9 @@ describe("the card's two faces", () => {
     const sw = box.querySelector<HTMLButtonElement>(".howto .osbtn")
     expect(box.querySelectorAll(".howto button")).toHaveLength(1)
     expect(["macOS", "Windows", "Linux"]).toContain(sw!.textContent!.trim())
+    // The platform's own mark rides with the word, and the chevron says there are others behind it.
+    expect(sw!.querySelector(".osface .glyph")).not.toBeNull()
+    expect(sw!.querySelector(".oscaret")).not.toBeNull()
     const tip = box.querySelector<HTMLElement>('.howto [role="tooltip"]')
     expect(sw!.getAttribute("aria-describedby")).toBe(tip!.id)
     const before = tip!.textContent
