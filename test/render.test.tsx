@@ -10,6 +10,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { analyze, type Analysis } from "../src/engine.ts"
 import { Page, type Dir } from "../src/Page.tsx"
+import { originOf, type Origin } from "../src/Upload.tsx"
 import { getHover, getState, resetState, setHover, setState, type ViewState } from "../src/store.ts"
 import { corpus } from "./fixture.ts"
 
@@ -573,5 +574,53 @@ describe("the card's two faces", () => {
     expect(box.querySelector(".cardslot > .dropzone")).not.toBeNull()
     expect(box.querySelector(".total")?.textContent).toBe("—")
     expect(box.querySelector(".toolbar")?.getAttribute("data-leaving")).toBeNull()
+  })
+})
+
+/* Reading the pick, so the page does not have to ask about it.
+
+   A folder that comes back empty or unbilled is two different stories -- transcripts with
+   nothing billed in them, or a wrong turn out of the file dialog -- and the paths say which
+   without a question being put to the reader. What is asserted here is the judgement, because
+   the sentence it picks is only as good as it is: `projects` on its own is a folder half the
+   machines in the world have, and calling someone's source tree the transcript store would be
+   worse than the question this replaces. */
+describe("where a pick came from", () => {
+  const at = (...paths: string[]): Origin => originOf(paths)
+
+  it("knows the transcript store, however far down it was picked", () => {
+    // The ask itself: `~/.claude/projects`, whose children are dash-encoded project folders.
+    expect(at("projects/-Users-me-code-thing/a.jsonl", "projects/-Users-me-x/b.jsonl")).toEqual({
+      root: "projects",
+      claude: true,
+    })
+    // A drawer up: `.claude` holds more than transcripts, and the pick still works.
+    expect(at(".claude/projects/-Users-me-x/a.jsonl", ".claude/todos/x.json")).toEqual({
+      root: ".claude",
+      claude: true,
+    })
+    /* One project's folder, which the help below the card recommends for one project's bill.
+       The store is no longer in the path here -- the folder's own name is the only evidence. */
+    expect(at("-Users-me-code-thing/a.jsonl")).toEqual({
+      root: "-Users-me-code-thing",
+      claude: true,
+    })
+    // Same name, made on Windows, where the drive letter survives the flattening.
+    expect(at("C--Users-me-code-thing/a.jsonl").claude).toBe(true)
+  })
+
+  it("does not mistake a folder that merely shares the name", () => {
+    // Someone's own `~/projects`, with a `.jsonl` in it. Named, and not the store.
+    expect(at("projects/site/notes.jsonl")).toEqual({ root: "projects", claude: false })
+    expect(at("Downloads/a.jsonl")).toEqual({ root: "Downloads", claude: false })
+    // A session id is a session id: the file's own name is not evidence of anything.
+    expect(at("Downloads/-Users-me-x.jsonl").claude).toBe(false)
+  })
+
+  it("names no folder when there was none to name", () => {
+    // Loose files dropped in, and two folders at once: neither has one root to report.
+    expect(at("a.jsonl", "b.jsonl")).toEqual({ root: null, claude: false })
+    expect(at("-Users-me-x/a.jsonl", "-Users-me-y/b.jsonl")).toEqual({ root: null, claude: true })
+    expect(at()).toEqual({ root: null, claude: false })
   })
 })

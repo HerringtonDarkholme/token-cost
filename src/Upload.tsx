@@ -12,7 +12,14 @@
    the same reason the ask is a folder rather than files: `.claude` is a dotfile, so the picker
    this page is about to open hides the very folder it just asked for. A reader who cannot get
    there never sees a report at all, and help that stands below the fold assumes they will go
-   looking for it. */
+   looking for it.
+
+   Once a folder *has* been chosen, nothing here asks about it twice. The pick is the answer, and
+   the browser has already made the reader confirm it once in its own dialog; a page that comes
+   back with "are these really your transcripts?" is asking a question it can answer itself. It
+   can, because every file arrives with the path it sat at inside the chosen folder -- see
+   `originOf` -- so when a pick turns out to be empty or unbilled, what is said back names the
+   folder that was picked and whether it was the transcript store at all. */
 
 import { useId, useRef, useState, type ReactNode } from "react"
 import { analyze, type Analysis, type RawFile } from "./engine.ts"
@@ -177,15 +184,59 @@ interface Status {
   err: boolean
 }
 
+/** A file, and where it sat inside the folder that was chosen. A `File` on its own cannot say:
+ *  the picker's files carry `webkitRelativePath` and a dropped entry's `File` carries nothing at
+ *  all, so the path travels beside the file rather than being read back off it later. */
+interface Picked {
+  file: File
+  /** Relative to the chosen folder, that folder's own name first. */
+  path: string
+}
+
+/** Claude Code names a project's folder after the directory it ran in, separators and all
+ *  flattened to dashes: `-Users-me-code-thing` on a mac or a Linux box, `C--Users-me-code-thing`
+ *  on Windows. It is the one name on the way down that could not be anything else, which is what
+ *  makes it worth matching -- `projects` on its own is a folder half the machines in the world
+ *  have in their home directory. */
+const PROJECT_DIR = /^-|^[A-Za-z]--/
+
+/** Where a pick came from, as far as its paths can say. */
+export interface Origin {
+  /** The chosen folder's own name, or `null` for loose files and for several folders at once. */
+  root: string | null
+  /** Whether it is `~/.claude/projects`, or one project's folder out of it. */
+  claude: boolean
+}
+
+/** Judge the pick from the paths alone, so the page never has to ask the reader where they just
+ *  were. Two shapes count: a `.claude/projects` anywhere on the way down, or a directory named
+ *  the way Claude Code names a project's -- which is what is left when the reader picks one
+ *  project rather than the whole store, and the folder above it is no longer in the path.
+ *
+ *  The file's own name is not asked, only the directories above it: a transcript is a session id
+ *  and has no business matching anything. */
+export function originOf(paths: readonly string[]): Origin {
+  const roots = new Set(paths.map((p) => (p.includes("/") ? p.slice(0, p.indexOf("/")) : "")))
+  const claude = paths.some((p) => {
+    const segs = p.split("/").slice(0, -1)
+    return segs.some(
+      (s, i) => (s === ".claude" && segs[i + 1] === "projects") || PROJECT_DIR.test(s),
+    )
+  })
+  return { root: roots.size === 1 && !roots.has("") ? [...roots][0] : null, claude }
+}
+
 /** Walk a dropped folder. `webkitGetAsEntry` is non-standard and the DOM types declare it
  *  as always present, but it is the entry point that makes dropping a *directory* work at
  *  all, so it stays feature-detected rather than assumed. */
-function walkEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
+function walkEntry(entry: FileSystemEntry, out: Picked[]): Promise<void> {
   return new Promise((res) => {
     if (entry.isFile) {
       ;(entry as FileSystemFileEntry).file(
         (f) => {
-          out.push(f)
+          /* The entry's path rather than the file's: a `File` handed over by the drop API has an
+             empty `webkitRelativePath`, and `fullPath` is rooted at the folder that was dropped. */
+          out.push({ file: f, path: entry.fullPath.replace(/^\//, "") || f.name })
           res()
         },
         () => res(),
@@ -215,17 +266,25 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
 
   const say = (node: ReactNode, err = false): void => setStatus({ node, err })
 
-  async function handle(list: FileList | File[] | null): Promise<void> {
-    const all = [...(list || [])]
-    const files = all.filter((f) => f.name.endsWith(".jsonl"))
+  async function handle(picked: Picked[]): Promise<void> {
+    const files = picked.filter((p) => p.file.name.endsWith(".jsonl"))
+    /* Judged before anything is read, and kept for whatever has to be said afterwards: the two
+       ways this can come to nothing are both questions about the folder, and the folder is
+       standing right here. */
+    const where = originOf(picked.map((p) => p.path))
     if (!files.length) {
       say(
-        all.length ? (
+        !picked.length ? (
+          "No files selected."
+        ) : where.root ? (
           <>
-            None of those {all.length} file(s) are <code>.jsonl</code> transcripts.
+            <b>{where.root}</b> holds no <code>.jsonl</code> transcripts. Claude Code writes one per
+            session, under <code>~/.claude/projects</code>.
           </>
         ) : (
-          "No files selected."
+          <>
+            None of those {picked.length} file(s) are <code>.jsonl</code> transcripts.
+          </>
         ),
         true,
       )
@@ -240,13 +299,15 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
     setNames(
       files
         .slice(0, MAX_LISTED)
-        .map((f) => f.name)
+        .map((p) => p.file.name)
         .concat(files.length > MAX_LISTED ? [`… +${files.length - MAX_LISTED} more`] : []),
     )
 
     let payload: RawFile[]
     try {
-      payload = await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() })))
+      payload = await Promise.all(
+        files.map(async (p) => ({ name: p.file.name, text: await p.file.text() })),
+      )
     } catch (e) {
       say(`Could not read the files: ${(e as Error).message}`, true)
       return
@@ -272,11 +333,31 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       return
     }
     if (!data.requests) {
+      /* Two different failures wearing the same face. Transcripts that are genuinely Claude
+         Code's and simply have nothing billed in them are a fact about the sessions; files that
+         came from somewhere else entirely are a wrong turn, and the folder's own name is the
+         quickest way to show which one happened. */
       say(
-        <>
-          Parsed {payload.length} file(s) but found no priced API requests — are these Claude Code
-          transcripts from <code>~/.claude/projects/</code>?
-        </>,
+        where.claude ? (
+          <>
+            Read {payload.length} transcript{payload.length > 1 ? "s" : ""} from{" "}
+            {where.root ? <b>{where.root}</b> : "that folder"}, and none of them holds a priced API
+            request — nothing here has been billed.
+          </>
+        ) : (
+          <>
+            Those {payload.length} <code>.jsonl</code> file{payload.length > 1 ? "s" : ""} hold no
+            priced API request.{" "}
+            {where.root ? (
+              <>
+                <b>{where.root}</b> is not
+              </>
+            ) : (
+              "They did not come from"
+            )}{" "}
+            <code>~/.claude/projects</code>, which is where Claude Code keeps its transcripts.
+          </>
+        ),
         true,
       )
       return
@@ -291,14 +372,15 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
     setOver(false)
     const items = e.dataTransfer?.items
     if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
-      const out: File[] = []
+      const out: Picked[] = []
       const entries = [...items]
         .map((i) => i.webkitGetAsEntry())
         .filter((x): x is FileSystemEntry => !!x)
       await Promise.all(entries.map((entry) => walkEntry(entry, out)))
       await handle(out)
     } else {
-      await handle(e.dataTransfer?.files ?? null)
+      // Loose files, and no folder above them to name: the path is the file.
+      await handle([...(e.dataTransfer?.files ?? [])].map((f) => ({ file: f, path: f.name })))
     }
   }
 
@@ -407,7 +489,14 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
         directory=""
         className="hidden"
         onChange={(e) => {
-          void handle(e.target.files)
+          /* `webkitRelativePath` is what a folder pick adds over a file pick, and it is the whole
+             reason the page can tell `projects` from `Downloads` without asking. */
+          void handle(
+            [...(e.target.files ?? [])].map((f) => ({
+              file: f,
+              path: f.webkitRelativePath || f.name,
+            })),
+          )
         }}
       />
       <p className="privacy">Parsed in this page · nothing is uploaded</p>
