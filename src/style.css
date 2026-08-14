@@ -1307,13 +1307,23 @@ tfoot .n {
     transform: scale(1);
   }
 }
-/* Sized off the longest name, so walking the three does not shunt the row about. */
+/* Sized off the longest name, so walking the three does not shunt the row about.
+   Flex the whole way down, including the swap span in the middle, rather than letting any part of
+   this sit in a line box: an inline-flex inside an inline-block is aligned on its baseline, and
+   the baseline of a row whose tallest thing is a 13px drawing is not its middle. That is what sat
+   the mark and the word 3px from the top of the chip and 5px from the bottom while the chevron
+   beside them -- a plain flex item -- was dead centre. */
+.osname,
+.osname .t-text-swap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
 .osname {
   min-width: 9.6ch;
-  text-align: left;
 }
 .osface {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 5px;
 }
