@@ -332,12 +332,23 @@ button {
   text-transform: uppercase;
   color: var(--ink3);
 }
+/* The figure's box is the type's, and the rolling digits are let out of it.
+   NumberFlow pads its own box top and bottom by half the vertical mask, so the fade has
+   somewhere to paint. That padding is decoration rather than type, and left in the flow it
+   makes the bill some 19px taller than the dash standing in for it -- which `.chead`, being
+   bottom-aligned, pays for by dropping the eyebrow and the heading by that much the moment a
+   report arrives. So the height is stated here, in the figure's own line box, and both faces
+   set their heading against the same one. The digits overflow it and nothing clips them. */
 .total {
   font-family: var(--mono);
   font-size: 33px;
   font-weight: 600;
   line-height: 1.02;
   letter-spacing: -0.03em;
+  height: 1.02em;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 .total[data-hidden="1"],
 .total[data-empty="1"] {
