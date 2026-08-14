@@ -1133,10 +1133,11 @@ tfoot .n {
    target, so the target has to be the frame's inside rather than a panel sitting in the middle
    of it. `flex: 1` is the same claim the chart makes on the same space.
 
-   And the same three bands the report puts in it, which is the point: the lede stands where the
-   thesis strip stands, the invitation stands where the picture stands, and the privacy line
-   stands on the rule where the chart switch stands. A frame this tall centring one small cluster
-   is a frame that looks empty; the same height read as a layout does not. */
+   Two bands now, on the report's own lines: the invitation stands where the picture stands and
+   the privacy line stands on the rule where the chart switch stands. There were three, with the
+   lede up on the thesis strip's line -- which mirrored the report exactly and read, on this face,
+   as a centred sentence orphaned under a left-aligned title with a hundred pixels of nothing
+   between it and the thing it introduced. It is the ask's subtitle, so it went to the ask. */
 .dropzone {
   flex: 1;
   min-height: 0;
@@ -1154,14 +1155,16 @@ tfoot .n {
 }
 /* Two classes deep on purpose: `.dropzone p` below is a class *and* a type, so it outranks a
    bare `.lede` however far down the file that is written -- which is how the old lede ended up
-   quietly taking the small size it was meant to override. */
-.dropzone > .lede {
+   quietly taking the small size it was meant to override.
+   The measure is set just inside the heading's, so the ask reads as one block down the middle of
+   the card rather than as a stack of three different widths. */
+.invite .lede {
   color: var(--ink2);
-  max-width: 74ch;
-  margin: 0 auto;
+  max-width: 58ch;
+  margin: -4px auto 0;
   font-size: 15px;
   line-height: 1.55;
-  text-wrap: pretty;
+  text-wrap: balance;
 }
 /* The middle band takes the slack, so the invitation sits on the card's centre line whatever
    the window has done to the two bands around it.
@@ -1209,17 +1212,19 @@ tfoot .n {
    read as a second thing to decide about. Space separates it now -- the only thing here that is
    drawn is the switch, because the switch is the only thing you can press. */
 .howto {
+  /* The hint's containing block, which is the whole point: see `.howto .t-tt`. */
+  position: relative;
   width: 100%;
   /* A shade under the heading's own measure, so the block below it lines up with the block
      above rather than introducing a third width down the middle of the card. */
   max-width: 58ch;
   text-align: center;
   /* The step from the ask to the help: on top of the band's own 18, so the button and the note
-     under it are two things rather than one stack of four evenly spaced rows. The 32 rather
-     than 16 is the platform hint's doing -- it opens upward into this gap (see below), and the
-     hint is a black chip opening under a black button: at the 3px the smaller gap left, the two
-     read as one shape rather than as a hint above a control. */
-  margin: 32px 0 0;
+     under it are two things rather than one stack of four evenly spaced rows.
+     It was 32 for a while, to hold the platform hint when that opened upward -- 50px of empty
+     card between a button and the note under it, spent entirely on a chip that is only there
+     while a pointer rests on the switch. Moving the hint below the block bought that back. */
+  margin: 16px 0 0;
 }
 .howhead {
   display: flex;
@@ -1263,16 +1268,16 @@ tfoot .n {
   color: var(--ink);
   border-color: var(--rule);
 }
-/* This one hint opens *upward*. Everywhere else a tip hangs below its control, which is right in
-   the toolbar -- the bar is the first thing on the page, so downward is the only way that stays
-   on screen. Here the thing directly below the control is the instruction the control chooses,
-   and a hint that covers it answers a question by hiding the answer. Above it is the gap to the
-   button, which holds nothing. It still hangs from the right edge, so it can only ever grow
-   leftward into the card and never off it. */
+/* This one hint hangs off the *block* rather than off its own control -- the switch's span is the
+   only trigger on the page without `t-tt-host`, so the nearest positioned ancestor is `.howto`.
+   Everywhere else a tip drops straight out of the control it describes, which is right in the
+   toolbar. Here the thing immediately under the control is the instruction the control chooses,
+   and a hint that covers it answers a question by hiding the answer; upward is the gap to the
+   button, and holding a 50px gap open all the time for a chip that appears on hover is paying
+   for it in the layout every reader sees. Under the block is empty card. Still off the right
+   edge, so it can only ever grow leftward into the card and never off it. */
 .howto .t-tt {
-  top: auto;
-  bottom: calc(100% + 7px);
-  transform-origin: 100% 100%;
+  top: calc(100% + 9px);
 }
 .osname {
   min-width: 7ch;
@@ -1328,24 +1333,53 @@ tfoot .n {
   letter-spacing: -0.01em;
   user-select: all;
 }
+/* The one button on this face, and the only thing on the page a first-time reader has to press,
+   so it is sized for that rather than to the toolbar's scale: 13px on a 16/34 pad against the
+   11px on 9/16 it started at. It sat under a 27px heading looking like a secondary control in a
+   dialog, which is the wrong reading of the only control there is. */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
   border: 1px solid var(--rule);
   background: var(--panel);
   color: var(--ink);
-  font-size: 11px;
+  font-size: 13px;
   font-family: var(--mono);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 9px 16px;
+  padding: 16px 34px;
   cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-smooth-out),
+    border-color var(--duration-fast) var(--ease-smooth-out);
 }
 .btn:hover {
   background: var(--sunk);
+}
+/* A shade over the cap height, so the mark sits as the tallest thing on the line rather than
+   matching the letters and disappearing into them. */
+.btn .glyph {
+  width: 16px;
+  height: 16px;
 }
 .btn.primary {
   background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
+}
+/* The primary had no hover at all: `.btn.primary` and `.btn:hover` are the same specificity, so
+   the one written later won and the button did not answer the pointer. It answers in the accent
+   now -- the same colour the card's frame takes when a folder is dragged over it, so hovering
+   the button previews what dropping on the card will do. */
+.btn.primary:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
 }
 /* On a rule across the foot of the card, where the report draws one under its chart: the same
    band, so the two faces close the same way. */

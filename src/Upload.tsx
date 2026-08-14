@@ -34,6 +34,23 @@ const PLATFORMS: ReadonlyArray<{ value: Os; label: string }> = [
   { value: "linux", label: "Linux" },
 ]
 
+/** A folder, on the button that opens a folder picker. Decoration in the strict sense -- the
+ *  words beside it already say what it does -- but it is what a reader's eye lands on before the
+ *  words resolve, and this is the one control on the page that has to be pressed. Same recipe as
+ *  every other mark here: one 16-unit box, stroked in `currentColor`, so it takes the button's
+ *  paper against its ink and follows it into the accent on hover.
+ *
+ *  `aria-hidden`, because the button's own text is its name: a second reading of "folder" between
+ *  the two words would be noise. */
+function FolderMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M1.9 12.7V3.5h4.2l1.5 1.9h6.5v7.3a.6.6 0 0 1-.6.6H2.5a.6.6 0 0 1-.6-.6Z" />
+      <path d="M1.9 7.3h12.2" />
+    </svg>
+  )
+}
+
 /** The one platform, and the way to the next. Not a segmented control: two of the three options
  *  are wrong for any given reader, and a row that shows all three spends the space on the two
  *  that do not apply. The guess is right nearly always, so the odd reader it fails is served by
@@ -42,8 +59,12 @@ function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JS
   const tip = useId()
   const at = PLATFORMS.findIndex((p) => p.value === os)
   const next = PLATFORMS[(at + 1) % PLATFORMS.length]
+  /* No `t-tt-host` on this span, deliberately: the hint positions against `.howto` instead, which
+     is the nearest positioned ancestor, so it hangs under the whole block rather than off the
+     chip. See the CSS -- the space under the block is empty, and the space around the chip is
+     the instruction the chip chooses. */
   return (
-    <span className="t-tt-host">
+    <span>
       <button
         type="button"
         className="osbtn t-tt-trigger"
@@ -259,19 +280,13 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
         void onDrop(e)
       }}
     >
-      {/* Three bands, standing where the report's three stand: the lede on the strip's line, the
-          invitation on the picture's, the privacy note on the rule that closes the card.
+      {/* Two bands: the invitation on the line the report's picture takes, the privacy note on the
+          rule that closes the card.
 
-          One line, and it took three tries to get there. It was the method first -- per-request
-          billing, re-billed context, the definition of carry cost -- which is the right paragraph
-          in the wrong place: it argued for numbers to a reader who had not seen any. Then it was a
-          promise and a row of three things you get, one of which ("by project, by session") the
-          engine does not do: nothing here groups by project, and sessions are counted rather than
-          broken out. What survives is the offer and the claim the report can actually keep. */}
-      <p className="lede">
-        Drop the folder in and the bill comes back itemised — which tools, which subcommands, and
-        what each one cost on every request it stayed in.
-      </p>
+          There were three. The lede stood on the strip's line at the top, which mirrored the
+          report's own three bands and read, on the empty face, as an orphan: a centred sentence
+          under a left-aligned title, then a hundred pixels of nothing before the thing it was
+          introducing. It belongs to the ask, so it now stands with it. */}
       <div className="invite">
         {/* The ask is the folder, not the files. `.jsonl` is a detail of the format that a reader
             has no reason to know, and asking for files put them in a picker with a hidden dotfile
@@ -282,8 +297,21 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
         <h2>
           Drop your <code>~/.claude/projects</code> folder here
         </h2>
+        {/* What pressing the button gets you, in one line, and it took five tries to get down to
+            one. It was the method first -- per-request billing, re-billed context, the definition
+            of carry cost -- which is the right paragraph in the wrong place: it argued for numbers
+            to a reader who had not seen any. Then it was a promise and a row of three things you
+            get, one of which ("by project, by session") the engine does not do: nothing here
+            groups by project, and sessions are counted rather than broken out. Then it opened
+            "Drop the folder in and", which is what the heading directly above it now says. Then it
+            spent its first three words on grammar -- "The bill comes back…" -- before saying
+            anything at all.
+            What is left is a verb, the thing, and the three sizes the report actually resolves to.
+            One line that fits on one line: a subtitle that wraps is a paragraph. */}
+        <p className="lede">Chart your bill: every tool, every subcommand, every dollar.</p>
         <div className="picks">
           <button className="btn primary" type="button" onClick={() => dirPicker.current?.click()}>
+            <FolderMark />
             Choose folder
           </button>
         </div>
