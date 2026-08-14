@@ -11,13 +11,13 @@
    still read the one hover key from the one place, which is what lets the mosaic, the
    panels and the table stay a single instrument. */
 
-import { useMemo } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Dataset } from "./engine.ts"
 import { useReport } from "./context.ts"
 import { count, FOLD_MIN, ledger, money, pctOf } from "./model.ts"
 import { setHover, setState, type ViewState } from "./store.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
-import { Reveal } from "./Motion.tsx"
+import { cssMs, Reveal, transition } from "./Motion.tsx"
 import { HoverBar, Mosaic } from "./Mosaic.tsx"
 import { Panels } from "./Panels.tsx"
 import { Sunburst } from "./Sunburst.tsx"
@@ -124,6 +124,77 @@ function Strip(): React.JSX.Element {
   )
 }
 
+/** The query box.
+ *
+ *  What the reader types and what the breakdown is filtered by are the same string a beat
+ *  apart, and the beat is the point. A view transition needs two settled states to travel
+ *  between, and a keystroke is not a settled state: filtering on every one of them would be a
+ *  transition started and thrown away five times a second, which is the jump it was supposed
+ *  to replace with extra steps. So the box owns what is typed, the store owns what is
+ *  filtered, and the store catches up once the typing stops.
+ *
+ *  `--find-settle` is short enough that the list still reads as following the keys rather than
+ *  waiting for them -- a search box is expected to think for a moment, and this one then has
+ *  something to show for it.
+ *
+ *  The store can also change the query without the box: a shared link seeds one, and "New
+ *  analysis" clears it. `committed` is how the box tells that apart from its own echo -- the
+ *  value it last sent is not news coming back. */
+function Find(): React.JSX.Element {
+  const { state } = useReport()
+  const [typed, setTyped] = useState(state.query)
+  const committed = useRef(state.query)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (state.query === committed.current) return
+    committed.current = state.query
+    setTyped(state.query)
+  }, [state.query])
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
+
+  const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value
+    setTyped(query)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(
+      () => {
+        committed.current = query
+        transition(() => setState({ query }), { "data-filter": "" })
+      },
+      cssMs("--find-settle", 150),
+    )
+  }, [])
+
+  return (
+    <>
+      <label htmlFor="q">Find</label>
+      {/* The browser's own suggestions are off because there is nothing here for them to be
+          right about: this box filters the line items of one bill, and what it offers instead
+          is whatever the reader last typed into a box called `q` on some other site.
+          Spellcheck goes with it -- the vocabulary is `mkdir`, `git diff` and tool names, and
+          every one of them would be underlined as a mistake. */}
+      <input
+        id="q"
+        type="search"
+        value={typed}
+        placeholder="git diff, thinking, schema…"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        onChange={onChange}
+      />
+    </>
+  )
+}
+
 export function Breakdown(): React.JSX.Element {
   const { d, state, amt } = useReport()
   /* Memoised for its identity rather than its cost -- a ledger walk is microseconds, and the
@@ -138,14 +209,7 @@ export function Breakdown(): React.JSX.Element {
       <div className="bhead">
         <h2>Breakdown</h2>
         <div className="bctl">
-          <label htmlFor="q">Find</label>
-          <input
-            id="q"
-            type="search"
-            value={state.query}
-            placeholder="git diff, thinking, schema…"
-            onChange={(e) => setState({ query: e.target.value })}
-          />
+          <Find />
           <Seg options={VIEWS} value={state.view} onPick={pickView} />
         </div>
       </div>

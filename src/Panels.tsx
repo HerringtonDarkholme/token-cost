@@ -5,6 +5,7 @@
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
 import { fold, kidsOf, maxCost, pctOf, type CostNode } from "./model.ts"
+import { vtName } from "./Motion.tsx"
 import { hoverBind, useHover } from "./store.ts"
 
 /* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when
@@ -41,8 +42,12 @@ const Panel = memo(function Panel({
       ? ""
       : `shown: ${amt(shown)} of ${amt(panel.cost)}`
 
+  /* Named for the filter transition -- see `vtName`. The key is the panel's identity rather
+     than its place in the grid, which is the whole point: a query that removes the third
+     panel moves the fourth into its slot, and a name that counted slots would morph one line
+     item into a different one. */
   return (
-    <div className="pan">
+    <div className="pan" style={vtName(key)}>
       <div className="pantop">
         <button
           type="button"
@@ -76,6 +81,7 @@ const Panel = memo(function Panel({
             <div
               className="pi"
               key={kk}
+              style={vtName(kk)}
               data-on={active ? 1 : 0}
               {...hoverBind({
                 key: kk,

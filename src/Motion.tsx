@@ -1,19 +1,85 @@
 /* The three transition primitives the page composes: a panel that slides into the region
-   another one left, a figure that re-enters character by character, and a line of copy that
-   swaps for a different line.
+   another one left, a figure that rolls from the number it was to the number it is, and a line
+   of copy that swaps for a different line.
 
    They live together because they are the same kind of thing -- a small component whose whole
-   job is to make a change visible -- and because all three read their timing off the
-   stylesheet rather than carrying a number of their own. The CSS is where the motion is
-   tuned; a duration written twice is a duration that drifts. */
+   job is to make a change visible -- and because they read their timing off the stylesheet
+   rather than carrying a number of their own. The CSS is where the motion is tuned; a duration
+   written twice is a duration that drifts. */
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { flushSync } from "react-dom"
+import NumberFlow, { useIsSupported, type Format } from "@number-flow/react"
 
 /** A duration from the stylesheet, in milliseconds. `parseFloat` is enough because every
  *  duration on the scale is written in `ms`. */
 export function cssMs(name: string, fallback: number): number {
   const value = getComputedStyle(document.documentElement).getPropertyValue(name)
   return parseFloat(value) || fallback
+}
+
+/** Motion the reader asked not to see. Asked each time rather than once, because the setting
+ *  can change under a page that is already open. */
+export function reduced(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
+}
+
+/** Whether a state change can be made as a view transition at all: the browser has the API,
+ *  and the reader has not asked for stillness. Asked separately from `transition` below
+ *  because a caller with a fallback has to choose the path *before* it takes the first step
+ *  of either -- the turn scrolls the page differently depending on whether what happens next
+ *  is a snapshot or a live exit. */
+export function canTransition(): boolean {
+  return typeof document.startViewTransition === "function" && !reduced()
+}
+
+/** Run `swap` as a view transition, with `mark` stamped on the document root for exactly as
+ *  long as it lasts.
+ *
+ *  The mark is how the stylesheet knows which transition this is. The pseudo-elements are
+ *  children of the root's own tree rather than of anything the component rendered, so a class
+ *  on the shell cannot reach them -- and a page with two different transitions in it needs to
+ *  be able to say which rules belong to which. It is also what switches on the
+ *  `view-transition-name`s themselves: a name is a promise that the element is worth
+ *  capturing separately, and forty rows making that promise during a transition that is not
+ *  about them would be forty things lifted out of a picture they belong in.
+ *
+ *  `flushSync`, because the callback has to leave the DOM in its new state by the time it
+ *  returns: an update React was free to batch until later would be captured as the *old*
+ *  screen, and the transition would cross-fade two identical pictures.
+ *
+ *  Where there is no transition to be had, `swap` still runs -- just on its own, immediately.
+ */
+export function transition(swap: () => void, mark: Record<string, string>): void {
+  const start = document.startViewTransition
+  if (typeof start !== "function" || reduced()) {
+    swap()
+    return
+  }
+  const root = document.documentElement
+  for (const [name, value] of Object.entries(mark)) root.setAttribute(name, value)
+  const run = start.call(document, () => flushSync(swap))
+  void run.finished
+    .catch(() => {})
+    .then(() => Object.keys(mark).forEach((name) => root.removeAttribute(name)))
+}
+
+/** A stable name for one thing across a transition, from whatever the rest of the page
+ *  already calls it.
+ *
+ *  Handed to the element as a custom property rather than as `view-transition-name` itself,
+ *  because the name has to be switchable from the stylesheet: see `transition` above, and
+ *  `:root[data-filter]` below it. A custom property costs nothing to carry when nothing is
+ *  reading it, while a name is a stacking context and a separately-captured layer on every
+ *  row of the table for the whole life of the page.
+ *
+ *  Hashed because the keys are line-item names -- "Tools · content read in›acme…" -- and a
+ *  `view-transition-name` is a CSS ident, which those are not. The letter in front is what
+ *  keeps a name that starts with a digit legal. */
+export function vtName(key: string): React.CSSProperties {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (Math.imul(h, 31) + key.charCodeAt(i)) | 0
+  return { "--vt": "v" + (h >>> 0).toString(36) } as React.CSSProperties
 }
 
 /** The panel a swapped-in view arrives in. Mounted closed and opened on the next frame,
@@ -54,61 +120,60 @@ export function Reveal({
   )
 }
 
-/** How long a digit pop-in runs, read off the stylesheet so the two cannot drift: the last
- *  two characters ride one and two stagger offsets behind the rest of the figure. */
-function popMs(): number {
-  return cssMs("--digit-dur", 500) + cssMs("--digit-stagger", 70) * 2 + 40
+/** The bill's own format, stated once. `money()` in `model.ts` produces the same string from
+ *  the same options; this is the machine-readable half of that agreement, because NumberFlow
+ *  is handed the number and the format rather than the text.
+ *
+ *  `Format` rather than `Intl.NumberFormatOptions`: the component narrows the options to the
+ *  ones it can take apart into digits, and an engineering notation is not one of them. */
+const MONEY: Format = {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 }
 
-/** A figure that re-enters character by character when it changes. Switching the TTL lens,
- *  covering the amount and arriving at a bill at all put a different number in the same place,
- *  and a number that changes without moving is a number the reader can miss.
+/** The bill, as a figure that travels between the numbers rather than cutting between them.
  *
- *  The group is keyed on a beat rather than mutated in place: a remount is what replays a CSS
- *  animation, which is the same thing the reference's remove-reflow-re-add dance buys. The
- *  beat drops back to 0 when the animation is over, which is what takes `.is-animating` off
- *  again -- the PNG rasterises this markup in a fresh document, where a live animation would
- *  be caught at its first frame with the digits still invisible. */
-export function PopNumber({
+ *  Switching the TTL lens moves the total by a few percent, and a few percent is exactly the
+ *  size of change a reader misses when it lands in one frame. Rolling the digits that actually
+ *  changed -- which is what NumberFlow does, digit by digit and against the real width of each
+ *  one -- says *which* part of the figure moved as well as that it moved, and says it in the
+ *  place the reader is already looking.
+ *
+ *  `value` is null for the two states that are not a number: the dash standing in for a bill
+ *  that has not been calculated, and the asterisks covering one that is being hidden on a
+ *  shared screen. Both are text in a plain span, because there is nothing to interpolate
+ *  between "—" and "$1,204.55" -- and because a masked figure that rolled its digits would be
+ *  animating the thing it is there to withhold.
+ *
+ *  So is anything at all, when the browser cannot run the animation or the reader has asked not
+ *  to see one. The digits are timed through the Web Animations API against measured character
+ *  widths, and where that is missing the component renders markup that is a scaffold for a
+ *  figure rather than a figure -- so `useIsSupported` decides whether it is asked at all. The
+ *  reduced-motion half is this page's own question rather than the component's, because the
+ *  answer has to be the one the rest of the stylesheet is giving.
+ *
+ *  `data-flat` carries that same text for the PNG, which is a document the digits cannot reach:
+ *  the snapshot serialises this markup as XML into a foreignObject, where the custom element is
+ *  undefined and its shadow root did not come along. Written here rather than read back off the
+ *  component, because what the component puts in the light DOM is its business. */
+export function Figure({
   value,
+  text,
   className,
 }: {
-  value: string
+  value: number | null
+  text: string
   className?: string
 }): React.JSX.Element {
-  const [beat, setBeat] = useState(0)
-  const shown = useRef(value)
-
-  useEffect(() => {
-    if (shown.current === value) return
-    shown.current = value
-    setBeat((n) => n + 1)
-    const t = setTimeout(() => setBeat(0), popMs())
-    return () => clearTimeout(t)
-  }, [value])
-
-  const chars = [...value]
+  const supported = useIsSupported()
+  if (value === null || !supported || reduced()) {
+    return <span className={className}>{text}</span>
+  }
   return (
-    <span
-      key={beat}
-      className={`t-digit-group${beat ? " is-animating" : ""}${className ? " " + className : ""}`}
-    >
-      {/* Keyed by position on purpose, which is the one case an index key is the right key:
-          these are the columns of a figure, not a list of things. "$1,204.55" becoming
-          "$989.10" should re-letter the spans that are already there rather than match
-          characters up by name, and the stagger below is a position too. */}
-      {/* oxlint-disable react/no-array-index-key -- see above. A block rather than a
-          `disable-next-line`, because the line the key sits on is oxfmt's to choose. */}
-      {chars.map((ch, i) => (
-        <span
-          key={i}
-          className="t-digit"
-          data-stagger={i === chars.length - 2 ? 1 : i === chars.length - 1 ? 2 : undefined}
-        >
-          {ch}
-        </span>
-      ))}
-      {/* oxlint-enable react/no-array-index-key */}
+    <span className={className} data-flat={text}>
+      <NumberFlow value={value} format={MONEY} />
     </span>
   )
 }

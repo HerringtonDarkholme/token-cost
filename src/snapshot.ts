@@ -23,6 +23,28 @@ const SCALE = 2
 /** Elements the reader needs but the picture does not: controls that do nothing in a PNG. */
 const OMIT = "[data-nosnap]"
 
+/** Figures whose digits live in a shadow root, which does not survive the trip below. */
+const FLAT = "[data-flat]"
+
+/** Replace the animated figures with their own text.
+ *
+ *  The rolling total is a custom element that renders into a shadow root. `XMLSerializer`
+ *  walks light DOM only, and the document at the far end of a `data:` URL has never heard of
+ *  the element anyway -- so what would arrive is a tag with a stylesheet in it where the bill
+ *  should be, and the header of the picture would have a blank in it.
+ *
+ *  The figure it is showing is on the wrapper, put there for exactly this. See `Figure` in
+ *  `Motion.tsx`: the same string the reader is looking at, written down in a place that
+ *  survives being serialised. */
+function flatten(clone: HTMLElement): void {
+  for (const el of Array.from(clone.querySelectorAll(FLAT))) {
+    const span = document.createElement("span")
+    span.className = el.className
+    span.textContent = el.getAttribute("data-flat") || ""
+    el.replaceWith(span)
+  }
+}
+
 /** Every rule of every stylesheet the page loaded, as text.
  *
  *  `cssRules` throws on a cross-origin sheet. This page has none -- the stylesheet is a
@@ -79,6 +101,7 @@ export async function snapshot(el: HTMLElement, scale = SCALE): Promise<Blob> {
 
   const clone = el.cloneNode(true) as HTMLElement
   for (const gone of Array.from(clone.querySelectorAll(OMIT))) gone.remove()
+  flatten(clone)
   /* Pinned rather than left to re-resolve: the card's height comes from an aspect ratio
      against a width that would otherwise be whatever the foreignObject decided. */
   clone.style.width = `${rect.width}px`

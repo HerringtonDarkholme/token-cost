@@ -385,23 +385,24 @@ describe("interaction", () => {
     }
   })
 
-  /* The total re-enters character by character when the lens or the mask changes it. The
-     figure is split across spans to do that, so what has to hold is that it is still one
-     number: the same characters, in order, and no digit left out. */
-  it("the total is a row of digits, and stays the whole figure", () => {
-    const digits = (): string[] =>
-      [...container.querySelectorAll(".total .t-digit")].map((el) => el.textContent || "")
-    expect(digits().join("")).toBe(container.querySelector(".total")?.textContent)
-    expect(digits().length).toBeGreaterThan(3)
-    // The last two characters ride behind the rest, which is what makes cents feel alive.
-    expect(
-      [...container.querySelectorAll(".total .t-digit[data-stagger]")].map((el) =>
-        el.getAttribute("data-stagger"),
-      ),
-    ).toEqual(["1", "2"])
+  /* The total rolls from one figure to the next when the lens or the mask changes it. Those
+     digits are a custom element, and this DOM does not register it -- which is the case
+     `Figure` already has to answer for old browsers and for readers with motion turned off, so
+     what runs here is that fallback rather than the animation.
+
+     Which leaves the claim that holds either way, and is the one worth having: whatever the
+     header is drawn with, it is showing the whole figure, and that figure is somewhere the PNG
+     can read it. `data-flat` is that place -- see `flatten` in `snapshot.ts`, which would
+     otherwise serialise a stylesheet into the space where the bill goes. */
+  it("the total is the whole figure, drawn either way", () => {
+    const total = (): Element | null => container.querySelector(".total")
+    const figure = (): string =>
+      total()?.querySelector("[data-flat]")?.getAttribute("data-flat") ?? total()?.textContent ?? ""
+
+    expect(figure()).toMatch(/^\$[\d,]+\.\d\d$/)
 
     show({ pctOnly: true })
-    expect(digits().join("")).toMatch(/^\*+$/)
+    expect(figure()).toMatch(/^\*+$/)
   })
 
   /* The picture is the biggest thing on the page and the frame around it is a different shape
@@ -434,7 +435,7 @@ describe("interaction", () => {
     expectClean()
   })
 
-  it("typing in the search box keeps focus", () => {
+  it("typing in the search box keeps focus, and the filter follows a beat later", async () => {
     const input = container.querySelector<HTMLInputElement>("#q")
     expect(input).not.toBeNull()
     input!.focus()
@@ -444,6 +445,14 @@ describe("interaction", () => {
       const native = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")
       native!.set!.call(input, "git")
       input!.dispatchEvent(new Event("input", { bubbles: true }))
+    })
+    /* The box has the letters at once and the breakdown does not, which is the arrangement
+       the filter's view transition needs: a keystroke is not a state worth travelling to.
+       See `Find` in `Report.tsx` -- `--find-settle` is the whole of the delay. */
+    expect(input!.value).toBe("git")
+    expect(getState().query).toBe("")
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 400))
     })
     expect(getState().query).toBe("git")
     // The old renderer replaced the whole subtree on every keystroke and had to restore

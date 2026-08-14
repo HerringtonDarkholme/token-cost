@@ -629,6 +629,16 @@ button {
   padding: 5px 9px;
   width: 230px;
 }
+/* The page's `:focus-visible` ring is drawn for things that have no focused state of their
+   own -- a button, a segment, a link -- and it is drawn 2px thick and 2px clear of the box so
+   it reads against them. A text field does have a focused state of its own, and the ring on
+   top of it made two rectangles where the reader is looking at one. So the field states its
+   own focus, in the same accent, on the edge it already has. */
+.bctl input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .panels {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -1865,14 +1875,17 @@ kbd {
   --tabs-text-muted: var(--ink2);
   --tabs-text-active: var(--ink);
   --tabs-pill-bg: var(--ink);
-  /* Number pop-in */
-  --digit-dur: var(--duration-very-slow);
-  --digit-distance: var(--distance-base);
-  --digit-stagger: 70ms;
-  --digit-blur: var(--blur-small);
-  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
-  --digit-dir-x: 0;
-  --digit-dir-y: 1;
+  /* Rolling figure. The digits are NumberFlow's, and so is their timing -- it is passed to the
+     Web Animations API rather than declared, so there is nothing there for the scale to hold.
+     What it does read off the cascade is two masks, and both are in `em` so they hold at any
+     size the figure is set at.
+
+     The vertical one fades a digit out at the top and bottom of the strip it spins through, and
+     is left near its default. The horizontal one fades the ends of the figure while it changes
+     width, and is halved: at the 33px this is set at, the default eats most of the dollar
+     sign -- and the dollar sign is the one character in the figure that never moves. */
+  --number-flow-mask-height: 0.28em;
+  --number-flow-mask-width: 0.25em;
   /* Text states swap */
   --text-swap-dur: var(--duration-quick);
   --text-swap-translate-y: var(--distance-micro);
@@ -1893,6 +1906,40 @@ kbd {
   --panel-exit-y: calc(var(--panel-translate-y) * -1);
   --panel-blur: var(--blur-small);
   --panel-ease: var(--ease-smooth-out);
+
+  /* How long the page under the card waits before it follows the card. The card is the
+     answer; the breakdown is the working behind it, and the working arriving in the same
+     instant is what made the report read as one flash rather than as a page assembling
+     itself. `--duration-quick` because it has to be long enough to be a sequence and short
+     enough not to be a wait -- the card is still opening when the breakdown starts. */
+  --face-stagger: var(--duration-quick);
+
+  /* The breakdown filtering itself. `--find-settle` is not a duration on screen: it is how
+     long the query box waits after the last keystroke before it hands the store a value to
+     filter by. A view transition needs two settled states to travel between, and a string
+     halfway through being typed is not one of them. `--duration-quick` is the shortest wait
+     that reliably has a whole word in it and the longest that still reads as the list
+     following the keys. */
+  --filter-dur: var(--duration-fast);
+  --filter-ease: var(--ease-smooth-out);
+  --find-settle: var(--duration-quick);
+
+  /* Bars drawing themselves. `both` on the animation is what holds them at zero through the
+     delay, so a bar's first appearance is its own left edge rather than a full-width bar
+     waiting to be noticed.
+
+     The two staggers are indices rather than durations: `--bar-stagger` counts across the
+     panels in reading order, `--row-stagger` counts down the rows inside one. Down is faster
+     than across, because a panel's rows are one gesture and the grid of panels is nine.
+
+     `--duration-fast` rather than the panel's own `--duration-slow`: a bar is not a panel
+     opening, it is a length being stated, and the sweep across nine panels is already 360ms
+     of stagger on top of whatever each one costs. The switch from table to panels is the
+     mount that happens most, and it has no card arriving over it to hide a long draw. */
+  --bar-dur: var(--duration-fast);
+  --bar-ease: var(--ease-smooth-out);
+  --bar-stagger: var(--duration-stagger);
+  --row-stagger: 18ms;
 
   /* The intake's two faces. One duration for the crossfade and for the height the box grows
      through, so the note leaving, the list arriving and the box resizing are one movement rather
@@ -2035,46 +2082,6 @@ kbd {
   }
 }
 
-/* Number pop-in — the billed total, re-entering from below when the lens or the
-   mask changes it. */
-@keyframes t-digit-pop-in {
-  0% {
-    transform: translate(
-      calc(var(--digit-distance) * var(--digit-dir-x)),
-      calc(var(--digit-distance) * var(--digit-dir-y))
-    );
-    opacity: 0;
-    filter: blur(var(--digit-blur));
-  }
-  100% {
-    transform: translate(0, 0);
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-.t-digit-group {
-  display: inline-flex;
-  align-items: baseline;
-}
-.t-digit {
-  display: inline-block;
-  will-change: transform, opacity, filter;
-}
-.t-digit-group.is-animating .t-digit {
-  animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
-}
-.t-digit-group.is-animating .t-digit[data-stagger="1"] {
-  animation-delay: var(--digit-stagger);
-}
-.t-digit-group.is-animating .t-digit[data-stagger="2"] {
-  animation-delay: calc(var(--digit-stagger) * 2);
-}
-@media (prefers-reduced-motion: reduce) {
-  .t-digit-group .t-digit {
-    animation: none !important;
-  }
-}
-
 /* Text states swap — the copy and share buttons, whose label is a running
    account of what just happened. */
 .t-text-swap {
@@ -2173,6 +2180,14 @@ kbd {
     opacity var(--panel-open-dur) var(--panel-ease),
     filter var(--panel-open-dur) var(--panel-ease);
 }
+/* The working, after the answer. The other half of `--face-stagger`, for the browsers that
+   take the two-step path: the card moves, and the page under it follows. Both directions,
+   because a breakdown that left first would empty the page bottom-up on the way out and
+   top-down on the way in. */
+.below.t-panel-slide[data-open="true"],
+.below.t-panel-slide[data-leaving="1"] {
+  transition-delay: var(--face-stagger);
+}
 @media (prefers-reduced-motion: reduce) {
   .t-panel-slide {
     transition: none !important;
@@ -2184,6 +2199,173 @@ kbd {
    way a stack of pages behaves. One value, because the exit is derived from it. */
 .shell[data-dir="back"] {
   --panel-translate-y: -24px;
+}
+
+/* The screen change, as a view transition — the drop zone becoming the report, and the
+   report becoming the drop zone again.
+
+   Everything below runs against snapshots rather than against the page. `App.tsx` hands the
+   browser one state change; the browser photographs the old screen, lets the change land, and
+   builds a pseudo-element tree beside the real one: a `group` per named element, holding an
+   `old` picture and a `new` live rendering. Those are what these rules animate. The real DOM
+   is already in its new state the whole time.
+
+   What is named is the whole argument of this block, and the rule is that a name is a claim of
+   identity: these two things, on the two screens, are the same thing. Five qualify.
+
+   The heading is the clearest of them. "Where did your money go?" and "Where the money went"
+   are one sentence in two tenses -- the question and its answer -- so the question does not
+   leave and the answer does not arrive: the words change while the line stays where it is.
+   The eyebrow the same, gaining the scope it is now able to state; the caption under the
+   figure the same; the figure itself the same, a dash standing in the place the bill will
+   occupy and then being replaced by it. And the card, which is the page's one frame: it does
+   not go anywhere, it stops being a dashed invitation and becomes a solid border around a
+   chart -- a change no CSS transition can make, since `border-style` does not interpolate.
+
+   What is deliberately *not* named is everything that is genuinely being replaced rather than
+   changed. The drop zone is not an earlier draft of the mosaic and the note about finding the
+   transcripts is not an earlier draft of the breakdown, so pairing them off would be a claim
+   that is not true, and it would look like one: two unrelated pictures stretching into each
+   other. Those ride in the root snapshot and cross-fade, and the arriving ones still slide up
+   under their own `.t-panel-slide` -- which runs live inside the new snapshot, and which is
+   where the breakdown's wait behind the card continues to come from. */
+.card {
+  view-transition-name: vt-card;
+}
+.chead .eyebrow {
+  view-transition-name: vt-eyebrow;
+}
+.chead h1 {
+  view-transition-name: vt-title;
+}
+.chead .billed {
+  view-transition-name: vt-billed;
+}
+.chead .total {
+  view-transition-name: vt-total;
+}
+
+/* The morph, at the page's own tempo rather than the browser's 250ms. One duration for the
+   box and for the two pictures crossing inside it, because a frame that arrives before its
+   contents is a frame that arrives twice. */
+::view-transition-group(vt-card),
+::view-transition-group(vt-eyebrow),
+::view-transition-group(vt-title),
+::view-transition-group(vt-billed),
+::view-transition-group(vt-total),
+::view-transition-old(vt-card),
+::view-transition-new(vt-card),
+::view-transition-old(vt-eyebrow),
+::view-transition-new(vt-eyebrow),
+::view-transition-old(vt-title),
+::view-transition-new(vt-title),
+::view-transition-old(vt-billed),
+::view-transition-new(vt-billed),
+::view-transition-old(vt-total),
+::view-transition-new(vt-total) {
+  animation-duration: var(--panel-close-dur);
+  animation-timing-function: var(--panel-ease);
+}
+
+/* Text does not stretch. A snapshot is a replaced element, and the browser's default is to
+   fill the group box with it -- which is right for the card, whose two sides are the same
+   size, and wrong for every line of copy here, whose two sides are not: a question and its
+   answer are different lengths, and a dash is not as wide as a bill. `object-fit: none` draws
+   each picture at the size it was taken and lets the box travel underneath it, so what the
+   reader sees is one line of words becoming another rather than two being squeezed.
+
+   Anchored where the copy is set: the heading and the eyebrow grow rightward from a left
+   margin, the figure and its caption grow leftward from a right one. */
+::view-transition-old(vt-eyebrow),
+::view-transition-new(vt-eyebrow),
+::view-transition-old(vt-title),
+::view-transition-new(vt-title) {
+  width: auto;
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+::view-transition-old(vt-billed),
+::view-transition-new(vt-billed),
+::view-transition-old(vt-total),
+::view-transition-new(vt-total) {
+  width: auto;
+  height: 100%;
+  object-fit: none;
+  object-position: right top;
+}
+
+/* The copy has a swap of its own for the browsers with no view transition to run -- see
+   `TextSwap` in `Motion.tsx`, which is what changes these same words on the fallback path.
+   Where there is one, it would be a second animation playing inside the first: the new words
+   sliding up through a box that is already travelling. So while `data-turn` is on the root the
+   swap holds still, and the attribute coming off at the end leaves the words where they are. */
+:root[data-turn] .t-text-swap {
+  transform: none;
+  filter: none;
+  opacity: 1;
+  transition: none;
+}
+
+/* The transition is not started at all when motion is reduced -- see `reduced()` in
+   `App.tsx` -- so this is the belt to that braces: `*` does not match a pseudo-element, which
+   means the blanket rule at the top of this file cannot reach any of the above. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* The breakdown filtering itself, as the page's second view transition.
+   ─────────────────────────────────────────────────────────────────────────────
+   Typing in the query box used to change the list between two frames: panels vanished, the
+   ones after them slid up into the gap with no travel, and the rows left over were suddenly
+   somewhere else. Nothing about that told the reader whether a line item had been filtered out
+   or had simply moved -- which is the only question a filter has to answer.
+
+   Same machinery as the turn above, opposite claim about what is named. Up there the two
+   screens are different content and only a handful of things are the same thing twice; here
+   almost everything is the same thing twice, and what changes is which of them are present
+   and where they sit. So every panel and every row is named, by identity rather than by
+   position -- `vtName` in `Motion.tsx` hashes the key the row is already keyed by -- and the
+   browser is left to work out which of them survived. A row in both states travels between
+   its two positions; a row in one state fades, and the fact that it fades rather than travels
+   is the answer to the question.
+
+   The names are switched on by `data-filter` and are absent otherwise, for the same reason
+   they are by identity: a name is a claim that this element is worth photographing on its
+   own, and it is not one the table's forty rows should be making during the turn, when the
+   whole page is what is changing. */
+:root[data-filter] .pan,
+:root[data-filter] .pi,
+:root[data-filter] tbody > tr {
+  view-transition-name: var(--vt, none);
+}
+
+/* The query box is exempt from its own transition. It is the one element the reader may still
+   be typing into while this runs, and a photograph of it laid over the live one is a caret in
+   two places and a letter that arrives faint. Naming it lifts it clear of the root snapshot;
+   dropping its `old` leaves the real control on screen, unphotographed, all the way through. */
+:root[data-filter] .bctl {
+  view-transition-name: vt-find;
+}
+:root[data-filter]::view-transition-old(vt-find) {
+  display: none;
+}
+:root[data-filter]::view-transition-new(vt-find) {
+  animation: none;
+}
+
+/* Faster than the turn, and for the same reason the bars are: a filter is an adjustment to
+   something the reader is already looking at, not an arrival. Scoped to `data-filter` so the
+   turn's own five morphs keep their slower tempo -- `*` here would otherwise reach them too. */
+:root[data-filter]::view-transition-group(*),
+:root[data-filter]::view-transition-old(*),
+:root[data-filter]::view-transition-new(*) {
+  animation-duration: var(--filter-dur);
+  animation-timing-function: var(--filter-ease);
 }
 
 /* Controls growing into the toolbar — the five that only mean something once there is a bill.
@@ -2240,6 +2422,154 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .t-grow,
   .toolbar[data-leaving="1"] .t-grow {
+    animation: none !important;
+  }
+}
+
+/* Bars drawing themselves — every bar in the breakdown, wiped out from its left edge
+   rather than already at length when the panel arrives.
+
+   A bar is a length, and a length that appears is a length nobody watched being measured.
+   Drawn, the same panel says which line items are big before any of the labels are read,
+   because the long ones are still moving when the short ones have stopped.
+
+   `scaleX` rather than `width`, because the width is React's -- it is a percentage in a
+   style attribute that changes on every drill, lens and query. Scaling a bar that is
+   already the right width leaves that untouched, and stays on the compositor.
+
+   It plays once, when the bars mount: the panels re-render constantly (a pointer crossing
+   one re-renders it) and a CSS animation does not restart on a re-render, only on a
+   remount. Which is exactly the set of moments worth drawing -- the report arriving, the
+   view switching back to panels, a drill changing what the panels are. */
+@keyframes t-bar-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* Where in the sequence a given bar falls, as two indices the delay below multiplies out.
+   Enumerated rather than counted, because CSS has no arithmetic on `nth-child`: the ladder
+   stops at the tenth panel and the twelfth row and holds every later one at that value, so a
+   long tail arrives with the tail rather than trailing off the end of the animation.
+
+   The row half is shared with the ledger's rows, because it is the same count of the same
+   thing: the table is the other way of drawing this list, and its magnitude column was the
+   one set of bars on the page that appeared already drawn. */
+.pan {
+  --pan-i: 0;
+}
+.panels > .pan:nth-child(2) {
+  --pan-i: 1;
+}
+.panels > .pan:nth-child(3) {
+  --pan-i: 2;
+}
+.panels > .pan:nth-child(4) {
+  --pan-i: 3;
+}
+.panels > .pan:nth-child(5) {
+  --pan-i: 4;
+}
+.panels > .pan:nth-child(6) {
+  --pan-i: 5;
+}
+.panels > .pan:nth-child(7) {
+  --pan-i: 6;
+}
+.panels > .pan:nth-child(8) {
+  --pan-i: 7;
+}
+.panels > .pan:nth-child(9) {
+  --pan-i: 8;
+}
+.panels > .pan:nth-child(n + 10) {
+  --pan-i: 9;
+}
+.pi,
+tbody > tr {
+  --row-i: 1;
+}
+.panitems > .pi:nth-child(2),
+tbody > tr:nth-child(2) {
+  --row-i: 2;
+}
+.panitems > .pi:nth-child(3),
+tbody > tr:nth-child(3) {
+  --row-i: 3;
+}
+.panitems > .pi:nth-child(4),
+tbody > tr:nth-child(4) {
+  --row-i: 4;
+}
+.panitems > .pi:nth-child(5),
+tbody > tr:nth-child(5) {
+  --row-i: 5;
+}
+.panitems > .pi:nth-child(6),
+tbody > tr:nth-child(6) {
+  --row-i: 6;
+}
+.panitems > .pi:nth-child(7),
+tbody > tr:nth-child(7) {
+  --row-i: 7;
+}
+.panitems > .pi:nth-child(8),
+tbody > tr:nth-child(8) {
+  --row-i: 8;
+}
+.panitems > .pi:nth-child(9),
+tbody > tr:nth-child(9) {
+  --row-i: 9;
+}
+.panitems > .pi:nth-child(10),
+tbody > tr:nth-child(10) {
+  --row-i: 10;
+}
+.panitems > .pi:nth-child(11),
+tbody > tr:nth-child(11) {
+  --row-i: 11;
+}
+.panitems > .pi:nth-child(n + 12),
+tbody > tr:nth-child(n + 12) {
+  --row-i: 12;
+}
+
+/* The panel's own bar leads its rows: `--row-i` starts at 1 for the first row, so the
+   headline bar at 0 is always a beat ahead of the list underneath it.
+
+   No `--face-stagger` in the base offset. It was there for the one mount that arrives under a
+   card -- the report itself -- and it charged every other mount for it: switching from the
+   table back to the panels put 150ms of nothing between the click and the first bar, which is
+   long enough to read as the page thinking. The bars now start with the panel they are in,
+   and on the turn they spend their first frames under a `.below` that is still travelling,
+   which is a bar drawing behind an arriving panel rather than a bar waiting for one.
+
+   No `will-change` either. It was a hint for a hundred-odd panel bars, and the table's rows
+   would have made it three hundred elements asking to be held on their own compositor layer
+   for as long as the page is open, for one 250ms animation each -- which is the cost the hint
+   is supposed to avoid. A transform animation is promoted for its own duration anyway. */
+.pan .track > span,
+.pan .tk > span,
+.magbar {
+  transform-origin: left center;
+  animation: t-bar-draw var(--bar-dur) var(--bar-ease) both;
+}
+.pan .track > span,
+.pan .tk > span {
+  animation-delay: calc(var(--pan-i) * var(--bar-stagger));
+}
+.pan .pi .tk > span {
+  animation-delay: calc(var(--pan-i) * var(--bar-stagger) + var(--row-i) * var(--row-stagger));
+}
+/* The table is one panel's worth of rows rather than a grid of them, so it takes the row
+   ladder alone -- there is no across for `--bar-stagger` to count. */
+.magbar {
+  animation-delay: calc(var(--row-i) * var(--row-stagger));
+}
+@media (prefers-reduced-motion: reduce) {
+  .pan .track > span,
+  .pan .tk > span,
+  .magbar {
     animation: none !important;
   }
 }

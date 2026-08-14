@@ -20,7 +20,7 @@ import type { Analysis } from "./engine.ts"
 import { ReportContext, useReportCtx } from "./context.ts"
 import { money } from "./model.ts"
 import { hashFor, hoverClear, readHash, setState, useViewState, type ViewState } from "./store.ts"
-import { PopNumber, Reveal, TextSwap } from "./Motion.tsx"
+import { Figure, Reveal, TextSwap } from "./Motion.tsx"
 import { Toolbar } from "./Toolbar.tsx"
 import { Breakdown, CardBody, Footnotes, scopeOf } from "./Report.tsx"
 import { Intake, Where } from "./Upload.tsx"
@@ -83,7 +83,10 @@ export function Page({
   const billed = ctx
     ? `Billed · ${state.pctOnly ? "amount hidden · " : ""}${state.ttl} cache TTL`
     : "Nothing dropped yet"
-  const total = ctx ? (state.pctOnly ? "****" : money(ctx.d.total)) : "—"
+  /* The figure twice over: as a number for the rolling digits, and as text for the two states
+     that are not one. Only one of them is ever rendered -- see `Figure`. */
+  const total = ctx && !state.pctOnly ? ctx.d.total : null
+  const totalText = ctx ? (state.pctOnly ? "****" : money(ctx.d.total)) : "—"
 
   return (
     <ReportContext.Provider value={ctx}>
@@ -138,7 +141,11 @@ export function Page({
                 data-hidden={state.pctOnly && ctx ? 1 : 0}
                 data-empty={ctx ? 0 : 1}
               >
-                <PopNumber value={total} className={state.pctOnly && ctx ? "mask" : undefined} />
+                <Figure
+                  value={total}
+                  text={totalText}
+                  className={state.pctOnly && ctx ? "mask" : undefined}
+                />
               </div>
             </div>
           </header>

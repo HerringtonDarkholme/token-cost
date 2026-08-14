@@ -5,6 +5,7 @@
 import { memo } from "react"
 import { useReport } from "./context.ts"
 import { maxCost, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts"
+import { vtName } from "./Motion.tsx"
 import { hoverBind, setState, useHover } from "./store.ts"
 
 /** What the footer claims, in words. Two different claims: unfiltered, it asserts the
@@ -52,6 +53,7 @@ const Row = memo(function Row({
   return (
     <tr
       className={`d${r.depth}`}
+      style={vtName(r.key)}
       data-on={active ? 1 : 0}
       {...hoverBind({
         key: r.hkey,
