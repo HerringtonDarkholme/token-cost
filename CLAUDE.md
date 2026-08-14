@@ -1,5 +1,21 @@
 # Working in this repo
 
+## Never commit this machine
+
+**No username, no home directory, no local path.** This repo is public. Nothing that goes
+into it — source, comments, test fixtures, docs, commit messages — may carry the account
+name or a path off the machine it was written on: not `/Users/<name>/…`, not the
+dash-flattened `-Users-<name>-code-…` form Claude Code gives a project folder, not
+`%USERPROFILE%` expanded.
+
+The examples this repo is full of — transcript paths, project folder names — are exactly
+where this leaks, because the real one is right there in the shell. Invent the example.
+`~/.claude/projects` for the folder, a made-up name like `-Users-me-code-thing` for a
+project inside it.
+
+Scan the diff for `/Users/` and for the account name before every commit. Getting it out
+afterwards means an amend and a force push.
+
 ## Git
 
 **Commit straight to `main` and push.** This project does not use branches, and does not use
