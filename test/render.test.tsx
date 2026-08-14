@@ -623,16 +623,11 @@ describe("the card's two faces", () => {
       const found = swap.querySelector(".found")!
       expect(found.getAttribute("data-on")).toBe("1")
       expect(found.getAttribute("data-busy")).toBe("1")
-      expect([...found.querySelectorAll(".filenm")].map((e) => e.textContent)).toEqual([
-        "0f2c9a.jsonl",
-      ])
-      /* And each name is written out rather than printed: one step per character, on a cover
-         that carries its own row's turn. "0f2c9a.jsonl" is twelve of them. */
-      expect(found.querySelector(".filenm .filecover")?.getAttribute("style")).toMatch(
-        /steps\(12\)/,
-      )
-      // The head of the list is what narrates the work, so nothing is said twice.
-      expect(found.querySelector(".foundlbl")?.textContent).toMatch(/Reading 1 transcript/)
+      /* The panel is up before a byte has been read, saying so: no names yet, nothing counted,
+         and the head naming the pass rather than a number nobody can check. */
+      expect(found.querySelectorAll(".filenm")).toHaveLength(0)
+      expect(found.querySelector(".foundlbl")?.textContent).toMatch(/Reading/)
+      expect(found.querySelector(".foundnum")?.textContent).toBe("0 / 1")
       expect(box.querySelector(".status")?.textContent).toBe("")
 
       /* An empty transcript is a folder with nothing billed in it, which is the road back: the
@@ -646,6 +641,17 @@ describe("the card's two faces", () => {
       expect(found.getAttribute("data-on")).toBe("0")
       expect(box.querySelector(".status")?.textContent).toMatch(/-Users-me-code-thing/)
       expect(box.querySelector(".status")?.textContent).toMatch(/has been billed/)
+
+      /* And the panel it left behind holds what it wrote: the file named once per pass, because
+         both passes walk every file and the panel reports the work rather than the folder. Each
+         name is written out rather than printed -- one step per character, and "0f2c9a.jsonl" is
+         twelve of them. */
+      expect([...found.querySelectorAll(".filenm")].map((e) => e.textContent)).toEqual([
+        "0f2c9a.jsonl",
+        "0f2c9a.jsonl",
+      ])
+      for (const cover of found.querySelectorAll(".filenm .filecover"))
+        expect(cover.getAttribute("style")).toMatch(/steps\(12\)/)
     })
   })
 

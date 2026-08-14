@@ -37,16 +37,18 @@
    last step -- see `.filecover`. */
 
 import { useId, useRef, useState, type ReactNode } from "react"
-import { analyze, type Analysis, type RawFile } from "./engine.ts"
-import { cssMs, TextSwap } from "./Motion.tsx"
+import {
+  allocOne,
+  closeAlloc,
+  closeScan,
+  openAlloc,
+  openScan,
+  report,
+  scanOne,
+  type Analysis,
+} from "./engine.ts"
+import { TextSwap } from "./Motion.tsx"
 import { Tip } from "./Tip.tsx"
-
-/** How many names the panel writes out before it stops naming them and says how many are left.
- *  A sample rather than an inventory: the list is there to show that the folder is being read, and
- *  a reader who is waiting on a bill does not need six hundred session ids to go past to believe
- *  it. Enough to fill the panel and roll it a few times, then the count of the rest -- which is
- *  the line that says the whole folder is accounted for, not just the part that fitted. */
-const MAX_LISTED = 13
 
 type Os = "mac" | "win" | "linux"
 
@@ -199,21 +201,6 @@ const HOW: Record<Os, ReactNode> = {
   ),
 }
 
-/** What the intake is doing with the pick, as the head of the list says it. A token as well as a
- *  line, because the two phases are swapped rather than substituted -- see `TextSwap`. */
-interface Phase {
-  token: string
-  node: ReactNode
-}
-
-/** The transcripts a pick came back with, as far as the list shows them. `id` counts the picks
- *  rather than naming them: it is what remounts the rows, so a second pick deals itself out
- *  again instead of quietly re-lettering the list that is already there. */
-interface Found {
-  id: number
-  names: string[]
-}
-
 /** A file, and where it sat inside the folder that was chosen. A `File` on its own cannot say:
  *  the picker's files carry `webkitRelativePath` and a dropped entry's `File` carries nothing at
  *  all, so the path travels beside the file rather than being read back off it later. */
@@ -336,122 +323,119 @@ function vars(v: Record<string, string | number>): React.CSSProperties {
   return v as React.CSSProperties
 }
 
-/** How the writing speeds up: each row takes this much of the time the row above it took, and by
- *  the row that fills the panel it has reached its floor -- a tenth of where it started, which is
- *  names arriving faster than they can be read.
- *
- *  The ramp stops exactly where the panel fills, and that is not a coincidence: the first rows are
- *  the ones anybody watches a name being written on, and every row after them is one the column
- *  has to roll for. Rolling on an even beat is what lets one stepped animation land its jumps on
- *  the rows -- see the roll in `Reading` -- so the machine spins up while there is room, and holds
- *  its speed once it is reading off the bottom of the panel. */
-const SPEEDUP = 0.75
+/** How long a name takes to write, in milliseconds, when the folder is being read faster or
+ *  slower than a person can follow. The floor keeps the caret from being a flicker; the ceiling
+ *  keeps a slow disk from spelling one name out for a second and a half. Between them the pace is
+ *  the machine's own, which is the point of driving this off the work instead of a schedule. */
+const MIN_WRITE = 55
+const MAX_WRITE = 260
 
-/** What row `i` is written at, as a fraction of the first row's pace. */
-function pace(i: number): number {
-  return SPEEDUP ** Math.min(i, SHOWN)
+/** And how long the column may take to travel a row. It follows the line that pushed it, so that
+ *  the scroll keeps the writing's pace -- but a slow line must not leave the panel sliding after
+ *  the next name has started. */
+const MAX_SLIDE = 150
+
+/** How many names each pass puts up. A share of the folder rather than a count: a name goes up
+ *  every `total / PER_PASS` files, so the stream starts with the first file, ends with the last,
+ *  and lasts exactly as long as the reading does -- whether that is a tenth of a second or a
+ *  minute. Nothing is truncated, because nothing was promising to list them all. */
+const PER_PASS = 24
+
+/** How often the count is allowed to repaint. Sixty is four or five times a second, which reads
+ *  as continuous, and it is the yield as much as the paint: the passes hand the frame back here,
+ *  and this is the only reason the page can move while it works. */
+const PAINT = 60
+
+/** One line of the panel: a name, and how long it should take to write itself. */
+interface Line {
+  key: string
+  name: string
+  ms: number
 }
 
-/** Two decimals is a hundredth of a beat -- under a tenth of a millisecond at these speeds, and
- *  it keeps the arithmetic the stylesheet is handed down to something a person can read. */
-function round(n: number): number {
-  return Math.round(n * 100) / 100
+/** Which pass is running, in the words the head says. Reading is pass 1 -- dedupe the sessions
+ *  and calibrate; pricing is pass 2, which allocates every request's cost. Both walk every file,
+ *  which is why both are worth a name: the second is not a spinner, it is half the work. */
+const VERB: Record<"read" | "price", string> = { read: "Reading", price: "Pricing" }
+
+/** How far the two passes have got, as the panel shows it. */
+interface Run {
+  /** The pick this belongs to, so a second folder starts a fresh column. */
+  id: number
+  phase: "read" | "price"
+  done: number
+  total: number
+  /** The names put up so far, oldest first. Both passes write into the one column: the work is
+   *  continuous, so the stream is. */
+  lines: Line[]
 }
 
-/** The transcripts, written out.
+/** The transcripts, written out as they are read.
  *
- *  One row at a time and one caret in the panel, because two names being typed at once is two
- *  machines reading one folder. A row's turn is therefore everything above it: a beat per
- *  character of every name before it, plus a pause per row.
+ *  Nothing here is on a schedule. A line goes up when a file has actually been read, and it is
+ *  written in the time that file took -- so the panel runs at the speed of the disk and the parse,
+ *  and it is still going when they are. One line at a time and one caret, because two names being
+ *  written at once is two machines reading one folder.
  *
- *  And the panel follows the writing rather than holding still while it runs off the bottom.
- *  Once there are more names than it shows, the column jumps up a row each time a new row starts,
- *  so the name being written is always the last line in the box -- a terminal, which is what this
- *  is. The jump is a `transform` on the whole column, for the same reason the typing is: the
- *  parse holds the main thread, and a scroll driven from JS would stop dead the moment it
- *  started while the typing carried on underneath it. */
-function Reading({ found, phase }: { found: Found; phase: Phase }): React.JSX.Element {
-  const each: Array<{ name: string | null; chars: number; beats: number; pause: number }> =
-    found.names.map((name, i) => ({
-      name,
-      /* Characters rather than `length`, because a name is text and text is not code units: the
-         "+N more" line ends in an ellipsis. The count is what the steps are cut from; the beats
-         are the same count at this row's pace, which is what they take. */
-      chars: [...name].length,
-      beats: [...name].length * pace(i),
-      pause: pace(i),
-    }))
-  /* And a line with nothing on it but a cursor, which is what is left once every name has been
-     written: the folder has been read and the parse has not finished, and a terminal that is
-     waiting says so with a prompt. It takes a row's turn like any other row -- and the same
-     interval as the row above it, so that the roll's even jumps stay even -- because the roll has
-     to make room for it too. */
-  const last = each.at(-1)
-  if (last) each.push({ name: null, chars: 0, beats: last.beats, pause: last.pause })
-  /** How long rows `from` up to `to` take, on the clock the stylesheet keeps: their characters
-   *  and their pauses, each counted at the pace its own row was written at. */
-  const span = (from: number, to: number): string => {
-    const rows = each.slice(from, to)
-    return (
-      `calc(var(--type-char) * ${round(rows.reduce((a, b) => a + b.beats, 0))}` +
-      ` + var(--type-row) * ${round(rows.reduce((a, b) => a + b.pause, 0))})`
-    )
-  }
-  /** When row `i` takes its turn: everything above it. */
-  const turn = (i: number): string => span(0, i)
-  /* The rows that have to be rolled past, which is every one that will not fit. The clock runs
-     from the turn of the first row below the fold to the turn *after* the last row, so that the
-     jumps land one per row -- `jump-start`, because the column has to have moved by the time the
-     row it is making room for starts writing, not after. Even jumps land on even rows, which is
-     what the ramp stopping at `SHOWN` buys: everything the roll covers is written at one pace. */
-  const rolls = Math.max(0, each.length - SHOWN)
-  const roll = rolls
-    ? {
-        ...vars({ "--roll-to": `calc(var(--file-row) * -${rolls})` }),
-        animationDelay: turn(SHOWN),
-        animationDuration: span(SHOWN, each.length),
-        animationTimingFunction: `steps(${rolls}, jump-start)`,
-      }
-    : undefined
-
+ *  The panel follows the writing rather than holding still while it runs off the bottom: the
+ *  column is translated up a row per line and transitions between the two, which is a composited
+ *  transform for the same reason the typing is one. The cursor on the line under the last name is
+ *  what says the machine has not stopped -- a prompt, which is what this whole panel is. */
+function Reading({ run }: { run: Run }): React.JSX.Element {
+  /* The prompt is a row like any other, so it counts: what the panel shows is the tail of the
+     column with the cursor on the bottom line. */
+  const roll = Math.max(0, run.lines.length + 1 - SHOWN)
+  const width = String(run.total).length
   return (
     <>
-      {/* The count stands where "The folder is hidden" stood, in the same mono caps on the same
-          line, and changes tense the way every other figure on this page does: the two phases are
-          swapped, not substituted. Announced politely, since it is the only thing that says the
-          page is working to a reader who cannot see it working. */}
-      <div className="foundhead" aria-live="polite">
-        <span className="foundlbl">
-          <TextSwap token={phase.token}>{phase.node}</TextSwap>
+      {/* The verb stands where "The folder is hidden" stood, in the same mono caps on the same
+          line, and it is swapped rather than substituted when the second pass starts. The count
+          beside it is not announced: it changes hundreds of times, and a live region that says
+          every one of them is a live region nobody can use. */}
+      <div className="foundhead">
+        <span className="foundlbl" aria-live="polite">
+          <TextSwap token={run.phase}>{VERB[run.phase]}</TextSwap>
+        </span>
+        {/* Padded rather than left to grow, so a count on its way to three digits does not shunt
+            the line about underneath itself. `white-space: pre` is what keeps the padding. */}
+        <span className="foundnum">
+          {`${String(run.done).padStart(width, " ")} / ${run.total}`}
         </span>
       </div>
-      {/* Keyed on the pick, so a second folder is written out again from the top rather than
-          re-lettering the names already lying there. */}
+      {/* Keyed on the pick, so a second folder starts a fresh column rather than sliding the last
+          one's names out of the way. */}
       <div className="foundbox">
         <div className="filelist">
-          <div className="fileroll" key={found.id} style={roll}>
-            {each.map(({ name, chars, beats }, i) =>
-              name === null ? (
-                <div key="wait" className="fileline" style={{ animationDelay: turn(i) }}>
-                  <span className="filewait" />
-                </div>
-              ) : (
-                <div key={name} className="fileline" style={{ animationDelay: turn(i) }}>
-                  <span className="filedot" />
-                  <span className="filenm">
-                    {name}
-                    <span
-                      className="filecover"
-                      style={{
-                        animationDuration: `calc(var(--type-char) * ${round(beats)})`,
-                        animationDelay: turn(i),
-                        animationTimingFunction: `steps(${chars})`,
-                      }}
-                    />
-                  </span>
-                </div>
-              ),
-            )}
+          <div
+            className="fileroll"
+            key={run.id}
+            style={{
+              transform: `translateY(calc(var(--file-row) * -${roll}))`,
+              /* The column travels in the time the line that pushed it took to arrive, so the
+                 scroll and the writing keep the same pace whatever that pace turns out to be. */
+              transitionDuration: `${Math.min(run.lines.at(-1)?.ms ?? MIN_WRITE, MAX_SLIDE)}ms`,
+            }}
+          >
+            {run.lines.map((line) => (
+              <div key={line.key} className="fileline">
+                <span className="filedot" />
+                <span className="filenm">
+                  {line.name}
+                  <span
+                    className="filecover"
+                    style={{
+                      animationDuration: `${line.ms}ms`,
+                      /* Characters rather than `length`: a name is text, and text is not code
+                         units. One step per character is what makes this typing. */
+                      animationTimingFunction: `steps(${[...line.name].length})`,
+                    }}
+                  />
+                </span>
+              </div>
+            ))}
+            <div className="fileline">
+              <span className="filewait" />
+            </div>
           </div>
         </div>
       </div>
@@ -461,8 +445,7 @@ function Reading({ found, phase }: { found: Found; phase: Phase }): React.JSX.El
 
 export function Intake({ onData }: { onData: (data: Analysis) => void }): React.JSX.Element {
   const [err, setErr] = useState<ReactNode>(null)
-  const [found, setFound] = useState<Found | null>(null)
-  const [phase, setPhase] = useState<Phase>({ token: "read", node: null })
+  const [run, setRun] = useState<Run | null>(null)
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const [os, setOs] = useState<Os>(guessOs)
@@ -524,56 +507,86 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       return
     }
 
-    /* The pick answers the note, so the note goes: what stands in its place is the transcripts
-       that came back, counted in the head and named in the list. */
+    /* The pick answers the note, so the note goes: what stands in its place is the folder being
+       read, a name at a time. */
     setErr(null)
-    setPhase({
-      token: "read",
-      node: (
-        <>
-          Reading <b>{files.length}</b> transcript{files.length > 1 ? "s" : ""}
-        </>
-      ),
-    })
-    setFound({
-      id: ++picks.current,
-      names: files
-        .slice(0, MAX_LISTED)
-        .map((p) => p.file.name)
-        .concat(files.length > MAX_LISTED ? [`… +${files.length - MAX_LISTED} more`] : []),
-    })
+    const id = ++picks.current
+    /* Empty, and up before a byte has been read: the panel is the answer to the pick, and the
+       first file is not always quick. A prompt blinking over nothing read yet is the truth. */
+    setRun({ id, phase: "read", done: 0, total: files.length, lines: [] })
     setBusy(true)
 
-    let payload: RawFile[]
+    /* Both passes are driven from here rather than handed the corpus, which is the whole shape of
+       this: `openScan`/`openAlloc` take one file at a time, so the page holds one transcript
+       instead of the whole folder, and gets the frame back between them. That is what makes the
+       panel able to say something true -- the count is files actually finished, and a name goes up
+       because a file was actually read.
+
+       What it costs is reading each file twice: pass 1 calibrates against the whole corpus before
+       pass 2 can price anything, and nothing keeps the text. Bytes off a disk are cheap next to a
+       few hundred megabytes of string resident at once. */
+    const lines: Line[] = []
+    const every = Math.max(1, Math.ceil(files.length / PER_PASS))
+    let wrote = performance.now()
+    let painted = 0
+
+    /** One file done. Puts a name up when this is one of the files whose turn it is, repaints if
+     *  it has been long enough, and hands the frame back when it does. */
+    const step = async (
+      phase: Run["phase"],
+      i: number,
+      total: number,
+      name: string,
+    ): Promise<void> => {
+      const now = performance.now()
+      const last = i + 1 >= total
+      if (i % every === 0 || last) {
+        lines.push({
+          key: `${phase}${i}`,
+          name,
+          /* Written in the time it took to get here, so the caret runs at the speed of the work.
+             Clamped at both ends: a folder on a fast disk would be a flicker, a slow one would
+             spell one name out for a second and a half. */
+          ms: Math.min(Math.max(now - wrote, MIN_WRITE), MAX_WRITE),
+        })
+        wrote = now
+      }
+      if (now - painted < PAINT && !last) return
+      painted = now
+      setRun({ id, phase, done: i + 1, total, lines: [...lines] })
+      // The yield. Everything the panel does, it does in the gaps this leaves.
+      await new Promise((r) => setTimeout(r, 0))
+    }
+
+    /* oxlint-disable no-await-in-loop -- awaiting each file in turn is the point of both loops
+       rather than an oversight in them. `Promise.all` over the reads is what this replaced: it
+       resolves with every transcript in the folder held at once, which for a real store is a few
+       hundred megabytes of string and twice that in memory, and it hands the page a single
+       uninterruptible block of work at the end. One at a time costs wall-clock and buys back the
+       memory and the frame. A block rather than two line comments, since which line the `await`
+       lands on is the formatter's to decide. */
+    const sc = openScan()
+    const kept: Picked[] = []
     try {
-      payload = await Promise.all(
-        files.map(async (p) => ({ name: p.file.name, text: await p.file.text() })),
-      )
+      for (const [i, p] of files.entries()) {
+        const text = await p.file.text()
+        if (scanOne(sc, { name: p.file.name, text })) kept.push(p)
+        await step("read", i, files.length, p.file.name)
+      }
     } catch (e) {
       stop(`Could not read the files: ${(e as Error).message}`)
       return
     }
-
-    const bytes = payload.reduce((a, b) => a + b.text.length, 0)
-    setPhase({
-      token: "parse",
-      node: (
-        <>
-          Analyzing <b>{(bytes / 1e6).toFixed(1)} MB</b>
-        </>
-      ),
-    })
-    /* Let the swap finish before the parse takes the main thread. A multi-hundred megabyte corpus
-       is seconds of synchronous work, and everything the box is in the middle of when that lands
-       -- the note leaving, the list arriving, the box growing, the head changing what it says --
-       is a transition that would be caught mid-stride and finish in one jump on the far side.
-       The wait is read off the same token the transitions are timed by, so the two cannot drift;
-       a third of a second bought against seconds of parse is not a cost worth arguing about. */
-    await new Promise((r) => setTimeout(r, cssMs("--intake-swap-dur", 250) + 60))
+    const scanned = closeScan(sc)
 
     let data: Analysis
     try {
-      data = analyze(payload)
+      const al = openAlloc(scanned)
+      for (const [i, p] of kept.entries()) {
+        allocOne(al, { name: p.file.name, text: await p.file.text() })
+        await step("price", i, kept.length, p.file.name)
+      }
+      data = report(scanned, closeAlloc(al))
     } catch (e) {
       stop(`Analysis failed: ${(e as Error).message}`)
       console.error(e)
@@ -587,14 +600,14 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       stop(
         where.claude ? (
           <>
-            Read {payload.length} transcript{payload.length > 1 ? "s" : ""} from{" "}
+            Read {scanned.filesUsed} transcript{scanned.filesUsed > 1 ? "s" : ""} from{" "}
             {where.root ? <b>{where.root}</b> : "that folder"}, and none of them holds a priced API
             request — nothing here has been billed.
           </>
         ) : (
           <>
-            Those {payload.length} <code>.jsonl</code> file{payload.length > 1 ? "s" : ""} hold no
-            priced API request.{" "}
+            Those {scanned.filesUsed} <code>.jsonl</code> file{scanned.filesUsed > 1 ? "s" : ""}{" "}
+            hold no priced API request.{" "}
             {where.root ? (
               <>
                 <b>{where.root}</b> is not
@@ -608,8 +621,9 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       )
       return
     }
-    /* Handed over only once the parse is done, so the card's turn plays against a free main
-       thread: an exit animation started before seconds of synchronous work freezes mid-slide. */
+    /* oxlint-enable no-await-in-loop */
+    /* Handed over only once both passes are done, so the card's turn plays against a free main
+       thread rather than against the tail of the work. */
     onData(data)
   }
 
@@ -738,9 +752,9 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
               runs, because a face that is unmounted the moment it stops being current has nothing
               left on screen to play its exit -- `data-on` is what shows it, `data-busy` what makes
               it look busy. */}
-          {found ? (
+          {run ? (
             <div className="found" data-on={busy ? "1" : "0"} data-busy={busy ? "1" : "0"}>
-              <Reading found={found} phase={phase} />
+              <Reading run={run} />
             </div>
           ) : null}
         </div>

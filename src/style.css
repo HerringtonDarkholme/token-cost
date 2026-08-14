@@ -1323,7 +1323,18 @@ tfoot .n {
   display: flex;
   align-items: flex-start;
   justify-content: center;
+  gap: 9px;
   height: var(--found-head);
+}
+/* Files finished over files found, in the same mono caps as the verb beside it and a step up the
+   ink, because it is the part that moves. `pre` keeps the padding the markup puts in front of a
+   short count -- without it the line shifts under itself every time a digit is added. */
+.foundnum {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink2);
+  white-space: pre;
 }
 .howlbl,
 .foundlbl {
@@ -1381,27 +1392,19 @@ tfoot .n {
   font-size: 11.5px;
   color: var(--ink3);
 }
-/* The column, and the thing that keeps the writing in the window: once there are more names than
-   the panel shows it jumps up one row per row, on the beat the row below the fold starts writing.
-   `steps(…, jump-start)` is what makes it a jump *before* rather than after -- the room has to be
-   there when the name arrives. How far and how many are the markup's, since only it knows how
-   many names there are: see `Reading`. */
-@keyframes t-roll {
-  to {
-    transform: translateY(var(--roll-to));
-  }
-}
+/* The column, and the thing that keeps the writing in the window: it is translated up a row for
+   every line past the panel's last, and it transitions between the two, so a name arriving at the
+   bottom carries the ones above it up out of the way. How far is the markup's to say -- it is the
+   one that knows how many lines have gone up -- and how long is the beat the last line was written
+   in, so the scroll and the writing keep the same pace. A transform, because the pass behind it
+   holds the main thread in bursts and a composited property is one that does not care. */
 .fileroll {
-  /* Nothing to travel is the honest default: a folder that fits in the panel never rolls, and
-     with no duration set the animation lands on this value on its first frame. */
-  --roll-to: 0px;
-  animation-name: t-roll;
-  animation-fill-mode: both;
+  transition-property: transform;
+  transition-timing-function: var(--ease-smooth-out);
+  transition-duration: var(--duration-quick);
 }
-/* A row does not arrive until it is that row's turn, and then it does not travel: what happens
-   at its turn is the name writing itself, and a line that slides in as well is two arrivals for
-   one event. The wait is the whole animation -- `both` is what holds the row invisible through
-   the delay the markup sets. */
+/* A line does not travel in: what happens when it arrives is the name writing itself, and a row
+   that slides as well is two arrivals for one event. All it does is stop being nothing. */
 @keyframes t-file-in {
   from {
     opacity: 0;
@@ -1467,14 +1470,11 @@ tfoot .n {
 /* Taken away entirely rather than left still. Motion the reader asked not to see is turned off
    at the top of this file with a blanket `animation: none`, and an animation that is the only
    thing which ever moves the cover off the name would leave the name under it for good. The
-   column does not roll for the same reason, so the panel goes back to being a scroller: with
-   nothing to bring the rest of the names up, the reader has to be able to. */
+   column still follows the writing: with no transition it arrives at each new offset in one
+   step, which is the honest reading of "no motion" -- the panel still shows the newest line. */
 @media (prefers-reduced-motion: reduce) {
   .filecover {
     display: none;
-  }
-  .filelist {
-    overflow: auto;
   }
 }
 /* The prompt on the empty line under the names: the folder has been read, the parse has not
@@ -1903,15 +1903,12 @@ kbd {
      nothing else on the page types: one per character, and one pause between names. They run one
      after another rather than overlapping -- a folder is read by one machine, and two carets in
      the panel at once says it is being read by two.
-     These are the *first* row's beats, and only its: every row after it is written at a fraction
-     of the row above, so what is set here is where the machine starts rather than where it ends
-     up. At 6ms a first name of forty characters is written in a quarter of a second -- fast, but
-     slowly enough to be read as writing -- and by the seventh row the same name lands in a tenth
-     of that. See `SPEEDUP`. */
+     What is *not* here any more is the beat the names are written in. It cannot be: a line is
+     written in the time the file it names took to read, which is a measurement rather than a
+     choice -- see `MIN_WRITE` and `PER_PASS` in `Upload.tsx`. The stylesheet keeps the timings
+     that are decisions; this one belongs to the disk. */
   --intake-swap-dur: var(--duration-fast);
   --intake-swap-ease: var(--ease-smooth-out);
-  --type-char: 6ms;
-  --type-row: 30ms;
 
   /* Controls growing into the toolbar. Sideways rather than up, because they emerge from
      beside the theme switch, which does not move; and out faster than in, because arriving is

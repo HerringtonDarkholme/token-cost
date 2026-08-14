@@ -17,12 +17,16 @@
  *      builtins, the Anthropic rate card, the transcript schema). It is never a list
  *      of the things one particular author happens to use.
  *
- * PASSES
- *   scan()      -- cheap: calibrate chars-per-token, learn which programs dispatch
- *                  subcommands, dedupe sessions.
- *   allocate()  -- full walk: build the per-key cost accumulators.
- *   price()     -- O(keys), so any TTL assumption or rate card is free to re-apply.
- *   buildTree() -- decides direction splits and grouping from the measured costs.
+ * PASSES. Both walks are fed one file at a time -- open, one per file, close -- because a folder
+ * of transcripts is bigger than a page should hold at once, and because a caller that gets the
+ * frame back between files can say where it has got to. analyze() is the same thing in one call
+ * for callers that already hold everything.
+ *   openScan/scanOne/closeScan   -- cheap: calibrate chars-per-token, learn which programs
+ *                                   dispatch subcommands, dedupe sessions.
+ *   openAlloc/allocOne/closeAlloc-- full walk: build the per-key cost accumulators.
+ *   price()      -- O(keys), so any TTL assumption or rate card is free to re-apply.
+ *   buildTree()  -- decides direction splits and grouping from the measured costs.
+ *   report()     -- arithmetic on the accumulators; walks nothing.
  *
  * ON THE TYPES. Transcript records are untrusted JSON from a schema that evolves without
  * asking us. So the record shapes below are open interfaces of optional fields, not closed
@@ -182,7 +186,7 @@ export function resolveRate(model: unknown): RateResolution {
 /* ------------------------------------------------------- shell interpretation --
  * The sets below are the shell language, not a taste list: POSIX special builtins
  * and reserved words. Everything program-specific (which commands take subcommands,
- * which ones matter) is learned from the corpus in scan().
+ * which ones matter) is learned from the corpus in pass 1.
  */
 const KEYWORDS = new Set([
   "for",
@@ -378,7 +382,7 @@ export function splitSegments(cmd: string): string[] {
 }
 
 /** Could this word be a subcommand verb? A bare lowercase-ish token -- not a flag,
- *  path, filename, number, URL or variable. Whether it IS one is decided by scan(). */
+ *  path, filename, number, URL or variable. Whether it IS one is decided by pass 1. */
 function isVerbShaped(w: string): boolean {
   return (
     !!w &&
@@ -439,7 +443,7 @@ export function resolveSegment(seg: string): Segment | null {
 }
 
 /** Every (program, candidate-verb) pair a Bash invocation contains -- the raw material
- *  scan() aggregates to learn which programs actually dispatch subcommands. */
+ *  pass 1 aggregates to learn which programs actually dispatch subcommands. */
 export function shellCandidates(cmd: string): Segment[] {
   return splitSegments(cmd)
     .map(resolveSegment)
@@ -448,7 +452,7 @@ export function shellCandidates(cmd: string): Segment[] {
 
 /** Label an invocation: pick the segment doing real work, then apply the learned
  *  vocabulary to decide whether its second token is a subcommand.
- *  @param dispatchers programs scan() observed dispatching subcommands */
+ *  @param dispatchers programs pass 1 observed dispatching subcommands */
 export function labelShell(
   cmd: string,
   dispatchers?: Set<string> | null,
@@ -792,9 +796,11 @@ const DISPATCH_MIN_CALLS = 5,
   DISPATCH_MIN_COVERAGE = 0.6,
   DISPATCH_MAX_RATIO = 0.5
 
-/** What pass 1 learned: the files worth reading, and the constants pass 2 needs. */
+/** What pass 1 learned: how many files were worth reading, and the constants pass 2 needs.
+ *  A count rather than the files themselves, because holding them is the thing this is written
+ *  to avoid -- see `openScan`. */
 export interface Scanned {
-  files: RawFile[]
+  filesUsed: number
   duplicatesDropped: number
   badLines: number
   dispatchers: Set<string>
@@ -803,28 +809,54 @@ export interface Scanned {
   densityCalibrated: boolean
 }
 
-export function scan(files: RawFile[]): Scanned {
-  const seen = new Set<string>(),
-    kept: RawFile[] = []
-  let duplicatesDropped = 0
-  for (const f of files) {
-    const m = SESSION_RE.exec(f.text || "")
-    const id = (m ? m[1] : f.name) + "::" + (f.text || "").length
-    if (seen.has(id)) {
-      duplicatesDropped++
-      continue
-    }
-    seen.add(id)
-    kept.push(f)
+/** Pass 1, mid-flight.
+ *
+ *  Both passes are fed one file at a time rather than handed the corpus, and that is the whole
+ *  point of them being shaped this way: a few hundred megabytes of transcript is a few hundred
+ *  megabytes of JavaScript string, twice that in memory, and reading the lot before starting
+ *  means the page holds all of it while it works. Fed a file at a time, it holds one -- and the
+ *  caller gets the event loop back between them, which is what lets a progress display be
+ *  something other than a lie.
+ *
+ *  What it costs is a second read of each file for pass 2, since nothing keeps the text. That is
+ *  the trade: bytes off the disk twice against every byte of the folder resident at once. */
+export interface Scan {
+  seen: Set<string>
+  /** prog -> {calls, withVerb, set:Set<verb>} */
+  verbs: Map<string, { calls: number; withVerb: number; set: Set<string> }>
+  /** Accumulators for the two-class least-squares fit described above. */
+  S: Accum
+  filesUsed: number
+  duplicatesDropped: number
+  badLines: number
+}
+
+export function openScan(): Scan {
+  return {
+    seen: new Set(),
+    verbs: new Map(),
+    S: { cc: 0, ct: 0, tt: 0, cy: 0, ty: 0, yy: 0, n: 0, code: 0, text: 0, tok: 0 },
+    filesUsed: 0,
+    duplicatesDropped: 0,
+    badLines: 0,
   }
+}
 
-  // prog -> {calls, withVerb, set:Set<verb>}
-  const verbs = new Map<string, { calls: number; withVerb: number; set: Set<string> }>()
-  // Accumulators for the two-class least-squares fit described above.
-  const S: Accum = { cc: 0, ct: 0, tt: 0, cy: 0, ty: 0, yy: 0, n: 0, code: 0, text: 0, tok: 0 }
-  let badLines = 0
+/** Scan one file into `st`. `false` means it was a duplicate of one already scanned and pass 2
+ *  must skip it too -- which is why the answer goes back to the caller rather than being kept
+ *  here: the caller is the one holding the handles it would have to read again. */
+export function scanOne(st: Scan, f: RawFile): boolean {
+  const m = SESSION_RE.exec(f.text || "")
+  const id = (m ? m[1] : f.name) + "::" + (f.text || "").length
+  if (st.seen.has(id)) {
+    st.duplicatesDropped++
+    return false
+  }
+  st.seen.add(id)
+  st.filesUsed++
 
-  for (const f of kept) {
+  const { verbs, S } = st
+  {
     let prevTokens: number | null = null,
       prevOut = 0,
       codeChars = 0,
@@ -837,7 +869,7 @@ export function scan(files: RawFile[]): Scanned {
       try {
         rec = JSON.parse(s) as TranscriptRecord
       } catch {
-        badLines++
+        st.badLines++
         continue
       }
       const msg = rec && rec.message
@@ -925,19 +957,23 @@ export function scan(files: RawFile[]): Scanned {
       }
     }
   }
+  return true
+}
 
+/** Close pass 1: judge which programs dispatch subcommands, and fit the densities. */
+export function closeScan(st: Scan): Scanned {
   const dispatchers = new Set<string>()
-  for (const [prog, e] of verbs) {
+  for (const [prog, e] of st.verbs) {
     if (e.calls < DISPATCH_MIN_CALLS || e.set.size < 2) continue
     if (e.withVerb / e.calls < DISPATCH_MIN_COVERAGE) continue
     if (e.set.size / e.withVerb > DISPATCH_MAX_RATIO) continue
     dispatchers.add(prog)
   }
-  const fit = solveDensities(S)
+  const fit = solveDensities(st.S)
   return {
-    files: kept,
-    duplicatesDropped,
-    badLines,
+    filesUsed: st.filesUsed,
+    duplicatesDropped: st.duplicatesDropped,
+    badLines: st.badLines,
     dispatchers,
     density: fit || {
       code: CPT_FALLBACK,
@@ -945,7 +981,7 @@ export function scan(files: RawFile[]): Scanned {
       basis: "default",
       pooled: CPT_FALLBACK,
     },
-    densitySamples: S.n,
+    densitySamples: st.S.n,
     densityCalibrated: !!fit,
   }
 }
@@ -992,43 +1028,74 @@ export interface Allocation {
   firstCtx: number[]
 }
 
-export function allocate(scanned: Scanned): Allocation {
-  const { files, dispatchers, density } = scanned
-  const CODE = density.code,
-    TEXT = density.text // chars per token, by content class
-  const acc = new Map<string, AccEntry>()
-  // key -> its record, so nothing re-parses keys
-  const recOf = new Map<string, Bucket>([[PRE_KEY, PRE_REC]])
-  const addCtx = (ctx: Map<string, number>, rec: Bucket, tokens: number): void => {
-    if (!(tokens > 0)) return
-    const k = keyOf(rec)
-    if (!recOf.has(k)) recOf.set(k, rec)
-    ctx.set(k, (ctx.get(k) || 0) + tokens)
-  }
-  const bump = (rec: Bucket, f: number, v: number, out: number): void => {
-    const k = keyOf(rec)
-    let e = acc.get(k)
-    if (!e) {
-      e = { rec, f: 0, v: 0, out: 0 }
-      acc.set(k, e)
-    }
-    e.f += f
-    e.v += v
-    e.out += out
-  }
+/** Pass 2, mid-flight -- everything the walk accumulates, and the two constants pass 1 fitted.
+ *  Same shape and the same reason as `Scan`: one file in at a time, nothing kept. */
+export interface Alloc {
+  /** chars per token, by content class */
+  CODE: number
+  TEXT: number
+  dispatchers: Set<string>
+  acc: Map<string, AccEntry>
+  /** key -> its record, so nothing re-parses keys */
+  recOf: Map<string, Bucket>
+  billed: { f: number; v: number; out: number }
+  /** raw id -> {n, basis, rate} */
+  models: Map<string, ModelSighting>
+  /** raw id -> requests skipped from pricing */
+  unpriced: Map<string, number>
+  ttl: TtlTokens
+  requests: number
+  sessions: number
+  sidechainRequests: number
+  tMin: number | null
+  tMax: number | null
+  firstCtx: number[]
+}
 
-  const billed = { f: 0, v: 0, out: 0 }
-  const models = new Map<string, ModelSighting>() // raw id -> {n, basis, rate}
-  const unpriced = new Map<string, number>() // raw id -> requests skipped from pricing
-  const ttl: TtlTokens = { "1h": 0, "5m": 0, unknown: 0 }
-  let requests = 0,
-    sessions = 0,
-    sidechainRequests = 0
-  let tMin: number | null = null,
-    tMax: number | null = null
-  const firstCtx: number[] = []
+export function openAlloc(scanned: Scanned): Alloc {
+  return {
+    CODE: scanned.density.code,
+    TEXT: scanned.density.text,
+    dispatchers: scanned.dispatchers,
+    acc: new Map(),
+    recOf: new Map<string, Bucket>([[PRE_KEY, PRE_REC]]),
+    billed: { f: 0, v: 0, out: 0 },
+    models: new Map(),
+    unpriced: new Map(),
+    ttl: { "1h": 0, "5m": 0, unknown: 0 },
+    requests: 0,
+    sessions: 0,
+    sidechainRequests: 0,
+    tMin: null,
+    tMax: null,
+    firstCtx: [],
+  }
+}
 
-  for (const file of files) {
+function addCtx(st: Alloc, ctx: Map<string, number>, rec: Bucket, tokens: number): void {
+  if (!(tokens > 0)) return
+  const k = keyOf(rec)
+  if (!st.recOf.has(k)) st.recOf.set(k, rec)
+  ctx.set(k, (ctx.get(k) || 0) + tokens)
+}
+
+function bump(st: Alloc, rec: Bucket, f: number, v: number, out: number): void {
+  const k = keyOf(rec)
+  let e = st.acc.get(k)
+  if (!e) {
+    e = { rec, f: 0, v: 0, out: 0 }
+    st.acc.set(k, e)
+  }
+  e.f += f
+  e.v += v
+  e.out += out
+}
+
+/** Allocate one file's requests. Only files pass 1 kept -- a duplicate walked twice is a bill
+ *  charged twice. */
+export function allocOne(st: Alloc, file: RawFile): void {
+  const { CODE, TEXT, dispatchers, recOf, billed, models, unpriced, ttl, firstCtx } = st
+  {
     const ctx = new Map<string, number>() // key -> estimated tokens in context
     // tool_use id -> {tool, sub}
     const toolOf = new Map<string, { tool: string; sub: string | null; shell: boolean }>()
@@ -1047,8 +1114,8 @@ export function allocate(scanned: Scanned): Allocation {
       if (typeof rec.timestamp === "string") {
         const t = Date.parse(rec.timestamp)
         if (!isNaN(t)) {
-          if (tMin === null || t < tMin) tMin = t
-          if (tMax === null || t > tMax) tMax = t
+          if (st.tMin === null || t < st.tMin) st.tMin = t
+          if (st.tMax === null || t > st.tMax) st.tMax = t
         }
       }
       const msg = rec.message
@@ -1074,10 +1141,10 @@ export function allocate(scanned: Scanned): Allocation {
         }
 
         if (rate && ctxTokens) {
-          requests++
-          if (rec.isSidechain === true) sidechainRequests++
+          st.requests++
+          if (rec.isSidechain === true) st.sidechainRequests++
           if (!sawRequest) {
-            sessions++
+            st.sessions++
             sawRequest = true
             firstCtx.push(ctxTokens)
           }
@@ -1140,7 +1207,7 @@ export function allocate(scanned: Scanned): Allocation {
           }
           for (const [key, t] of denom > 0 ? shares : []) {
             const r = recOf.get(key)
-            if (r) bump(r, fixedIn * (t / denom), varIn * (t / denom), 0)
+            if (r) bump(st, r, fixedIn * (t / denom), varIn * (t / denom), 0)
           }
 
           // Output. Thinking text is not persisted (only a signature), so it is the
@@ -1155,9 +1222,9 @@ export function allocate(scanned: Scanned): Allocation {
           const think = Math.max(0, out - prose - args)
           const d2 = prose + args + think
           if (d2 > 0) {
-            bump({ role: "assistant", kind: "thinking" }, 0, 0, (outCost * think) / d2)
-            bump({ role: "assistant", kind: "prose" }, 0, 0, (outCost * prose) / d2)
-            bump({ role: "assistant", kind: "tool-args" }, 0, 0, (outCost * args) / d2)
+            bump(st, { role: "assistant", kind: "thinking" }, 0, 0, (outCost * think) / d2)
+            bump(st, { role: "assistant", kind: "prose" }, 0, 0, (outCost * prose) / d2)
+            bump(st, { role: "assistant", kind: "tool-args" }, 0, 0, (outCost * args) / d2)
           }
         } else if (ctxTokens && basis !== "synthetic") {
           const id = msg.model || "(no model field)"
@@ -1168,14 +1235,20 @@ export function allocate(scanned: Scanned): Allocation {
         for (const b of content) {
           if (!b || typeof b !== "object") continue
           if (b.type === "text") {
-            addCtx(ctx, { role: "assistant", kind: "prose-carried" }, (b.text || "").length / TEXT)
+            addCtx(
+              st,
+              ctx,
+              { role: "assistant", kind: "prose-carried" },
+              (b.text || "").length / TEXT,
+            )
           } else if (b.type === "thinking" || b.type === "redacted_thinking") {
-            addCtx(ctx, { role: "assistant", kind: "thinking-carried" }, charsOf(b) / TEXT)
+            addCtx(st, ctx, { role: "assistant", kind: "thinking-carried" }, charsOf(b) / TEXT)
           } else if (b.type === "tool_use") {
             const tool = b.name || "(unnamed tool)"
             const { sub, shell } = subKeyOf(b.input, dispatchers)
             if (b.id) toolOf.set(b.id, { tool, sub, shell })
             addCtx(
+              st,
               ctx,
               { role: "tool", tool, dir: "call", sub, shell },
               JSON.stringify(b.input || {}).length / CODE,
@@ -1192,38 +1265,42 @@ export function allocate(scanned: Scanned): Allocation {
               shell: false,
             }
             addCtx(
+              st,
               ctx,
               { role: "tool", tool: t.tool, dir: "result", sub: t.sub, shell: t.shell },
               charsOf(b) / CODE,
             )
           } else if (bt === "image") {
-            addCtx(ctx, { role: "image", kind: "image" }, imageTokens(b))
+            addCtx(st, ctx, { role: "image", kind: "image" }, imageTokens(b))
           } else if (bt === "document") {
-            addCtx(ctx, { role: "image", kind: "document" }, charsOf(b) / CODE)
+            addCtx(st, ctx, { role: "image", kind: "document" }, charsOf(b) / CODE)
           } else {
             for (const part of classifyUserBlock(textOf(b), rec))
-              addCtx(ctx, { role: part.role, sub: part.sub }, part.chars / TEXT)
+              addCtx(st, ctx, { role: part.role, sub: part.sub }, part.chars / TEXT)
           }
         }
       }
     }
   }
+}
 
+export function closeAlloc(st: Alloc): Allocation {
+  const { tMin, tMax } = st
   const days =
     tMin !== null && tMax !== null ? Math.max(1, Math.round((tMax - tMin) / 86400000)) : null
   return {
-    acc,
-    billed,
-    requests,
-    sessions,
-    sidechainRequests,
-    models,
-    unpriced,
-    ttl,
+    acc: st.acc,
+    billed: st.billed,
+    requests: st.requests,
+    sessions: st.sessions,
+    sidechainRequests: st.sidechainRequests,
+    models: st.models,
+    unpriced: st.unpriced,
+    ttl: st.ttl,
     days,
     spanFrom: tMin,
     spanTo: tMax,
-    firstCtx,
+    firstCtx: st.firstCtx,
   }
 }
 
@@ -1571,11 +1648,10 @@ export interface Analysis {
   groupDefs: GroupDef[]
 }
 
-export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analysis {
-  const scanned = scan(rawFiles)
-  if (!scanned.files.length) throw new Error("no readable transcript files")
-  const alloc = allocate(scanned)
-
+/** The bill, out of what the two passes accumulated. Nothing here walks a transcript again --
+ *  it is arithmetic on the accumulators -- so it is the same call whether the passes were fed
+ *  the corpus at once or a file at a time. */
+export function report(scanned: Scanned, alloc: Allocation): Analysis {
   const datasets = {} as Record<TtlAssumption, Dataset>
   for (const t of ["1h", "5m"] as const) datasets[t] = buildTree(alloc, t)
 
@@ -1616,7 +1692,7 @@ export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analys
     days: alloc.days,
     spanFrom: alloc.spanFrom,
     spanTo: alloc.spanTo,
-    filesUsed: scanned.files.length,
+    filesUsed: scanned.filesUsed,
     duplicatesDropped: scanned.duplicatesDropped,
     badLines: scanned.badLines,
     models: [...alloc.models]
@@ -1635,4 +1711,17 @@ export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analys
     warnings,
     groupDefs: GROUPS,
   }
+}
+
+/** The whole thing in one call, for callers that already hold every file: the tests, and any
+ *  script with a directory in hand. The page does not use it -- it drives the passes itself so
+ *  that it can say where it has got to. */
+export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analysis {
+  const sc = openScan()
+  const kept = rawFiles.filter((f) => scanOne(sc, f))
+  const scanned = closeScan(sc)
+  if (!scanned.filesUsed) throw new Error("no readable transcript files")
+  const al = openAlloc(scanned)
+  for (const f of kept) allocOne(al, f)
+  return report(scanned, closeAlloc(al))
 }
