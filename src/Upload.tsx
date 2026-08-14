@@ -41,7 +41,12 @@ import { analyze, type Analysis, type RawFile } from "./engine.ts"
 import { cssMs, TextSwap } from "./Motion.tsx"
 import { Tip } from "./Tip.tsx"
 
-const MAX_LISTED = 60
+/** How many names the panel writes out before it stops naming them and says how many are left.
+ *  A sample rather than an inventory: the list is there to show that the folder is being read, and
+ *  a reader who is waiting on a bill does not need six hundred session ids to go past to believe
+ *  it. Enough to fill the panel and roll it a few times, then the count of the rest -- which is
+ *  the line that says the whole folder is accounted for, not just the part that fitted. */
+const MAX_LISTED = 13
 
 type Os = "mac" | "win" | "linux"
 
@@ -319,6 +324,141 @@ function walkEntry(entry: FileSystemEntry, out: Picked[]): Promise<void> {
   })
 }
 
+/** How many rows the panel shows at once. It is a number here rather than a length in the
+ *  stylesheet because the roll below has to count in rows -- how far to travel, and how many
+ *  jumps to get there -- and CSS cannot do arithmetic on the step count. So the markup owns it
+ *  and hands it over as `--file-rows`, which is what the panel is then sized by: see `.swap`. */
+const SHOWN = 7
+
+/** A custom property, on its way to the stylesheet. React types `style` as the properties it
+ *  knows the names of, so a variable has to be cast in -- once, here, rather than at each site. */
+function vars(v: Record<string, string | number>): React.CSSProperties {
+  return v as React.CSSProperties
+}
+
+/** How the writing speeds up: each row takes this much of the time the row above it took, and by
+ *  the row that fills the panel it has reached its floor -- a tenth of where it started, which is
+ *  names arriving faster than they can be read.
+ *
+ *  The ramp stops exactly where the panel fills, and that is not a coincidence: the first rows are
+ *  the ones anybody watches a name being written on, and every row after them is one the column
+ *  has to roll for. Rolling on an even beat is what lets one stepped animation land its jumps on
+ *  the rows -- see the roll in `Reading` -- so the machine spins up while there is room, and holds
+ *  its speed once it is reading off the bottom of the panel. */
+const SPEEDUP = 0.75
+
+/** What row `i` is written at, as a fraction of the first row's pace. */
+function pace(i: number): number {
+  return SPEEDUP ** Math.min(i, SHOWN)
+}
+
+/** Two decimals is a hundredth of a beat -- under a tenth of a millisecond at these speeds, and
+ *  it keeps the arithmetic the stylesheet is handed down to something a person can read. */
+function round(n: number): number {
+  return Math.round(n * 100) / 100
+}
+
+/** The transcripts, written out.
+ *
+ *  One row at a time and one caret in the panel, because two names being typed at once is two
+ *  machines reading one folder. A row's turn is therefore everything above it: a beat per
+ *  character of every name before it, plus a pause per row.
+ *
+ *  And the panel follows the writing rather than holding still while it runs off the bottom.
+ *  Once there are more names than it shows, the column jumps up a row each time a new row starts,
+ *  so the name being written is always the last line in the box -- a terminal, which is what this
+ *  is. The jump is a `transform` on the whole column, for the same reason the typing is: the
+ *  parse holds the main thread, and a scroll driven from JS would stop dead the moment it
+ *  started while the typing carried on underneath it. */
+function Reading({ found, phase }: { found: Found; phase: Phase }): React.JSX.Element {
+  const each: Array<{ name: string | null; chars: number; beats: number; pause: number }> =
+    found.names.map((name, i) => ({
+      name,
+      /* Characters rather than `length`, because a name is text and text is not code units: the
+         "+N more" line ends in an ellipsis. The count is what the steps are cut from; the beats
+         are the same count at this row's pace, which is what they take. */
+      chars: [...name].length,
+      beats: [...name].length * pace(i),
+      pause: pace(i),
+    }))
+  /* And a line with nothing on it but a cursor, which is what is left once every name has been
+     written: the folder has been read and the parse has not finished, and a terminal that is
+     waiting says so with a prompt. It takes a row's turn like any other row -- and the same
+     interval as the row above it, so that the roll's even jumps stay even -- because the roll has
+     to make room for it too. */
+  const last = each.at(-1)
+  if (last) each.push({ name: null, chars: 0, beats: last.beats, pause: last.pause })
+  /** How long rows `from` up to `to` take, on the clock the stylesheet keeps: their characters
+   *  and their pauses, each counted at the pace its own row was written at. */
+  const span = (from: number, to: number): string => {
+    const rows = each.slice(from, to)
+    return (
+      `calc(var(--type-char) * ${round(rows.reduce((a, b) => a + b.beats, 0))}` +
+      ` + var(--type-row) * ${round(rows.reduce((a, b) => a + b.pause, 0))})`
+    )
+  }
+  /** When row `i` takes its turn: everything above it. */
+  const turn = (i: number): string => span(0, i)
+  /* The rows that have to be rolled past, which is every one that will not fit. The clock runs
+     from the turn of the first row below the fold to the turn *after* the last row, so that the
+     jumps land one per row -- `jump-start`, because the column has to have moved by the time the
+     row it is making room for starts writing, not after. Even jumps land on even rows, which is
+     what the ramp stopping at `SHOWN` buys: everything the roll covers is written at one pace. */
+  const rolls = Math.max(0, each.length - SHOWN)
+  const roll = rolls
+    ? {
+        ...vars({ "--roll-to": `calc(var(--file-row) * -${rolls})` }),
+        animationDelay: turn(SHOWN),
+        animationDuration: span(SHOWN, each.length),
+        animationTimingFunction: `steps(${rolls}, jump-start)`,
+      }
+    : undefined
+
+  return (
+    <>
+      {/* The count stands where "The folder is hidden" stood, in the same mono caps on the same
+          line, and changes tense the way every other figure on this page does: the two phases are
+          swapped, not substituted. Announced politely, since it is the only thing that says the
+          page is working to a reader who cannot see it working. */}
+      <div className="foundhead" aria-live="polite">
+        <span className="foundlbl">
+          <TextSwap token={phase.token}>{phase.node}</TextSwap>
+        </span>
+      </div>
+      {/* Keyed on the pick, so a second folder is written out again from the top rather than
+          re-lettering the names already lying there. */}
+      <div className="foundbox">
+        <div className="filelist">
+          <div className="fileroll" key={found.id} style={roll}>
+            {each.map(({ name, chars, beats }, i) =>
+              name === null ? (
+                <div key="wait" className="fileline" style={{ animationDelay: turn(i) }}>
+                  <span className="filewait" />
+                </div>
+              ) : (
+                <div key={name} className="fileline" style={{ animationDelay: turn(i) }}>
+                  <span className="filedot" />
+                  <span className="filenm">
+                    {name}
+                    <span
+                      className="filecover"
+                      style={{
+                        animationDuration: `calc(var(--type-char) * ${round(beats)})`,
+                        animationDelay: turn(i),
+                        animationTimingFunction: `steps(${chars})`,
+                      }}
+                    />
+                  </span>
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 export function Intake({ onData }: { onData: (data: Analysis) => void }): React.JSX.Element {
   const [err, setErr] = useState<ReactNode>(null)
   const [found, setFound] = useState<Found | null>(null)
@@ -562,7 +702,13 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
             upward as the other arrives from below -- and two things that take turns in the flow
             cannot cross, they shove. What does move is the box's height, which grows into the
             taller job as they pass. See `.swap`. */}
-        <div className="swap" data-face={busy ? "files" : "how"}>
+        <div
+          className="swap"
+          data-face={busy ? "files" : "how"}
+          /* How tall the panel is, in rows, handed to the stylesheet as the number the markup
+             already had to count in. See `SHOWN`. */
+          style={vars({ "--file-rows": SHOWN })}
+        >
           <div className="howto" data-on={busy ? "0" : "1"}>
             {/* Two rows, rather than one row of label, sentence and switch run together: the switch
                 decides *which* instruction is drawn, so it belongs above the line it governs, not
@@ -594,48 +740,7 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
               it look busy. */}
           {found ? (
             <div className="found" data-on={busy ? "1" : "0"} data-busy={busy ? "1" : "0"}>
-              {/* The count stands where "The folder is hidden" stood, in the same mono caps on the
-                  same line, and changes tense the way every other figure on this page does: the
-                  two phases are swapped, not substituted. Announced politely, since it is the only
-                  thing that says the page is working to a reader who cannot see it working. */}
-              <div className="foundhead" aria-live="polite">
-                <span className="foundlbl">
-                  <TextSwap token={phase.token}>{phase.node}</TextSwap>
-                </span>
-              </div>
-              {/* Keyed on the pick, so a second folder deals its rows out again rather than
-                  re-lettering the ones already lying there. */}
-              <div className="foundbox">
-                <div className="filelist" key={found.id}>
-                  {found.names.map((n, i) => {
-                    /* A row's turn and a name's length are positions and counts, which are the
-                       markup's to know; the beats they are counted in belong to the stylesheet.
-                       So what is written here is arithmetic on the tokens rather than any number
-                       of its own -- the row waits its turn, and then takes one beat per character
-                       to write itself out.
-                       Characters rather than `length`, because a name is text and text is not
-                       code units: the "+N more" line ends in an ellipsis. */
-                    const chars = [...n].length
-                    const turn = `calc(var(--type-row) * ${i})`
-                    return (
-                      <div key={n} className="fileline" style={{ animationDelay: turn }}>
-                        <span className="filedot" />
-                        <span className="filenm">
-                          {n}
-                          <span
-                            className="filecover"
-                            style={{
-                              animationDuration: `calc(var(--type-char) * ${chars})`,
-                              animationDelay: turn,
-                              animationTimingFunction: `steps(${chars})`,
-                            }}
-                          />
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
+              <Reading found={found} phase={phase} />
             </div>
           ) : null}
         </div>

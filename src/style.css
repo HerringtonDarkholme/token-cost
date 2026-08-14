@@ -104,7 +104,13 @@ button {
 .hidden {
   display: none !important;
 }
+/* Positioned, and above what follows it. Its hints hang below the bar, which is where the card
+   starts -- and the card is a positioned element further down the document, so with both at the
+   same level the later one wins and the hint is painted underneath it. A stacking context here
+   settles that for the whole bar at once. */
 .toolbar {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1228,6 +1234,14 @@ tfoot .n {
    taller. That is only ever the floor or the note, because the list's own scroller has no
    intrinsic height to contribute -- see `.foundbox`. */
 .swap {
+  /* The panel's grid, in the units the list is written in: a row's height, the air above and
+     below the rows, and the label's line with its own air. The panel is an exact number of rows
+     tall because the column inside it travels by whole rows -- half a line showing at the bottom
+     edge would be half a line of a name nobody asked to see. `--file-rows` comes in from the
+     markup, which is the one place the count can live: see `SHOWN`. */
+  --file-row: 20px;
+  --file-pad: 6px;
+  --found-head: 21px;
   display: grid;
   width: 100%;
   /* A shade under the heading's own measure, so the block below it lines up with the block
@@ -1242,8 +1256,12 @@ tfoot .n {
   margin: 16px 0 0;
   transition: min-height var(--intake-swap-dur) var(--intake-swap-ease);
 }
+/* The label, the rows it stands over, the panel's padding and its hairline -- added up rather
+   than rounded to a number that looked about right, because everything below measures from it. */
 .swap[data-face="files"] {
-  min-height: 168px;
+  min-height: calc(
+    var(--found-head) + var(--file-row) * var(--file-rows) + var(--file-pad) * 2 + 2px
+  );
 }
 /* The stack, and the state both faces rest in when they are not the one on show: away from the
    middle, blurred out, and gone from the tab order. Which direction "away" is belongs to each
@@ -1290,14 +1308,22 @@ tfoot .n {
   /* Upward, because it is being answered: the note is the question the pick has just settled. */
   transform: translateY(-10px);
 }
-.howhead,
-.foundhead {
+.howhead {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px 9px;
   margin-bottom: 7px;
+}
+/* The same line, held to an exact height instead of a line box plus a margin: what is left of
+   the box after it is the panel, and the panel has to come out at a whole number of rows. The
+   label sits at the top of it, which is where the note's label sits in the face this replaces. */
+.foundhead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  height: var(--found-head);
 }
 .howlbl,
 .foundlbl {
@@ -1323,15 +1349,13 @@ tfoot .n {
   /* Up from below, the way an answer arrives. */
   transform: translateY(14px);
 }
-/* The panel the names scroll in, and the frame the sweep is clipped to. Two elements rather than
-   one: the scan has to stay put while the list scrolls under it, and a pseudo-element on the
-   scroller would scroll away with the rows. */
+/* The panel the names are written into: exactly the rows the box was sized for, and a window
+   rather than a scroller -- what brings a name into view is the column moving under it, and a
+   scrollbar beside a list that scrolls itself is an offer to fight it. */
 .foundbox {
   position: relative;
   flex: 1;
-  /* Both halves of "take the room you are given and no more": the flex minimum that would
-     otherwise be the rows' own height, and the scroller that would otherwise ask the grid for
-     all sixty of them. */
+  /* The flex minimum that would otherwise be all sixty rows' own height. */
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--rule);
@@ -1340,14 +1364,39 @@ tfoot .n {
      readout is the one thing on this face that earns a well to sit in. */
   background: var(--sunk);
 }
+/* Out of flow, which is the whole reason the panel is the height it was asked for. In flow, sixty
+   rows are sixty rows of content: the box would report them as the height it wants, the grid would
+   hand it over, and the panel would grow until the card ran out of room -- which is what put a
+   fixed number of names on screen and clipped the rest. Taken out, the rows have no say in it.
+   Inset rather than padded, and that is the difference between seven rows and seven rows plus a
+   sliver of the eighth: `overflow` clips at the padding box, so the air under the last row is air
+   the row below is free to show through. Held off the edges from outside, the window is exactly
+   the rows it was sized for. */
 .filelist {
-  height: 100%;
-  overflow: auto;
-  padding: 7px 10px;
+  position: absolute;
+  inset: var(--file-pad) 10px;
+  overflow: hidden;
   text-align: left;
   font-family: var(--mono);
   font-size: 11.5px;
   color: var(--ink3);
+}
+/* The column, and the thing that keeps the writing in the window: once there are more names than
+   the panel shows it jumps up one row per row, on the beat the row below the fold starts writing.
+   `steps(…, jump-start)` is what makes it a jump *before* rather than after -- the room has to be
+   there when the name arrives. How far and how many are the markup's, since only it knows how
+   many names there are: see `Reading`. */
+@keyframes t-roll {
+  to {
+    transform: translateY(var(--roll-to));
+  }
+}
+.fileroll {
+  /* Nothing to travel is the honest default: a folder that fits in the panel never rolls, and
+     with no duration set the animation lands on this value on its first frame. */
+  --roll-to: 0px;
+  animation-name: t-roll;
+  animation-fill-mode: both;
 }
 /* A row does not arrive until it is that row's turn, and then it does not travel: what happens
    at its turn is the name writing itself, and a line that slides in as well is two arrivals for
@@ -1361,11 +1410,13 @@ tfoot .n {
     opacity: 1;
   }
 }
+/* A fixed height rather than a line box, because the roll above counts in rows: a row that is
+   20.125px tall puts the column a pixel out by the eighth jump. */
 .fileline {
   display: flex;
   align-items: center;
   gap: 8px;
-  line-height: 1.75;
+  height: var(--file-row);
   animation: t-file-in var(--duration-micro) var(--ease-out) both;
 }
 /* The name, and the ground the cover is measured against: the box is the text's own width, so
@@ -1392,7 +1443,15 @@ tfoot .n {
     transform: translateX(0);
   }
   to {
-    transform: translateX(100%);
+    /* Two characters past the end of the name rather than exactly on it, which is what makes the
+       *second to last* step the one that finishes the name. The last step cannot be relied on: a
+       composited step animation that ends between two frames is left holding the last value it
+       was sampled at, so a name whose final character only arrives on the final step spends the
+       rest of its life one character short with a caret sitting where the character should be.
+       Overshoot by a character and the step before the end has already cleared the name; overshoot
+       by two and the caret is outside the box that clips it as well. `ch` because the panel is
+       monospaced, so a character is a unit here. */
+    transform: translateX(calc(100% + 2ch));
   }
 }
 .filecover {
@@ -1407,11 +1466,36 @@ tfoot .n {
 }
 /* Taken away entirely rather than left still. Motion the reader asked not to see is turned off
    at the top of this file with a blanket `animation: none`, and an animation that is the only
-   thing which ever moves the cover off the name would leave the name under it for good. */
+   thing which ever moves the cover off the name would leave the name under it for good. The
+   column does not roll for the same reason, so the panel goes back to being a scroller: with
+   nothing to bring the rest of the names up, the reader has to be able to. */
 @media (prefers-reduced-motion: reduce) {
   .filecover {
     display: none;
   }
+  .filelist {
+    overflow: auto;
+  }
+}
+/* The prompt on the empty line under the names: the folder has been read, the parse has not
+   finished, and this is the page saying so in the one vocabulary the panel has. It blinks on a
+   step rather than a fade, because that is what a cursor does, and on `opacity`, because the
+   parse it is drawn over is holding the main thread. */
+@keyframes t-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.filewait {
+  width: 1px;
+  height: 12px;
+  background: var(--accent);
+  animation: t-blink 900ms var(--ease-linear) infinite;
 }
 /* One square per transcript, on the grid every other mark on this page is drawn on. It arrives
    with its row and does nothing after that: the row beside it is being written a character at a
@@ -1816,17 +1900,18 @@ kbd {
      it out before handing the main thread to the parse.
 
      The two beats the list is written in are the values here with no usage on the scale, because
-     nothing else on the page types: one per character, one per row. A character is fast -- 14ms
-     is about seventy a second, which is a machine writing rather than a person -- and a row's
-     turn comes round long before the row above it has finished, so the names overlap down the
-     column instead of queueing politely. That ratio is the whole look: at these two numbers a
-     forty-character name takes a little over half a second and four or five rows are being
-     written at any moment. Slow the row down towards the name's own length and the list becomes
-     a queue; speed it up and they all land at once. */
+     nothing else on the page types: one per character, and one pause between names. They run one
+     after another rather than overlapping -- a folder is read by one machine, and two carets in
+     the panel at once says it is being read by two.
+     These are the *first* row's beats, and only its: every row after it is written at a fraction
+     of the row above, so what is set here is where the machine starts rather than where it ends
+     up. At 6ms a first name of forty characters is written in a quarter of a second -- fast, but
+     slowly enough to be read as writing -- and by the seventh row the same name lands in a tenth
+     of that. See `SPEEDUP`. */
   --intake-swap-dur: var(--duration-fast);
   --intake-swap-ease: var(--ease-smooth-out);
-  --type-char: 14ms;
-  --type-row: 130ms;
+  --type-char: 6ms;
+  --type-row: 30ms;
 
   /* Controls growing into the toolbar. Sideways rather than up, because they emerge from
      beside the theme switch, which does not move; and out faster than in, because arriving is
