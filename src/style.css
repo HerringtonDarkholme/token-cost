@@ -1340,40 +1340,6 @@ tfoot .n {
      readout is the one thing on this face that earns a well to sit in. */
   background: var(--sunk);
 }
-/* The work, said as light rather than as words: a soft band with an accent line down its middle,
-   travelling the height of the panel on a loop. Transform and opacity only, which is the whole
-   reason it is drawn this way -- the parse behind it holds the main thread for seconds at a time,
-   and a composited animation keeps running through that while anything paint-driven would freeze
-   on the frame the parse started. */
-@keyframes t-scan {
-  from {
-    transform: translateY(-100%);
-  }
-  to {
-    transform: translateY(100%);
-  }
-}
-.foundbox::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  background:
-    linear-gradient(to bottom, transparent 49.5%, var(--accent) 50%, transparent 50.5%),
-    linear-gradient(
-      to bottom,
-      transparent 0%,
-      var(--accent-soft) 42%,
-      var(--accent-soft) 58%,
-      transparent 100%
-    );
-  transition: opacity var(--duration-quick) var(--ease-out);
-}
-.found[data-busy="1"] .foundbox::after {
-  opacity: 0.62;
-  animation: t-scan var(--intake-scan-dur) var(--ease-linear) infinite;
-}
 .filelist {
   height: 100%;
   overflow: auto;
@@ -1383,17 +1349,16 @@ tfoot .n {
   font-size: 11.5px;
   color: var(--ink3);
 }
-/* Dealt in from the left, one after another, because that is what a list of things being read
-   looks like. The delay per row is inline -- a stagger is a position, and a position is the
-   markup's to know -- and it counts in the shared beat. */
+/* A row does not arrive until it is that row's turn, and then it does not travel: what happens
+   at its turn is the name writing itself, and a line that slides in as well is two arrivals for
+   one event. The wait is the whole animation -- `both` is what holds the row invisible through
+   the delay the markup sets. */
 @keyframes t-file-in {
   from {
     opacity: 0;
-    transform: translateX(calc(var(--distance-base) * -1));
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 .fileline {
@@ -1401,45 +1366,71 @@ tfoot .n {
   align-items: center;
   gap: 8px;
   line-height: 1.75;
-  animation: t-file-in var(--duration-fast) var(--ease-smooth-out) both;
+  animation: t-file-in var(--duration-micro) var(--ease-out) both;
 }
+/* The name, and the ground the cover is measured against: the box is the text's own width, so
+   one step of the cover is exactly one character of a monospaced name. `min-width` is what lets
+   a name too long for the panel shrink and take the ellipsis instead of pushing the row wide. */
 .filenm {
+  position: relative;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* One square per transcript, on the grid every other mark on this page is drawn on. They pulse
-   in fours while the work runs -- a wave down the column rather than sixty squares blinking
-   together, and four rules rather than sixty because a wave is a thing that repeats. */
-@keyframes t-file-pulse {
-  0%,
-  100% {
-    opacity: 0.25;
+/* The typing. A panel-coloured cover lying over the name, sliding off it to the right in as many
+   steps as the name has characters -- so the name is written a character at a time, and it is a
+   transform doing it. That is the point rather than a detail: the parse this is drawn over holds
+   the main thread for seconds, and a composited animation keeps stepping through that while
+   anything paint-driven -- a width, a background position, a caret drawn by a timer -- would
+   freeze on the frame the parse started.
+   The border is the caret, and it needs no second animation to put itself away: the cover's own
+   left edge is where the next character is about to land, and on the last step the whole cover
+   has passed the end of the name, which is past the end of the box that clips it. */
+@keyframes t-type {
+  from {
+    transform: translateX(0);
   }
-  50% {
-    opacity: 1;
+  to {
+    transform: translateX(100%);
   }
 }
+.filecover {
+  position: absolute;
+  inset: 0;
+  background: var(--sunk);
+  border-left: 1px solid var(--accent);
+  /* The duration, the delay and the step count are the row's own -- one beat per character, from
+     this row's turn onward -- so they are set on the element. See `Intake`. */
+  animation-name: t-type;
+  animation-fill-mode: both;
+}
+/* Taken away entirely rather than left still. Motion the reader asked not to see is turned off
+   at the top of this file with a blanket `animation: none`, and an animation that is the only
+   thing which ever moves the cover off the name would leave the name under it for good. */
+@media (prefers-reduced-motion: reduce) {
+  .filecover {
+    display: none;
+  }
+}
+/* One square per transcript, on the grid every other mark on this page is drawn on. It arrives
+   with its row and does nothing after that: the row beside it is being written a character at a
+   time, and a mark that blinks next to text that is already moving is one signal too many. The
+   accent is what it says while there is work on -- the same ink the caret writing the name is
+   drawn in. */
 .filedot {
   flex: none;
   width: 4px;
   height: 4px;
   background: currentColor;
   opacity: 0.45;
-  transition: background var(--duration-quick) var(--ease-out);
+  transition:
+    background var(--duration-quick) var(--ease-out),
+    opacity var(--duration-quick) var(--ease-out);
 }
 .found[data-busy="1"] .filedot {
   background: var(--accent);
-  animation: t-file-pulse var(--intake-scan-dur) var(--ease-in-out) infinite;
-}
-.found[data-busy="1"] .fileline:nth-child(4n + 2) .filedot {
-  animation-delay: calc(var(--intake-scan-dur) / -4);
-}
-.found[data-busy="1"] .fileline:nth-child(4n + 3) .filedot {
-  animation-delay: calc(var(--intake-scan-dur) / -2);
-}
-.found[data-busy="1"] .fileline:nth-child(4n + 4) .filedot {
-  animation-delay: calc(var(--intake-scan-dur) * -0.75);
+  opacity: 1;
 }
 /* The platform, and the way to the next one. A chip rather than a bare word: a word set in the
    same ink as the label beside it is not obviously pressable, and this is the control a reader
@@ -1823,12 +1814,19 @@ kbd {
      through, so the note leaving, the list arriving and the box resizing are one movement rather
      than three that end at three different moments. It is read back in `Upload.tsx`, which waits
      it out before handing the main thread to the parse.
-     The scan's own period is the one value here with no usage on the scale: 1.5s is slow enough
-     to read as a sweep rather than a strobe, and it is what the dots' pulse counts in too, so the
-     light travelling down the panel and the squares lighting up beside it keep the same time. */
+
+     The two beats the list is written in are the values here with no usage on the scale, because
+     nothing else on the page types: one per character, one per row. A character is fast -- 14ms
+     is about seventy a second, which is a machine writing rather than a person -- and a row's
+     turn comes round long before the row above it has finished, so the names overlap down the
+     column instead of queueing politely. That ratio is the whole look: at these two numbers a
+     forty-character name takes a little over half a second and four or five rows are being
+     written at any moment. Slow the row down towards the name's own length and the list becomes
+     a queue; speed it up and they all land at once. */
   --intake-swap-dur: var(--duration-fast);
   --intake-swap-ease: var(--ease-smooth-out);
-  --intake-scan-dur: 1500ms;
+  --type-char: 14ms;
+  --type-row: 130ms;
 
   /* Controls growing into the toolbar. Sideways rather than up, because they emerge from
      beside the theme switch, which does not move; and out faster than in, because arriving is

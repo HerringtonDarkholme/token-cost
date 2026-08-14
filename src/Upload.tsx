@@ -24,12 +24,17 @@
    And the moment it has been chosen, the route into the hidden folder is answered rather than
    left standing: the keystrokes are help for a dialog that is no longer open, and the thing the
    reader now wants to see is what came back out. So the two share one box -- the note leaves and
-   the transcripts arrive in the same place, the box growing into the taller job as they cross --
-   and the list says out loud that work is happening, because the parse behind it is seconds of
-   synchronous main thread and a page that goes still reads as a page that has died. Everything
-   that moves while it is working moves on the compositor -- transform and opacity, never a
-   background position -- for exactly that reason: those keep running while the parse holds the
-   thread, and a paint-driven animation would freeze on its first frame. */
+   the transcripts arrive in the same place, the box growing into the taller job as they cross.
+
+   The list says out loud that work is happening, because the parse behind it is seconds of
+   synchronous main thread and a page that goes still reads as a page that has died. It says it
+   by writing the names out, one character at a time, one row overlapping the last -- the machine
+   reading the folder out to you rather than a bar or a spinner drawn beside a list that is
+   already complete. What does the typing is a cover the colour of the panel sliding off the name
+   in as many steps as it has characters, which is a `transform` and therefore composited: it
+   keeps running while the parse holds the thread, where anything paint-driven would freeze on
+   the frame the parse started. The cover's leading edge is the caret, and it clips itself on the
+   last step -- see `.filecover`. */
 
 import { useId, useRef, useState, type ReactNode } from "react"
 import { analyze, type Analysis, type RawFile } from "./engine.ts"
@@ -37,11 +42,6 @@ import { cssMs, TextSwap } from "./Motion.tsx"
 import { Tip } from "./Tip.tsx"
 
 const MAX_LISTED = 60
-
-/** How many rows are dealt in with a stagger of their own before the rest share the last one.
- *  A little more than the box shows at once, so the deal is still running when it reaches the
- *  fold; a folder of six hundred transcripts must not spend twenty seconds laying itself out. */
-const STAGGERED = 11
 
 type Os = "mac" | "win" | "linux"
 
@@ -607,21 +607,33 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
                   re-lettering the ones already lying there. */}
               <div className="foundbox">
                 <div className="filelist" key={found.id}>
-                  {found.names.map((n, i) => (
-                    <div
-                      key={n}
-                      className="fileline"
-                      /* The stagger is a position, so it is written here rather than in the
-                         stylesheet -- but the beat it counts in is the stylesheet's, which is why
-                         this is a `calc` on the shared token and not a number. */
-                      style={{
-                        animationDelay: `calc(var(--duration-stagger) * ${Math.min(i, STAGGERED)})`,
-                      }}
-                    >
-                      <span className="filedot" />
-                      <span className="filenm">{n}</span>
-                    </div>
-                  ))}
+                  {found.names.map((n, i) => {
+                    /* A row's turn and a name's length are positions and counts, which are the
+                       markup's to know; the beats they are counted in belong to the stylesheet.
+                       So what is written here is arithmetic on the tokens rather than any number
+                       of its own -- the row waits its turn, and then takes one beat per character
+                       to write itself out.
+                       Characters rather than `length`, because a name is text and text is not
+                       code units: the "+N more" line ends in an ellipsis. */
+                    const chars = [...n].length
+                    const turn = `calc(var(--type-row) * ${i})`
+                    return (
+                      <div key={n} className="fileline" style={{ animationDelay: turn }}>
+                        <span className="filedot" />
+                        <span className="filenm">
+                          {n}
+                          <span
+                            className="filecover"
+                            style={{
+                              animationDuration: `calc(var(--type-char) * ${chars})`,
+                              animationDelay: turn,
+                              animationTimingFunction: `steps(${chars})`,
+                            }}
+                          />
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>

@@ -626,6 +626,11 @@ describe("the card's two faces", () => {
       expect([...found.querySelectorAll(".filenm")].map((e) => e.textContent)).toEqual([
         "0f2c9a.jsonl",
       ])
+      /* And each name is written out rather than printed: one step per character, on a cover
+         that carries its own row's turn. "0f2c9a.jsonl" is twelve of them. */
+      expect(found.querySelector(".filenm .filecover")?.getAttribute("style")).toMatch(
+        /steps\(12\)/,
+      )
       // The head of the list is what narrates the work, so nothing is said twice.
       expect(found.querySelector(".foundlbl")?.textContent).toMatch(/Reading 1 transcript/)
       expect(box.querySelector(".status")?.textContent).toBe("")
