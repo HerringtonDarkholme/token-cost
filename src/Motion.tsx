@@ -2,7 +2,14 @@
    one left, a figure that rolls from the number it was to the number it is, and a line of copy
    that swaps for a different line. */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react"
 import { flushSync } from "react-dom"
 import NumberFlow, { useIsSupported, type Format } from "@number-flow/react"
 import { tagOf } from "./i18n.ts"
@@ -20,9 +27,25 @@ export function cssMs(name: string, fallback: number): number {
   return parseFloat(value) || fallback
 }
 
+const STILL = "(prefers-reduced-motion: reduce)"
+
 /** Motion the reader asked not to see. */
 export function reduced(): boolean {
-  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
+  return typeof matchMedia === "function" && matchMedia(STILL).matches
+}
+
+function subscribeReduced(fn: () => void): () => void {
+  if (typeof matchMedia !== "function") return () => {}
+  const list = matchMedia(STILL)
+  list.addEventListener("change", fn)
+  return () => list.removeEventListener("change", fn)
+}
+
+/** The same answer, subscribed. The stylesheet re-answers the query the moment the reader
+ *  changes the setting; anything deciding in JS has to be told, or it stays on whatever was true
+ *  when it last rendered. */
+export function useReduced(): boolean {
+  return useSyncExternalStore(subscribeReduced, reduced, reduced)
 }
 
 /** Whether a state change can be made as a view transition at all: the browser has the API, and
@@ -117,7 +140,8 @@ export function Figure({
 }): React.JSX.Element {
   const supported = useIsSupported()
   const { lang } = useViewState()
-  if (value === null || !supported || reduced()) {
+  const still = useReduced()
+  if (value === null || !supported || still) {
     return <span className={className}>{text}</span>
   }
   return (
