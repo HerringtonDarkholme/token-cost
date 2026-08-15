@@ -15,12 +15,12 @@
    conditional provider is a different tree, and a different tree remounts the card. `null` is
    what it carries in between. */
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef } from "react"
 import type { Analysis } from "./engine.ts"
 import { ReportContext, useReportCtx } from "./context.ts"
 import { money } from "./model.ts"
 import { hashFor, hoverClear, readHash, setState, useViewState, type ViewState } from "./store.ts"
-import { Figure, Reveal, TextSwap } from "./Motion.tsx"
+import { Figure, Reveal, TextSwap, useCountingUp } from "./Motion.tsx"
 import { Toolbar } from "./Toolbar.tsx"
 import { Breakdown, CardBody, Footnotes, scopeOf } from "./Report.tsx"
 import { Intake, Where } from "./Upload.tsx"
@@ -83,24 +83,24 @@ export function Page({
   const billed = ctx
     ? `Billed · ${state.pctOnly ? "amount hidden · " : ""}${state.ttl} cache TTL`
     : "Nothing dropped yet"
-  /* What the empty card's figure counts from, and what it counts through: the walk hands its
-     running total up here, so the slot holds $0.00 before a folder is picked and then climbs
-     towards the bill from the first transcript to the last. A dash stood here before, and a
-     dash is a slot waiting to be filled -- this is the same slot saying the same thing while
-     also being true, and it gives the rolling digits the one thing they never had, which is a
-     number that changes. It survives the turn: the header is outside the face that swaps, so
-     the figure that arrives at the bill is the figure that was counting towards it. */
-  const [tally, setTally] = useState(0)
+  /* What the empty card's figure counts from, and what it counts through: the walk writes its
+     running total into this box as it reads, so the slot holds $0.00 before a folder is picked
+     and then climbs towards the bill from the first transcript to the last. A dash stood here
+     before, and a dash is a slot waiting to be filled -- this is the same slot saying the same
+     thing while also being true, and it gives the rolling digits the one thing they never had,
+     which is a number that changes. It survives the turn: the header is outside the face that
+     swaps, so the figure that arrives at the bill is the figure that was counting towards it.
 
-  /* The tally belongs to one pick. Coming back to the empty card starts another. */
-  useEffect(() => {
-    if (!ctx) setTally(0)
-  }, [ctx])
+     A box the figure watches rather than a number handed up on a schedule: how often digits may
+     be given something new to roll to is a question about the roll, so it is asked and answered
+     next to it. See `useCountingUp`. */
+  const sofar = useRef(0)
+  const counted = useCountingUp(sofar, !ctx)
 
   /* The figure twice over: as a number for the rolling digits, and as text for the one state
      that is not one. Only one of them is ever rendered -- see `Figure`. */
-  const total = ctx ? (state.pctOnly ? null : ctx.d.total) : tally
-  const totalText = ctx ? (state.pctOnly ? "****" : money(ctx.d.total)) : money(tally)
+  const total = ctx ? (state.pctOnly ? null : ctx.d.total) : counted
+  const totalText = ctx ? (state.pctOnly ? "****" : money(ctx.d.total)) : money(counted)
 
   return (
     <ReportContext.Provider value={ctx}>
@@ -174,7 +174,7 @@ export function Page({
               `closed` held from outside for the length of the exit, so the departing one has
               somewhere to go. */}
           <Reveal key={face} className="cardslot" closed={leaving}>
-            {ctx ? <CardBody /> : <Intake onData={onData} onTally={setTally} />}
+            {ctx ? <CardBody /> : <Intake onData={onData} sofar={sofar} />}
           </Reveal>
         </section>
         {/* What stands under the card: the breakdown and the footnotes, or the help for

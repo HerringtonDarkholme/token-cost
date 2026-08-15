@@ -196,6 +196,35 @@ export function Figure({
   )
 }
 
+/** A number that is being counted up to, sampled rather than delivered.
+ *
+ *  The figure above rolls between values over a few hundred milliseconds, so it has an opinion
+ *  about how often it may be given a new one -- and that opinion is nobody else's business. The
+ *  producer here is a folder being read: it writes its running total into `source` the moment it
+ *  has one, per file, at whatever rate the disk and the parse happen to go. Handing that rate
+ *  straight to the digits is what made the figure thrash, and fixing it inside the reading loop
+ *  put a fact about an animation in the middle of a file walk. So the walk publishes and this
+ *  watches, on the beat the stylesheet keeps beside the mask widths.
+ *
+ *  A ref rather than a value, because the point is that the producer does not re-render anything
+ *  when it moves: the box is written to hundreds of times and read six times a second, and the
+ *  reads that find it unchanged cost nothing -- React drops a `setState` to the number it
+ *  already has.
+ *
+ *  `watch` is what turns it on, and going true is also what zeroes the box: a second folder
+ *  starts its count where the first one started rather than at the bill the first one reached. */
+export function useCountingUp(source: React.RefObject<number>, watch: boolean): number {
+  const [seen, setSeen] = useState(0)
+  useEffect(() => {
+    if (!watch) return
+    source.current = 0
+    setSeen(0)
+    const id = setInterval(() => setSeen(source.current), cssMs("--figure-beat", 160))
+    return () => clearInterval(id)
+  }, [watch, source])
+  return seen
+}
+
 /** How long the label's exit leg runs, read off the stylesheet so the swap's three phases
  *  stay in step with the CSS that draws them. */
 function swapMs(): number {

@@ -1897,6 +1897,13 @@ kbd {
      sign -- and the dollar sign is the one character in the figure that never moves. */
   --number-flow-mask-height: 0.28em;
   --number-flow-mask-width: 0.25em;
+  /* And how often the figure is given a new number to roll to, while a folder is being read.
+     Not a duration on screen -- nothing lasts this long -- but it is the same kind of decision
+     as the ones around it, and it is a decision about the roll rather than about the reading:
+     the digits take a few hundred milliseconds to travel, so a number handed over faster than
+     this lands on a roll that is still going, restarts it, and the figure spends the whole read
+     blurred without ever arriving anywhere. Read in `Motion.tsx`, beside the figure it paces. */
+  --figure-beat: 160ms;
   /* Text states swap */
   --text-swap-dur: var(--duration-quick);
   --text-swap-translate-y: var(--distance-micro);
@@ -1963,7 +1970,7 @@ kbd {
      the panel at once says it is being read by two.
      What is *not* here any more is the beat the names are written in. It cannot be: a line is
      written in the time the file it names took to read, which is a measurement rather than a
-     choice -- see `MIN_WRITE` and `PER_PASS` in `Upload.tsx`. The stylesheet keeps the timings
+     choice -- see `MIN_WRITE` and `NAMES` in `Upload.tsx`. The stylesheet keeps the timings
      that are decisions; this one belongs to the disk. */
   --intake-swap-dur: var(--duration-fast);
   --intake-swap-ease: var(--ease-smooth-out);

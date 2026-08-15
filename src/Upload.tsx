@@ -345,15 +345,6 @@ const NAMES = 24
  *  and this is the only reason the page can move while it works. */
 const PAINT = 60
 
-/** And how often the figure in the header is allowed to change, which is a slower beat than the
- *  panel's on purpose. The digits do not jump to a new number, they roll to it over a few
- *  hundred milliseconds -- so a fresh number every 60ms lands on a roll that is still going,
- *  restarts it, and the figure spends the whole read blurred without ever arriving anywhere.
- *  At 160 each value gets most of its roll before the next one, which reads as counting rather
- *  than as thrashing. The panel keeps its own faster beat: names and counts are text, and text
- *  is not mid-animation when it is replaced. */
-const TALLY = 160
-
 /** One line of the panel: a name, and how long it should take to write itself. */
 interface Line {
   key: string
@@ -445,13 +436,14 @@ function Reading({ run }: { run: Run }): React.JSX.Element {
 
 export function Intake({
   onData,
-  onTally,
+  sofar,
 }: {
   onData: (data: Analysis) => void
-  /** The bill so far, handed up on the beat the panel repaints, for the figure in the header
-   *  to count towards. It starts moving on the first file and stops on the last, because the
-   *  total is the one number the walk never had to wait for a constant to know. */
-  onTally: (usd: number) => void
+  /** Where to leave the bill as it stands, for the figure in the header to count towards. It is
+   *  written per file and read by whoever is drawing it, on whatever beat that drawing wants --
+   *  see `useCountingUp`. The number is exact from the first file, because the total is the one
+   *  thing the walk never had to wait for a constant to know. */
+  sofar: React.RefObject<number>
 }): React.JSX.Element {
   const [err, setErr] = useState<ReactNode>(null)
   const [run, setRun] = useState<Run | null>(null)
@@ -525,7 +517,7 @@ export function Intake({
     setRun({ id, done: 0, total: files.length, lines: [] })
     /* Back to zero with the panel, not with the first priced file: a second pick has to start
        its count where the first one started, or the figure would appear to carry over. */
-    onTally(0)
+    sofar.current = 0
     setBusy(true)
 
     /* The walk is driven from here rather than handed the corpus, which is the whole shape of
@@ -543,11 +535,10 @@ export function Intake({
     const every = Math.max(1, Math.ceil(files.length / NAMES))
     let wrote = performance.now()
     let painted = 0
-    let counted = 0
 
     /** One file done. Puts a name up when this is one of the files whose turn it is, repaints if
      *  it has been long enough, and hands the frame back when it does. */
-    const step = async (i: number, total: number, name: string, tally: number): Promise<void> => {
+    const step = async (i: number, total: number, name: string): Promise<void> => {
       const now = performance.now()
       const last = i + 1 >= total
       if (i % every === 0 || last) {
@@ -564,14 +555,6 @@ export function Intake({
       if (now - painted < PAINT && !last) return
       painted = now
       setRun({ id, done: i + 1, total, lines: [...lines] })
-      /* And the figure on its own, slower beat -- see `TALLY`. It rides the panel's repaints
-         rather than opening a gap of its own, so the header changes on a frame the page was
-         already giving up. The last file reports whatever it has whether or not the beat is
-         due: the number the roll finishes on is the number the bill opens with. */
-      if (now - counted >= TALLY || last) {
-        counted = now
-        onTally(tally)
-      }
       // The yield. Everything the panel does, it does in the gaps this leaves.
       await new Promise((r) => setTimeout(r, 0))
     }
@@ -587,7 +570,11 @@ export function Intake({
     try {
       for (const [i, p] of files.entries()) {
         walkOne(w, { name: p.file.name, text: await p.file.text() })
-        await step(i, files.length, p.file.name, billedSoFar(w))
+        /* Left where the header can find it, on every file rather than on a beat: this is two
+           adds and a multiply, and deciding how often it is worth looking at is the job of
+           whoever is drawing it. */
+        sofar.current = billedSoFar(w)
+        await step(i, files.length, p.file.name)
       }
     } catch (e) {
       stop(`Could not read the files: ${(e as Error).message}`)
