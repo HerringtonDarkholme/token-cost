@@ -112,17 +112,24 @@ export function Page({
                 Cost attribution · Claude Code
                 <TextSwap token={face}>{ctx ? " · " + scopeOf(ctx.d) : ""}</TextSwap>
               </div>
-              {/* One sentence in two tenses, and `money` keeps its accent through the
-                  change -- the question and the answer are the same question. */}
+              {/* One sentence in two tenses, set word by word so the words can be told apart.
+                  "Where", "your" and "money" are the same three words on both faces, and the
+                  question loses two the answer does not have -- so the shared three travel to
+                  where the shorter sentence puts them while "did" and "go?" leave and "went"
+                  arrives. `data-w` is what the stylesheet names them by; `money` keeps its
+                  accent across the change, which is what makes it the one to follow. */}
               <h1>
                 <TextSwap token={face}>
                   {ctx ? (
                     <>
-                      Where the <em>money</em> went
+                      <span data-w="where">Where</span> <span data-w="your">your</span>{" "}
+                      <em data-w="money">money</em> <span data-w="went">went</span>
                     </>
                   ) : (
                     <>
-                      Where did your <em>money</em> go?
+                      <span data-w="where">Where</span> <span data-w="did">did</span>{" "}
+                      <span data-w="your">your</span> <em data-w="money">money</em>{" "}
+                      <span data-w="go">go?</span>
                     </>
                   )}
                 </TextSwap>

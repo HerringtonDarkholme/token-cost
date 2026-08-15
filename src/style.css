@@ -2222,14 +2222,15 @@ kbd {
    is already in its new state the whole time.
 
    What is named is the whole argument of this block, and the rule is that a name is a claim of
-   identity: these two things, on the two screens, are the same thing. Five qualify.
+   identity: these two things, on the two screens, are the same thing.
 
-   The heading is the clearest of them. "Where did your money go?" and "Where the money went"
-   are one sentence in two tenses -- the question and its answer -- so the question does not
-   leave and the answer does not arrive: the words change while the line stays where it is.
-   The eyebrow the same, gaining the scope it is now able to state; the caption under the
-   figure the same; the figure itself the same, a dash standing in the place the bill will
-   occupy and then being replaced by it. And the card, which is the page's one frame: it does
+   The heading is the clearest of them, and it is claimed a word at a time rather than a line
+   at a time -- "Where did your money go?" and "Where your money went" are one sentence in two
+   tenses, and three of its words are the same word in both. So the words themselves are what
+   travel; see the block below them. The eyebrow is claimed whole, gaining the scope it is now
+   able to state; the caption under the figure the same; the figure itself the same, a dash
+   standing in the place the bill will occupy and then being replaced by it. And the card,
+   which is the page's one frame: it does
    not go anywhere, it stops being a dashed invitation and becomes a solid border around a
    chart -- a change no CSS transition can make, since `border-style` does not interpolate.
 
@@ -2246,8 +2247,37 @@ kbd {
 .chead .eyebrow {
   view-transition-name: vt-eyebrow;
 }
-.chead h1 {
-  view-transition-name: vt-title;
+/* The heading is named a word at a time rather than as a line, because between the two faces
+   it is not one line becoming another -- it is the same three words with two taken out from
+   under them. "Where", "your" and "money" are on both sides, so each carries its own name and
+   the browser pairs them off and moves them: dropping "did" pulls everything after it left,
+   and `money` -- the one word set in the accent, and so the one the eye is already on -- has
+   the furthest to go.
+
+   "did", "go?" and "went" are named too, and have no counterpart on the other side. That is
+   the whole of what makes them fade where they stand: the browser pairs by name, and a name
+   present on one side only is an arrival or a departure rather than a move. Which is the true
+   account of them -- they are what the change of tense costs.
+
+   The `h1` itself is deliberately unnamed. A line that both moves as a whole and has moving
+   parts is two claims about the same pixels. */
+.chead h1 [data-w="where"] {
+  view-transition-name: vt-w-where;
+}
+.chead h1 [data-w="your"] {
+  view-transition-name: vt-w-your;
+}
+.chead h1 [data-w="money"] {
+  view-transition-name: vt-w-money;
+}
+.chead h1 [data-w="did"] {
+  view-transition-name: vt-w-did;
+}
+.chead h1 [data-w="go"] {
+  view-transition-name: vt-w-go;
+}
+.chead h1 [data-w="went"] {
+  view-transition-name: vt-w-went;
 }
 .chead .billed {
   view-transition-name: vt-billed;
@@ -2257,23 +2287,16 @@ kbd {
 }
 
 /* The morph, at the page's own tempo rather than the browser's 250ms. One duration for the
-   box and for the two pictures crossing inside it, because a frame that arrives before its
-   contents is a frame that arrives twice. */
-::view-transition-group(vt-card),
-::view-transition-group(vt-eyebrow),
-::view-transition-group(vt-title),
-::view-transition-group(vt-billed),
-::view-transition-group(vt-total),
-::view-transition-old(vt-card),
-::view-transition-new(vt-card),
-::view-transition-old(vt-eyebrow),
-::view-transition-new(vt-eyebrow),
-::view-transition-old(vt-title),
-::view-transition-new(vt-title),
-::view-transition-old(vt-billed),
-::view-transition-new(vt-billed),
-::view-transition-old(vt-total),
-::view-transition-new(vt-total) {
+   boxes and for the pictures crossing inside them, because a frame that arrives before its
+   contents is a frame that arrives twice.
+
+   A wildcard under the turn's own mark rather than the names written out: the heading alone
+   is six of them now, and a name added above should not also have to be remembered here. The
+   mark is what stops it reaching the breakdown's transition, which runs faster -- see the
+   `data-filter` block below, which is scoped for the same reason in the other direction. */
+:root[data-turn]::view-transition-group(*),
+:root[data-turn]::view-transition-old(*),
+:root[data-turn]::view-transition-new(*) {
   animation-duration: var(--panel-close-dur);
   animation-timing-function: var(--panel-ease);
 }
@@ -2289,8 +2312,18 @@ kbd {
    margin, the figure and its caption grow leftward from a right one. */
 ::view-transition-old(vt-eyebrow),
 ::view-transition-new(vt-eyebrow),
-::view-transition-old(vt-title),
-::view-transition-new(vt-title) {
+::view-transition-old(vt-w-where),
+::view-transition-new(vt-w-where),
+::view-transition-old(vt-w-your),
+::view-transition-new(vt-w-your),
+::view-transition-old(vt-w-money),
+::view-transition-new(vt-w-money),
+::view-transition-old(vt-w-did),
+::view-transition-new(vt-w-did),
+::view-transition-old(vt-w-go),
+::view-transition-new(vt-w-go),
+::view-transition-old(vt-w-went),
+::view-transition-new(vt-w-went) {
   width: auto;
   height: 100%;
   object-fit: none;

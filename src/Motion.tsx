@@ -58,10 +58,28 @@ export function transition(swap: () => void, mark: Record<string, string>): void
   }
   const root = document.documentElement
   for (const [name, value] of Object.entries(mark)) root.setAttribute(name, value)
-  const run = start.call(document, () => flushSync(swap))
+  const run = start.call(document, () => {
+    capturing = true
+    try {
+      flushSync(swap)
+    } finally {
+      capturing = false
+    }
+  })
   void run.finished
     .catch(() => {})
     .then(() => Object.keys(mark).forEach((name) => root.removeAttribute(name)))
+}
+
+/** Whether the DOM is being rewritten inside a capture at this moment.
+ *
+ *  Set for the length of the swap callback and read by `TextSwap`, which otherwise holds the
+ *  copy it is showing for the length of its own exit. A component that defers like that is a
+ *  component photographed still saying the old thing, so the words below commit at once while
+ *  this is true. */
+let capturing = false
+export function isCapturing(): boolean {
+  return capturing
 }
 
 /** A stable name for one thing across a transition, from whatever the rest of the page
@@ -210,6 +228,17 @@ export function TextSwap({
      render of the parent, and a dependency on them would restart the exit leg mid-flight. */
   const latest = useRef(children)
   latest.current = children
+
+  /* Inside a capture the words have to be the new words before the swap callback returns: the
+     browser photographs the DOM as it stands, and copy held back for its own exit is copy
+     photographed unchanged -- the heading would morph into itself. So the three phases below
+     are the fallback path's, and here the change lands in a single render with the motion
+     left to the browser. Updated during the render rather than from an effect, because an
+     effect runs after the commit the capture has already read. */
+  if (isCapturing() && token !== shown.token) {
+    setShown({ token, body: children })
+    setPhase("")
+  }
 
   useEffect(() => {
     if (token === shown.token) return
