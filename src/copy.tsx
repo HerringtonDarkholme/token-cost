@@ -115,9 +115,12 @@ const EN = {
     all: "all",
     headMosaic: "Every line item · column width = share of bill · block height = share of column",
     headSun: "Every line item · arc = share of the ring inside it · each ring one level deeper",
+    /* One line of the card's closing rule, in every language: the sentence that used to sit in
+       the middle -- carry cost tracks survival, not size -- is the footnotes' `compact` note
+       word for word, and saying it twice cost the German and the Japanese a second line. */
     hoverIdle: (gen: string, carry: string): string =>
       `Accented block = prose the model wrote once for ${gen}, re-billed as input for ${carry} more. ` +
-      "Carry cost tracks survival, not size. Hover any block for its line item.",
+      "Hover any block for its line item.",
     hoverLine: (name: string, amount: string, share: string, under: string): string =>
       `${name}   ${amount}   ${share} of ${under}`,
   },
@@ -452,7 +455,7 @@ const ZH: Dict = {
     headSun: "每一条明细 · 弧长＝占内圈的比例 · 每一圈深入一层",
     hoverIdle: (gen, carry) =>
       `高亮的块＝模型写了一次、花了 ${gen} 的文字，之后又作为输入被重新计费 ${carry}。` +
-      "结转成本取决于它活了多久，而不是它有多大。把鼠标移到任意块上可以看它的明细。",
+      "把鼠标移到任意块上可以看它的明细。",
     hoverLine: (name, amount, share, under) => `${name}   ${amount}   占${under} ${share}`,
   },
   sun: {
@@ -751,8 +754,8 @@ const JA: Dict = {
     headMosaic: "全項目 · 列幅＝請求に占める割合 · ブロックの高さ＝その列に占める割合",
     headSun: "全項目 · 弧＝内側のリングに占める割合 · リング一つで一階層深く",
     hoverIdle: (gen, carry) =>
-      `強調されたブロック＝モデルが一度 ${gen} で書いた文章が、入力として ${carry} 分だけ再課金されたもの。` +
-      "持ち越しコストは大きさではなく生存期間で決まります。任意のブロックにカーソルを合わせると項目が出ます。",
+      `強調ブロック＝モデルが一度 ${gen} で書いた文章が、入力として ${carry} 分だけ再課金されたもの。` +
+      "ブロックにカーソルを合わせると明細が出ます。",
     hoverLine: (name, amount, share, under) => `${name}   ${amount}   ${under}の ${share}`,
   },
   sun: {
@@ -1063,8 +1066,8 @@ const ES: Dict = {
       "Cada línea · ancho de columna = parte de la factura · alto del bloque = parte de la columna",
     headSun: "Cada línea · arco = parte del anillo interior · cada anillo, un nivel más",
     hoverIdle: (gen, carry) =>
-      `Bloque acentuado = prosa que el modelo escribió una vez por ${gen} y que se recobró como entrada por ${carry} más. ` +
-      "El coste de arrastre depende de cuánto sobrevive, no de su tamaño. Pasa el cursor por cualquier bloque para ver su línea.",
+      `Bloque acentuado = prosa que el modelo escribió una vez por ${gen}, recobrada como entrada por ${carry} más. ` +
+      "Pasa el cursor para ver su línea.",
     hoverLine: (name, amount, share, under) => `${name}   ${amount}   ${share} de ${under}`,
   },
   sun: {
@@ -1383,7 +1386,7 @@ const FR: Dict = {
     headSun: "Chaque ligne · arc = part de l’anneau intérieur · chaque anneau, un niveau de plus",
     hoverIdle: (gen, carry) =>
       `Bloc accentué = de la prose écrite une fois par le modèle pour ${gen}, refacturée en entrée pour ${carry} de plus. ` +
-      "Le coût de report suit la survie, pas la taille. Survolez un bloc pour voir sa ligne.",
+      "Survolez un bloc pour voir sa ligne.",
     hoverLine: (name, amount, share, under) => `${name}   ${amount}   ${share} de ${under}`,
   },
   sun: {
@@ -1700,8 +1703,8 @@ const DE: Dict = {
       "Jeder Posten · Spaltenbreite = Anteil an der Rechnung · Blockhöhe = Anteil an der Spalte",
     headSun: "Jeder Posten · Bogen = Anteil am inneren Ring · jeder Ring eine Ebene tiefer",
     hoverIdle: (gen, carry) =>
-      `Hervorgehobener Block = Prosa, die das Modell einmal für ${gen} geschrieben hat und die als Eingabe für weitere ${carry} neu berechnet wurde. ` +
-      "Die Mitschleppkosten folgen der Überlebensdauer, nicht der Größe. Fahre über einen Block, um seinen Posten zu sehen.",
+      `Hervorgehobener Block = Prosa, einmal für ${gen} geschrieben, als Eingabe für weitere ${carry} neu berechnet. ` +
+      "Für den Posten über einen Block fahren.",
     hoverLine: (name, amount, share, under) => `${name}   ${amount}   ${share} von ${under}`,
   },
   sun: {
