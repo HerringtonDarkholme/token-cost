@@ -68,7 +68,9 @@ const EN = {
     /** The browser tab, which the shell ships in English because the markup is written before
      *  anyone has guessed anything. */
     title: "Where the money went — Claude Code cost attribution",
-    nothingYet: "Nothing dropped yet",
+    /** Read rather than dropped: this line stands over the figure on every device, and a phone
+     *  has nothing to drop. Reading is what the page does with either way in. */
+    nothingYet: "Nothing read yet",
     /** Said in the eyebrow when the bill came from the example rather than from a folder. */
     example: "Example data",
     /** What goes between the heading's words: a space, or nothing in the scripts that set none. */
@@ -445,7 +447,7 @@ const ZH: Dict = {
   card: {
     eyebrow: "成本归因 · Claude Code",
     title: "钱花到哪儿去了 — Claude Code 成本归因",
-    nothingYet: "还没有放入任何文件",
+    nothingYet: "还没有读取任何记录",
     example: "示例数据",
     gap: "",
     billed: (ttl, masked) => `已计费 · ${masked ? "金额已隐藏 · " : ""}${ttl} 缓存 TTL`,
@@ -757,7 +759,7 @@ const JA: Dict = {
   card: {
     eyebrow: "コスト配分 · Claude Code",
     title: "お金はどこへ — Claude Code コスト配分",
-    nothingYet: "まだ何も渡されていません",
+    nothingYet: "まだ何も読み込んでいません",
     example: "サンプルデータ",
     gap: "",
     billed: (ttl, masked) => `課金済み · ${masked ? "金額は非表示 · " : ""}${ttl} キャッシュ TTL`,
@@ -1080,7 +1082,7 @@ const ES: Dict = {
   card: {
     eyebrow: "Atribución de costes · Claude Code",
     title: "En qué se fue el dinero — Atribución de costes de Claude Code",
-    nothingYet: "Todavía no hay nada",
+    nothingYet: "Todavía no se ha leído nada",
     example: "Datos de ejemplo",
     gap: " ",
     billed: (ttl, masked) =>
@@ -1414,7 +1416,7 @@ const FR: Dict = {
   card: {
     eyebrow: "Attribution des coûts · Claude Code",
     title: "Où est passé l’argent — Attribution des coûts Claude Code",
-    nothingYet: "Rien n’a encore été déposé",
+    nothingYet: "Rien n’a encore été lu",
     example: "Données d’exemple",
     gap: " ",
     billed: (ttl, masked) => `Facturé · ${masked ? "montant masqué · " : ""}TTL de cache ${ttl}`,
@@ -1748,7 +1750,7 @@ const DE: Dict = {
   card: {
     eyebrow: "Kostenzuordnung · Claude Code",
     title: "Wohin das Geld geflossen ist — Claude-Code-Kostenzuordnung",
-    nothingYet: "Noch nichts abgelegt",
+    nothingYet: "Noch nichts gelesen",
     example: "Beispieldaten",
     gap: " ",
     billed: (ttl, masked) =>
