@@ -2058,6 +2058,30 @@ kbd {
      the first ring across the words in the hole. */
   --sun-ring-from: 0.88;
 
+  /* The mosaic being laid down, which is the two claims its own header makes -- column width is
+     a share of the bill, block height is a share of the column -- said in that order.
+
+     `--mos-wipe-dur` is a column uncovering across its own width. Every column starts at once
+     and they all finish together, so what differs between them is the rate: a line item worth a
+     third of the bill crosses a third of the chart in the time a sliver crosses sixty pixels.
+     That is the sunburst's fan made straight, and it is the same argument -- see the block
+     beside `t-sun-fan`, where the case against one hand crossing the whole picture is written
+     out. `--duration-slow` because it is the same leg the fan takes; a width stated sideways is
+     the same size of movement whether the picture is round or square.
+
+     `--mos-block-dur` is one block growing into its slot, and the stagger is what separates it
+     from the block below it. It is `--duration-stagger`, the scale's own per-item offset, because
+     that is what this is -- a list inside one column, the same ladder the panels' rows take -- and
+     deliberately not the sunburst's 120ms. Three rings can afford a beat that carries the
+     sequence on its own; a column holds up to fifteen blocks, and fifteen beats of anything is a
+     column the reader watches fill. At 40ms the ladder runs out roughly where the wipe does, so
+     the width and the depth land as one arrival rather than two. */
+  --mos-wipe-dur: var(--duration-slow);
+  --mos-wipe-ease: var(--ease-smooth-out);
+  --mos-block-dur: var(--duration-fast);
+  --mos-block-ease: var(--ease-smooth-out);
+  --mos-block-stagger: var(--duration-stagger);
+
   /* The intake's two faces. One duration for the crossfade and for the height the box grows
      through, so the note leaving, the list arriving and the box resizing are one movement rather
      than three that end at three different moments. It is read back in `Upload.tsx`, which waits
@@ -2822,6 +2846,95 @@ tbody > tr:nth-child(n + 12) {
   .sunfan,
   .sunwedge,
   .suncore > * {
+    animation: none !important;
+  }
+}
+
+/* The mosaic laying itself down — every column uncovering across its own width at once, with
+   the blocks inside each one filling down the stack while it does.
+
+   The same two movements as the disc, because it is the same tree and the same two claims; what
+   changes is that here they are both straight lines. The column's width is the share of the
+   bill, so the width is what is uncovered, and it is uncovered at the rate that states it --
+   every column starting together and every column landing together, which is the fan's argument
+   without the trigonometry. The blocks are the share of the column, so they arrive down the
+   stack in the order the column ranks them, biggest first: the rings' claim about depth, made
+   downward instead of outward.
+
+   Downward, and it was tried the other way -- each block growing out of its own bottom edge,
+   the column stacking up off the baseline the way a bar rises. On paper that is the better
+   argument, since a column is a quantity standing on a baseline. On screen it is worse, and the
+   reason is the leading edge. Filling down, one edge travels the whole height of the column:
+   each block picks up where the one above it stopped, and the boundaries between them are things
+   the edge passes rather than places it restarts. Growing up, every block opens from its own
+   floor, so what the eye gets is not one edge crossing a column but seven edges sprouting in
+   seven slots -- the stack does not build, it flickers into place. Down also runs with the
+   ranking rather than against it.
+
+   A wipe rather than a scale, which is the difference between this and the bars in the panels.
+   A bar is a bare length and can be drawn by scaling it from nothing; a column is a length with
+   labels standing in it, and a column scaled from nothing is a column whose name arrives
+   stretched. What travels here is the edge of the reveal, and everything behind it is already
+   at full size and full weight.
+
+   `backwards` rather than the `both` every other mount animation on this page takes, and this
+   is the one place the difference matters. `both` would hold the end state for the life of the
+   page, and the end state is a clip: `inset(0)` is the border box, and the 2px focus ring these
+   blocks and headings draw *outside* their box would be clipped away for every keyboard reader
+   from then on, to keep a shape that has nothing left to do. So the resting state is no clip at
+   all, and both ends are named in the keyframes -- `none` is not a shape, and there is nothing
+   to interpolate between it and one. */
+@keyframes t-mos-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@keyframes t-mos-fill {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+.col {
+  animation: t-mos-wipe var(--mos-wipe-dur) var(--mos-wipe-ease) backwards;
+}
+.segb {
+  animation: t-mos-fill var(--mos-block-dur) var(--mos-block-ease) backwards;
+  animation-delay: calc(var(--seg-i) * var(--mos-block-stagger));
+}
+/* Where in the stack a block falls, enumerated for the reason the panels' ladder is: CSS has no
+   arithmetic on `nth-child`. It stops at the seventh block and holds every later one there, so
+   a column that folds fourteen line items in arrives with its tail rather than trailing off the
+   end of the wipe. */
+.colsegs > .segb {
+  --seg-i: 0;
+}
+.colsegs > .segb:nth-child(2) {
+  --seg-i: 1;
+}
+.colsegs > .segb:nth-child(3) {
+  --seg-i: 2;
+}
+.colsegs > .segb:nth-child(4) {
+  --seg-i: 3;
+}
+.colsegs > .segb:nth-child(5) {
+  --seg-i: 4;
+}
+.colsegs > .segb:nth-child(6) {
+  --seg-i: 5;
+}
+.colsegs > .segb:nth-child(n + 7) {
+  --seg-i: 6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .col,
+  .segb {
     animation: none !important;
   }
 }
