@@ -10,6 +10,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { flushSync } from "react-dom"
 import NumberFlow, { useIsSupported, type Format } from "@number-flow/react"
+import { tagOf } from "./i18n.ts"
+import { useViewState } from "./store.ts"
 
 /** A duration from the stylesheet, in milliseconds. `parseFloat` is enough because every
  *  duration on the scale is written in `ms`. */
@@ -147,6 +149,9 @@ export function Reveal({
 const MONEY: Format = {
   style: "currency",
   currency: "USD",
+  /* Both halves of that agreement, including this one: without it the digits would roll under
+     a `US$` in Chinese while `money()` printed a bare `$` beside them. */
+  currencyDisplay: "narrowSymbol",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 }
@@ -186,12 +191,17 @@ export function Figure({
   className?: string
 }): React.JSX.Element {
   const supported = useIsSupported()
+  const { lang } = useViewState()
   if (value === null || !supported || reduced()) {
     return <span className={className}>{text}</span>
   }
   return (
     <span className={className} data-flat={text}>
-      <NumberFlow value={value} format={MONEY} />
+      {/* The locale as well as the format, because the two halves of the agreement with
+          `money()` are both locale-dependent: where the grouping separators fall and which
+          side the symbol sits on. Handed the tag rather than left to the browser's own
+          default, which is the reader's machine and not the page's language. */}
+      <NumberFlow value={value} locales={tagOf(lang)} format={MONEY} />
     </span>
   )
 }
@@ -241,6 +251,20 @@ function swapMs(): number {
  *  label can be a fragment with a mark or an emphasis in it rather than a string.
  *
  *  `token` is what identifies the copy, because the copy itself is fresh JSX every render.
+ *
+ *  Which leaves one thing the caller cannot be trusted to remember: every word inside here is
+ *  translated, and a language change rewrites all of it without moving any caller's token. Held
+ *  copy would then be *stale* copy -- the heading stayed in English while the eyebrow beside it
+ *  turned, because only the heading was inside one of these. So the language is read here and
+ *  folded in, rather than being a fifth thing each call site has to append to its token and a
+ *  fifth chance to forget.
+ *
+ *  It is folded in as a *refresh* rather than as part of the token, though, and the difference
+ *  is the motion. The swap says "these words now mean something else" -- the bill arrived, the
+ *  render finished. A reader who just picked their own language out of a menu has not been told
+ *  anything by four fragments of the page leaving upward through a blur at once; they know what
+ *  they changed. So the words are replaced where they stand, and the phases are left for the
+ *  changes the reader did not make.
  */
 export function TextSwap({
   token,
@@ -250,6 +274,7 @@ export function TextSwap({
   children: ReactNode
 }): React.JSX.Element {
   const el = useRef<HTMLSpanElement>(null)
+  const { lang } = useViewState()
   const [shown, setShown] = useState<{ token: string; body: ReactNode }>({ token, body: children })
   const [phase, setPhase] = useState<"" | "exit" | "enter">("")
 
@@ -257,6 +282,21 @@ export function TextSwap({
      render of the parent, and a dependency on them would restart the exit leg mid-flight. */
   const latest = useRef(children)
   latest.current = children
+
+  /* The language, in the same place and for the same reason as the token above: during the
+     render, because the words have to be the new words in the commit rather than one frame
+     after it. Held to the previous value in a ref so this fires once per change and not on
+     every render -- and it deliberately leaves `phase` alone, so a swap already mid-flight when
+     the language changes finishes its exit and arrives carrying the new words. */
+  const drawn = useRef(lang)
+  if (drawn.current !== lang) {
+    drawn.current = lang
+    /* Only when nothing is in flight. Mid-swap the children are already the *arriving* copy,
+       so writing them into the departing body would show the new words during the old words'
+       exit -- and there is no need to: the timer below reads `latest` when it fires, by which
+       point that is the new copy in the new language. */
+    if (token === shown.token) setShown({ token, body: latest.current })
+  }
 
   /* Inside a capture the words have to be the new words before the swap callback returns: the
      browser photographs the DOM as it stands, and copy held back for its own exit is copy

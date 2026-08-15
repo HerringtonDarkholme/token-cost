@@ -9,6 +9,7 @@
 
 import { useSyncExternalStore } from "react"
 import type { TtlAssumption } from "./engine.ts"
+import { GUESSED, isLang, noteLang, type Lang } from "./i18n.ts"
 
 /** What the pointer (or keyboard focus) is on. One object rather than a key plus a parallel
  *  bag of details, so highlighting and the readout can never disagree about what is hovered. */
@@ -35,6 +36,9 @@ export interface ViewState {
   /** Amounts hidden for screen-sharing: shares of the bill instead of dollars. */
   pctOnly: boolean
   theme: ThemeChoice
+  /** Which language the page is in. A lens like the theme is a lens: it belongs to the reader
+   *  rather than to the file, so it survives a reset and rides in the shared link. */
+  lang: Lang
 }
 
 const INITIAL: ViewState = {
@@ -46,6 +50,8 @@ const INITIAL: ViewState = {
   view: "panels",
   pctOnly: false,
   theme: "system",
+  /* The one initial value that is a guess rather than a default. See `guessLang`. */
+  lang: GUESSED,
 }
 
 let state: ViewState = { ...INITIAL }
@@ -55,6 +61,9 @@ export const getState = (): ViewState => state
 
 export function setState(patch: Partial<ViewState>): void {
   state = { ...state, ...patch }
+  /* The two number formatters are plain functions called by name from inside JSX, so they
+     cannot subscribe to anything. This is the one write that reaches them -- see `noteLang`. */
+  noteLang(state.lang)
   listeners.forEach((fn) => fn())
 }
 
@@ -150,11 +159,11 @@ export const hoverClear: {
   },
 }
 
-/** Back to a clean slate, keeping the reader's theme: they chose it for the session, not
- *  for the file. */
+/** Back to a clean slate, keeping the reader's theme and their language: both were chosen for
+ *  the session, not for the file. */
 export function resetState(): void {
   setHover(null)
-  setState({ ...INITIAL, theme: state.theme })
+  setState({ ...INITIAL, theme: state.theme, lang: state.lang })
 }
 
 /* ---------- URL state ----------
@@ -178,6 +187,7 @@ export function readHash(hash: string): Partial<ViewState> {
   if (p.q) out.query = p.q
   if (p.u === "pct") out.pctOnly = true
   if (p.t === "dark" || p.t === "light") out.theme = p.t
+  if (p.l && isLang(p.l)) out.lang = p.l
   return out
 }
 
@@ -190,5 +200,10 @@ export function hashFor(s: ViewState): string {
   if (s.query) parts.push("q=" + encodeURIComponent(s.query))
   if (s.pctOnly) parts.push("u=pct")
   if (s.theme !== "system") parts.push("t=" + s.theme)
+  /* Against the guess rather than against a constant, which is the one place this differs from
+     every other key: `en` is not the default, *the reader's own browser* is. So a link carries
+     a language only when its author overrode theirs, and a link that never mentions one arrives
+     in whatever the person opening it reads. Sharing a view should not also export a locale. */
+  if (s.lang !== GUESSED) parts.push("l=" + s.lang)
   return parts.length ? "#" + parts.join("&") : ""
 }

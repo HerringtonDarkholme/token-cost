@@ -23,9 +23,18 @@
   --on-cat: #ffffff;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  /* Told, rather than left to be inferred from the background. Two things on this page are
+     drawn by the browser rather than by the stylesheet -- the language picker's popup list and
+     the search box's clear button -- and they take their ink from this property alone. Without
+     it a dark page opens a white list, which is the one flash of the wrong theme a reader gets
+     from a control they only touch when they cannot read the page yet. It travels with the
+     palette below for the same reason the palette does. */
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --paper: #0c0f0e;
     --panel: #141817;
     --sunk: #1b201e;
@@ -49,6 +58,8 @@
   }
 }
 :root[data-theme="dark"] {
+  color-scheme: dark;
+
   --paper: #0c0f0e;
   --panel: #141817;
   --sunk: #1b201e;
@@ -205,6 +216,48 @@ button {
   white-space: nowrap;
   color: var(--ink3);
   border-right: 1px solid var(--rule);
+}
+/* The language picker: a `.seg` box like its neighbours, holding a globe and a native
+   `<select>` rather than a row of buttons. Six options is where the travelling pill stops
+   working -- six words in six scripts is the widest thing on the page for a control pressed
+   once a session -- and the platform's own list already knows how to draw 简体中文 beside
+   Français, and how to be operated by a thumb.
+
+   Which means the one thing to undo is the platform's *chrome*: `appearance: none` strips the
+   bevel and the arrow so the box is the same box as the theme switch beside it. The glyph is
+   the arrow's replacement and the label at once -- the word would be in the language you are
+   trying to leave.
+
+   `font-family` is inherited by the popup on some platforms and not on others, so the options
+   are left to the system's own UI font: a mono stack asked to set kana or hanzi falls back
+   per-glyph, and a list where three rows are one face and three are another reads as broken. */
+.langseg {
+  align-items: center;
+  padding-left: 9px;
+  color: var(--ink3);
+}
+.langsel {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 5px 9px 5px 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--ink2);
+}
+/* Focus goes on the box the reader sees, not on the `<select>` inside it. The page's ring is
+   drawn 2px clear of what it surrounds, which here would be a rectangle a hair inside the
+   border that is already there -- two frames where the reader is looking at one. It is the
+   same problem the search field has, and it gets the same answer: the control states its own
+   focus on the edge it already has, and the element inside stops drawing anything. */
+.langseg:has(.langsel:focus-visible) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.langsel:focus-visible {
+  outline: none;
 }
 .eyebtn,
 .freshbtn {

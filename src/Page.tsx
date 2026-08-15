@@ -15,9 +15,10 @@
    conditional provider is a different tree, and a different tree remounts the card. `null` is
    what it carries in between. */
 
-import { useEffect, useRef } from "react"
+import { Fragment, useEffect, useRef } from "react"
 import type { Analysis } from "./engine.ts"
 import { ReportContext, useReportCtx } from "./context.ts"
+import { useT, type Word } from "./copy.tsx"
 import { money } from "./model.ts"
 import { hashFor, hoverClear, readHash, setState, useViewState, type ViewState } from "./store.ts"
 import { Figure, Reveal, TextSwap, useCountingUp } from "./Motion.tsx"
@@ -57,6 +58,27 @@ function useUrlSync(state: ViewState): void {
   }, [])
 }
 
+/** One face of the heading, set word by word so the words can be told apart. Which slots a
+ *  language shares between its question and its answer is the dictionary's decision -- see
+ *  `Word` -- and so is what goes between them: a space in the ones that put spaces between
+ *  words, nothing in the two that do not. */
+function Heading({ words, gap }: { words: Word[]; gap: string }): React.JSX.Element {
+  return (
+    <>
+      {words.map((word, i) => (
+        <Fragment key={word.w}>
+          {i && !word.tight ? gap : null}
+          {word.em ? (
+            <em data-w={word.w}>{word.text}</em>
+          ) : (
+            <span data-w={word.w}>{word.text}</span>
+          )}
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
 export function Page({
   data,
   leaving,
@@ -73,6 +95,7 @@ export function Page({
   onReset: () => void
 }): React.JSX.Element {
   const state = useViewState()
+  const t = useT()
   useUrlSync(state)
   const ctx = useReportCtx(data, state)
 
@@ -80,9 +103,7 @@ export function Page({
      one is on show. */
   const face = ctx ? "report" : "empty"
 
-  const billed = ctx
-    ? `Billed · ${state.pctOnly ? "amount hidden · " : ""}${state.ttl} cache TTL`
-    : "Nothing dropped yet"
+  const billed = ctx ? t.card.billed(state.ttl, state.pctOnly) : t.card.nothingYet
   /* What the empty card's figure counts from, and what it counts through: the walk writes its
      running total into this box as it reads, so the slot holds $0.00 before a folder is picked
      and then climbs towards the bill from the first transcript to the last. A dash stood here
@@ -123,29 +144,20 @@ export function Page({
               {/* The words are identical on both faces; what the report adds is the scope,
                   which arrives on the end rather than replacing the line. */}
               <div className="eyebrow">
-                Cost attribution · Claude Code
-                <TextSwap token={face}>{ctx ? " · " + scopeOf(ctx.d) : ""}</TextSwap>
+                {t.card.eyebrow}
+                <TextSwap token={face}>{ctx ? " · " + scopeOf(t, ctx.d) : ""}</TextSwap>
               </div>
               {/* One sentence in two tenses, set word by word so the words can be told apart.
-                  "Where", "your" and "money" are the same three words on both faces, and the
-                  question loses two the answer does not have -- so the shared three travel to
-                  where the shorter sentence puts them while "did" and "go?" leave and "went"
-                  arrives. `data-w` is what the stylesheet names them by; `money` keeps its
-                  accent across the change, which is what makes it the one to follow. */}
+                  In English "Where", "your" and "money" are the same three words on both faces,
+                  and the question loses two the answer does not have -- so the shared three
+                  travel to where the shorter sentence puts them while "did" and "go?" leave and
+                  "went" arrives. `data-w` is what the stylesheet names them by; `money` keeps
+                  its accent across the change, which is what makes it the one to follow.
+                  Which slots a language shares is the dictionary's to say: `zh` shares two and
+                  uses no "where" at all, `de` shares three. */}
               <h1>
                 <TextSwap token={face}>
-                  {ctx ? (
-                    <>
-                      <span data-w="where">Where</span> <span data-w="your">your</span>{" "}
-                      <em data-w="money">money</em> <span data-w="went">went</span>
-                    </>
-                  ) : (
-                    <>
-                      <span data-w="where">Where</span> <span data-w="did">did</span>{" "}
-                      <span data-w="your">your</span> <em data-w="money">money</em>{" "}
-                      <span data-w="go">go?</span>
-                    </>
-                  )}
+                  <Heading words={ctx ? t.card.answer : t.card.ask} gap={t.card.gap} />
                 </TextSwap>
               </h1>
             </div>

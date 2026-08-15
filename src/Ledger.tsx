@@ -4,7 +4,8 @@
 
 import { memo } from "react"
 import { useReport } from "./context.ts"
-import { maxCost, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts"
+import { nodeName, useT } from "./copy.tsx"
+import { maxCost, moneyFine, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts"
 import { vtName } from "./Motion.tsx"
 import { hoverBind, setState, useHover } from "./store.ts"
 
@@ -13,17 +14,14 @@ import { hoverBind, setState, useHover } from "./store.ts"
  *  their parents' context, so nobody reads the total as having shrunk. */
 export function useReconNote(L: Ledger): string {
   const { d, state, amt } = useReport()
-  if (state.query)
-    return (
-      `Filtered view · ${amt(L.recon)} across matching line items, shown in their ` +
-      "parents' context; parent rows keep their own full totals."
-    )
-  let s = "Children sum to parent at every level; folded rows keep their full value."
+  const t = useT()
+  if (state.query) return t.breakdown.noteFiltered(amt(L.recon))
+  let s = t.breakdown.noteWhole
   if (!state.path.length && Math.abs(d.total - L.recon) > 0.005) {
     const gap = state.pctOnly
       ? (((d.total - L.recon) / d.total) * 100).toFixed(2) + "%"
-      : "$" + (d.total - L.recon).toFixed(2)
-    s += ` ${gap} of the billed total is unattributed rounding.`
+      : moneyFine(d.total - L.recon, 2)
+    s += t.breakdown.noteGap(gap)
   }
   return s
 }
@@ -42,11 +40,12 @@ const Row = memo(function Row({
   active: boolean
 }): React.JSX.Element {
   const { state, pal, amt, reqs } = useReport()
+  const t = useT()
   const h = pal.hue(r.group)
   const pct = (r.node.cost / rootCost) * 100
   const name = (
     <span className="nm" data-folded={r.node.folded ? 1 : 0}>
-      {r.node.name}
+      {nodeName(t, r.node)}
     </span>
   )
 
@@ -110,15 +109,14 @@ const Row = memo(function Row({
           }}
         />
       </td>
-      <td className="per">
-        {state.pctOnly ? amt(r.node.cost) : "$" + (r.node.cost / reqs).toFixed(4)}
-      </td>
+      <td className="per">{state.pctOnly ? amt(r.node.cost) : moneyFine(r.node.cost / reqs, 4)}</td>
     </tr>
   )
 })
 
 export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
   const { state, amt } = useReport()
+  const t = useT()
   const hover = useHover()
   const hk = hover?.key ?? null
   const maxRow = maxCost(L.rows.filter((r) => r.depth === 0).map((r) => r.node))
@@ -130,19 +128,19 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
         <thead>
           <tr>
             <th scope="col" className="l">
-              Line item
+              {t.table.lineItem}
             </th>
             <th scope="col" className="r" style={{ width: 110 }}>
-              Cost
+              {t.table.cost}
             </th>
             <th scope="col" className="r" style={{ width: 78 }}>
-              Share
+              {t.table.share}
             </th>
             <th scope="col" className="l" style={{ width: 230 }}>
-              Magnitude
+              {t.table.magnitude}
             </th>
             <th scope="col" className="last" style={{ width: 110 }}>
-              {state.pctOnly ? "Share of bill" : "Per request"}
+              {state.pctOnly ? t.table.shareOfBill : t.table.perRequest}
             </th>
           </tr>
         </thead>
@@ -160,14 +158,14 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
           ) : (
             <tr>
               <td colSpan={5} style={{ padding: "14px 0", color: "var(--ink3)" }}>
-                No line item matches “{state.query}”.
+                {t.table.noMatch(state.query)}
               </td>
             </tr>
           )}
         </tbody>
         <tfoot>
           <tr>
-            <td className="lbl">{state.query ? "Matched" : "Reconciled"}</td>
+            <td className="lbl">{state.query ? t.table.matched : t.breakdown.reconciled}</td>
             <td className="v">{amt(L.recon)}</td>
             <td className="p">{(reconShare * 100).toFixed(reconShare < 0.1 ? 2 : 1)}%</td>
             {/* The sentence lives in `.reconline` directly below, which is where it has to

@@ -9,6 +9,7 @@
 */
 
 import { analyze, type Dataset } from "../src/engine.ts"
+import { LANGS } from "../src/i18n.ts"
 import {
   fold,
   focusOf,
@@ -262,6 +263,34 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
     [0, 0.25, 0.5, 0.999, 1].every((p) => open.includes(postText(dd, false, home, p))),
     "the random draw always lands on one of the built captions",
   )
+
+  /* And every claim above, in every language the page speaks. A translated caption is a
+     different length in a different alphabet: the ceiling is the one thing that cannot be
+     checked by reading it, and Japanese is counted double by the composer, so a sentence that
+     fits in English can be refused in the language it was translated into. The mask matters
+     just as much -- a variant that reaches for the total in one dictionary and not another is
+     a leak that only one reader in six would ever see.
+
+     The language is passed rather than set, because these run as a plain node script with no
+     store in them and nothing else here has an opinion about locale. */
+  for (const { value: l, label } of LANGS) {
+    const covered = postVariants(dd, true, home, l)
+    const all = [...postVariants(dd, false, home, l), ...covered]
+    const longest = Math.max(...all.map(postLength))
+    ok(
+      all.length > 0 && longest <= POST_MAX,
+      `${label}: every caption fits a post (longest ${longest} of ${POST_MAX})`,
+    )
+    ok(!all.some((s) => /undefined|NaN|\$0\.00/.test(s)), `${label}: no caption has a hole`)
+    ok(
+      !covered.some((s) => s.includes("$")),
+      `${label}: covering the amounts keeps money out of every caption`,
+    )
+    ok(
+      postVariants(dd, false, null, l).every((s) => !s.includes(home)),
+      `${label}: with nowhere to point, the invitation is dropped`,
+    )
+  }
 }
 
 console.log(fails ? `\n${fails} MODEL FAILURE(S)` : "\nmodel clean")

@@ -23,6 +23,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Analysis } from "./engine.ts"
 import { readHash, resetState, setState, useViewState } from "./store.ts"
+import { useT } from "./copy.tsx"
+import { tagOf } from "./i18n.ts"
 import { canTransition, cssMs, reduced, transition } from "./Motion.tsx"
 import { Page, type Dir } from "./Page.tsx"
 
@@ -45,6 +47,22 @@ function useTheme(): void {
   }, [theme])
 }
 
+/** And the language, on the same element and for the same reason: `lang` is above `body`, and
+ *  it is not decoration -- a screen reader picks its voice from it, and the browser picks its
+ *  hyphenation and its quotes. The title goes with it, because the tab is the one piece of the
+ *  page that is read from outside it.
+ *
+ *  Both are stamped from React rather than written into the shell, which ships in English: the
+ *  markup is composed before anyone has guessed anything. This is the guess arriving. */
+function useLangAttr(): void {
+  const { lang } = useViewState()
+  const t = useT()
+  useEffect(() => {
+    document.documentElement.lang = tagOf(lang)
+    document.title = t.card.title
+  }, [lang, t])
+}
+
 interface Turn {
   data: Analysis | null
   leaving: boolean
@@ -54,6 +72,7 @@ interface Turn {
 export function App(): React.JSX.Element {
   const [turn, setTurn] = useState<Turn>({ data: null, leaving: false, dir: "fwd" })
   useTheme()
+  useLangAttr()
 
   /* Seed from the shared link before anything paints, so a link that says "dark, table
      view, drilled into shell commands" arrives that way rather than snapping into it. */

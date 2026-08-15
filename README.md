@@ -48,6 +48,48 @@ rules that a `file://` page cannot rely on. The build then asserts the result is
 self-contained — no `<script src>`, no stylesheet link, no absolute URL, no CSS `@import` —
 and fails rather than ship a page that would reach the network when opened.
 
+## Languages
+
+The page speaks English, 简体中文, 日本語, Español, Français and Deutsch. Which one it opens in is
+a guess from the browser's own ordered preference list, matched on the primary subtag — so
+`de-AT` and `fr-CA` land on their language rather than falling through to English — and the
+globe in the toolbar is there for when the guess is wrong. Only Simplified Chinese ships, so a
+`zh-Hant` reader is guessed into a script they may not want; that is the case the switcher
+exists for.
+
+Translated is everything a reader sees, including the line-item names the engine produces —
+"Shell commands", "assistant prose (re-billed as input)" — and the captions *Share to X* writes.
+What is not translated is what is not ours: tool names, shell programs, file paths, model ids,
+`1h`/`5m`, and the three platform names.
+
+Numbers follow the language and the currency does not. `$1,234.56` is `1.234,56 $` in German
+because that is where German puts the symbol, but it stays USD in every language: the API bills
+in dollars, and a figure converted for the reader's locale would be a number this page cannot
+stand behind. The symbol is `narrowSymbol`, so it is a bare `$` rather than the `US$` that
+`Intl` reaches for by default outside English — a disambiguation against currencies this page
+never quotes.
+
+Three things are worth knowing if you add a seventh:
+
+- **English is the shape.** `Dict` is `typeof EN`, so a key added to `src/copy.tsx` is a type
+  error in the other five until it is answered. There is no runtime fallback and no lookup by
+  string — a missing key cannot reach a build.
+- **The engine's names stay English in the data.** They key the palette, they are what the
+  drill path carries into a shared link, and one of them is what the mosaic tests to find the
+  block this page argues about. `labelOf` translates them on the way to the screen.
+- **The captions have a hard ceiling.** X counts CJK and kana double, so a caption that fits in
+  English can be refused in Japanese. `pnpm run test:model` holds all six to it.
+- **`TextSwap` holds its copy.** It keeps the words it is showing until its token moves, and no
+  caller's token moves when the language does — so it reads the language itself and refreshes in
+  place. Held copy that did not would be *stale* copy: the heading sitting in English under a
+  translated eyebrow. It refreshes without the swap's motion, because a reader who just picked
+  their own language out of a menu is not being told anything by half the page blurring at once.
+
+The card's heading is the one piece of copy that is not a sentence: it is set word by word, so
+the words the question and the answer share can travel between the two faces while the rest fade
+where they stand. Which slots a language shares is its own to say — `zh` shares two and uses no
+"where" at all, `de` shares three. See `Word` in `src/copy.tsx`.
+
 ## Deploy
 
 Vercel serves `dist/`, built from source on each push — so nothing generated is committed
@@ -233,9 +275,12 @@ file tool under any name gets the same treatment.
 | `src/engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
 | `src/model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
 | `src/store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
+| `src/i18n.ts` | the language: which six ship, the guess at the reader's, and the tag the number formatters use |
+| `src/copy.tsx` | every word on the page, six times over, typed against English so a missing key is a build error |
+| `src/post-copy.ts` | the share captions, kept apart from the rest because `model.ts` builds them and runs under plain `node` |
 | `src/context.ts` | the one context the report's components read: dataset, state, palette, formatters |
 | `src/main.tsx` | entry: mounts `<App>` |
-| `src/App.tsx` | the turn: which face the card shows, and the exit phase in between; owns the theme attribute |
+| `src/App.tsx` | the turn: which face the card shows, and the exit phase in between; owns the theme attribute, the `lang` attribute and the title |
 | `src/Page.tsx` | the page itself — shell, toolbar, card, header — which outlives both faces, so the frame can tween rather than being replaced |
 | `src/Motion.tsx` | the three transition primitives: the panel that slides in, the figure that re-enters digit by digit, the copy that swaps |
 | `src/Upload.tsx` | the empty face: folder picker, drop target, hand-off to the engine; the per-platform way into the hidden folder, and the help under the card |
@@ -244,7 +289,7 @@ file tool under any name gets the same treatment.
 | `src/Sunburst.tsx` | the same tree as rings — arc = share of the ring inside it — with a legend for the names the arcs have no room for |
 | `src/Panels.tsx` | the same data ranked and labelled instead of packed |
 | `src/Ledger.tsx` | the table, where identity does not rest on colour |
-| `src/Toolbar.tsx` | TTL lens, the eye that covers amounts, theme, copy chart, share on X, and the reset back to an empty card |
+| `src/Toolbar.tsx` | TTL lens, the eye that covers amounts, language, theme, copy chart, share on X, and the reset back to an empty card |
 | `src/Seg.tsx`, `src/Tip.tsx` | the segmented control every lens switch is made of, with its travelling pill; and the hint the controls whose face is a symbol hang off |
 | `src/Share.tsx` | the card as a PNG — copied on its own, or copied and handed to an X composer with a caption written |
 | `src/snapshot.ts` | the card rasterised in the page, through `<foreignObject>` and a canvas — no library, nothing fetched |

@@ -4,6 +4,7 @@
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
+import { labelOf, nodeName, useT } from "./copy.tsx"
 import { branches, fold, kidsOf, pctOf, type CostNode } from "./model.ts"
 import { hoverBind, useHover } from "./store.ts"
 
@@ -39,6 +40,7 @@ const Column = memo(function Column({
   anyHover: boolean
 }): React.JSX.Element {
   const { pal, focus, amt, drill } = useReport()
+  const t = useT()
   const h = pal.hue(gname)
   const key = gname + "›" + node.name
   const dim = anyHover && !hit
@@ -50,6 +52,9 @@ const Column = memo(function Column({
      carry most of the bill. Narrow columns show nothing rather than an unreadable stub. */
   const crosses80 = cumFrom < 80 && cumTo >= 80
   const cum = crosses80 ? "◂80%" : width < 0.075 ? "" : cumTo.toFixed(0) + "%"
+  /* At the root a column is a group, and a group has a short label for the narrow ones. Both
+     halves are engine names, so both are translated on the way out. */
+  const short = focus.groupName ? undefined : pal.short(node.name)
 
   return (
     <div
@@ -72,7 +77,7 @@ const Column = memo(function Column({
               type="button"
               key={segKey}
               className="segb"
-              title={`${s.name} · ${amt(s.cost)}`}
+              title={`${nodeName(t, s)} · ${amt(s.cost)}`}
               onClick={() => drill(node.name)}
               {...hoverBind({
                 key: segKey,
@@ -92,7 +97,7 @@ const Column = memo(function Column({
                 outlineOffset: carry && !active ? "-4px" : undefined,
               }}
             >
-              {pct > 7 ? <span className="sl">{s.name}</span> : null}
+              {pct > 7 ? <span className="sl">{nodeName(t, s)}</span> : null}
             </button>
           )
         })}
@@ -104,7 +109,7 @@ const Column = memo(function Column({
         {...hoverBind({ key, name: node.name, cost: node.cost, under: null, group: gname })}
       >
         <span className="cn" style={{ fontSize: width < 0.08 ? "10.5px" : "11.5px" }}>
-          {(!focus.groupName && pal.short(node.name)) || node.name}
+          {short ? labelOf(t, short) : nodeName(t, node)}
         </span>
         <span className="cc">{amt(node.cost)}</span>
         <span className="cp">
@@ -160,21 +165,24 @@ export function Mosaic(): React.JSX.Element {
  *  sitting empty, because that is the sentence the page exists to teach. */
 export function HoverBar(): React.JSX.Element {
   const { state, pal, focus, amt, d } = useReport()
+  const t = useT()
   const h = useHover()
   const rootCost = focus.node.cost || 1
   const share = h ? (rootCost > 0 ? h.cost / rootCost : 0) : 0
-  const under = state.path.length ? state.path[state.path.length - 1] : "the bill"
+  const under = state.path.length ? labelOf(t, state.path[state.path.length - 1]) : t.strip.theBill
 
   return (
     <div className="hoverbar">
       <span className="sw" style={{ background: h ? pal.hue(h.group) : "transparent" }} />
       <span className="txt" data-on={h ? 1 : 0}>
         {h
-          ? `${h.under ? h.under + " › " : ""}${h.name}   ${amt(h.cost)}   ` +
-            `${(share * 100).toFixed(share < 0.01 ? 2 : 1)}% of ${under}`
-          : `Accented block = prose the model wrote once for ${amt(d.insights.proseGen)}, ` +
-            `re-billed as input for ${amt(d.insights.proseCarry)} more. Carry cost tracks ` +
-            "survival, not size. Hover any block for its line item."}
+          ? t.chart.hoverLine(
+              (h.under ? labelOf(t, h.under) + " › " : "") + labelOf(t, h.name),
+              amt(h.cost),
+              (share * 100).toFixed(share < 0.01 ? 2 : 1) + "%",
+              under,
+            )
+          : t.chart.hoverIdle(amt(d.insights.proseGen), amt(d.insights.proseCarry))}
       </span>
     </div>
   )

@@ -14,7 +14,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Dataset } from "./engine.ts"
 import { useReport } from "./context.ts"
-import { count, FOLD_MIN, ledger, money, pctOf } from "./model.ts"
+import { labelOf, useT, type Dict } from "./copy.tsx"
+import { count, FOLD_MIN, ledger, money, moneyFine, pctOf } from "./model.ts"
 import { setHover, setState, type ViewState } from "./store.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
 import { cssMs, Reveal, transition } from "./Motion.tsx"
@@ -23,15 +24,16 @@ import { Panels } from "./Panels.tsx"
 import { Sunburst } from "./Sunburst.tsx"
 import { LedgerTable, useReconNote } from "./Ledger.tsx"
 
-/* No hints on these two: the words are the whole explanation. */
-const VIEWS: ReadonlyArray<SegOption<ViewState["view"]>> = [
-  { value: "panels", label: "Panels" },
-  { value: "table", label: "Table" },
+/* No hints on these four: the words are the whole explanation. Built per render, like the
+   toolbar's, because the words move when the language does. */
+const views = (t: Dict): ReadonlyArray<SegOption<ViewState["view"]>> => [
+  { value: "panels", label: t.chart.panels },
+  { value: "table", label: t.chart.table },
 ]
 
-const CHARTS: ReadonlyArray<SegOption<ViewState["chart"]>> = [
-  { value: "mosaic", label: "Mosaic" },
-  { value: "sun", label: "Sunburst" },
+const charts = (t: Dict): ReadonlyArray<SegOption<ViewState["chart"]>> => [
+  { value: "mosaic", label: t.chart.mosaic },
+  { value: "sun", label: t.chart.sunburst },
 ]
 
 /* Written once rather than closed over per render: a pick is a write to the store, which is a
@@ -41,8 +43,9 @@ const pickChart = (chart: ViewState["chart"]): void => setState({ chart })
 
 function Crumbs(): React.JSX.Element {
   const { state } = useReport()
+  const t = useT()
   return (
-    <nav className="crumbs" aria-label="Breadcrumb">
+    <nav className="crumbs" aria-label={t.chart.breadcrumb}>
       <button
         type="button"
         data-cur={state.path.length ? 0 : 1}
@@ -51,8 +54,10 @@ function Crumbs(): React.JSX.Element {
           setState({ path: [] })
         }}
       >
-        all
+        {t.chart.all}
       </button>
+      {/* The crumb is a node name, which stays English in the state so the link keeps
+          working across a change of language -- translated here, on the way out. */}
       {state.path.map((p, i) => (
         <span key={p}>
           <span className="sep">/</span>
@@ -64,7 +69,7 @@ function Crumbs(): React.JSX.Element {
               setState({ path: state.path.slice(0, i + 1) })
             }}
           >
-            {p}
+            {labelOf(t, p)}
           </button>
         </span>
       ))}
@@ -76,13 +81,12 @@ function Crumbs(): React.JSX.Element {
  *  their own numbers, not a headline figure that belongs to one dataset. */
 function Strip(): React.JSX.Element {
   const { d, state, amt, reqs } = useReport()
+  const t = useT()
   const I = d.insights
   return (
     <div className="strip">
       <div>
-        <div className="thesis">
-          A <em>carry</em> bill, not a usage bill — every request re-bills the whole context.
-        </div>
+        <div className="thesis">{t.strip.thesis}</div>
       </div>
       <div>
         <div className="carryrow">
@@ -91,8 +95,7 @@ function Strip(): React.JSX.Element {
           <span className="to">{amt(I.proseCarry)}</span>
         </div>
         <div className="cap">
-          Written once, carried{" "}
-          {I.proseGen > 0 ? (I.proseCarry / I.proseGen).toFixed(1) + "×" : "—"}
+          {t.strip.carried(I.proseGen > 0 ? (I.proseCarry / I.proseGen).toFixed(1) + "×" : "—")}
         </div>
       </div>
       <div>
@@ -100,24 +103,20 @@ function Strip(): React.JSX.Element {
           {pctOf(d.input, d.total).toFixed(1)}% <span className="sm">/</span>{" "}
           <span className="dim">{pctOf(d.output, d.total).toFixed(1)}%</span>
         </div>
-        <div className="cap">
-          Input vs output · thinking {pctOf(I.thinking, d.total).toFixed(1)}%
-        </div>
+        <div className="cap">{t.strip.split(pctOf(I.thinking, d.total).toFixed(1) + "%")}</div>
       </div>
       <div>
         <div className="big">
-          {state.pctOnly
-            ? pctOf(I.fixed, d.total).toFixed(1) + "%"
-            : "$" + (I.fixed / reqs).toFixed(3)}
-          <span className="sm"> of</span>{" "}
+          {state.pctOnly ? pctOf(I.fixed, d.total).toFixed(1) + "%" : moneyFine(I.fixed / reqs, 3)}
+          <span className="sm">{t.strip.of}</span>{" "}
           <span className="dim">
-            {state.pctOnly ? "the bill" : "$" + (d.total / reqs).toFixed(3)}
+            {state.pctOnly ? t.strip.theBill : moneyFine(d.total / reqs, 3)}
           </span>
         </div>
         <div className="cap">
           {state.pctOnly
-            ? `Fixed, paid on all ${count(d.requests)} requests`
-            : `Fixed, every request · ${money(I.fixed)}`}
+            ? t.strip.fixedMasked(count(d.requests))
+            : t.strip.fixedOpen(money(I.fixed))}
         </div>
       </div>
     </div>
@@ -142,6 +141,7 @@ function Strip(): React.JSX.Element {
  *  value it last sent is not news coming back. */
 function Find(): React.JSX.Element {
   const { state } = useReport()
+  const t = useT()
   const [typed, setTyped] = useState(state.query)
   const committed = useRef(state.query)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -174,7 +174,7 @@ function Find(): React.JSX.Element {
 
   return (
     <>
-      <label htmlFor="q">Find</label>
+      <label htmlFor="q">{t.breakdown.find}</label>
       {/* The browser's own suggestions are off because there is nothing here for them to be
           right about: this box filters the line items of one bill, and what it offers instead
           is whatever the reader last typed into a box called `q` on some other site.
@@ -184,7 +184,7 @@ function Find(): React.JSX.Element {
         id="q"
         type="search"
         value={typed}
-        placeholder="git diff, thinking, schema…"
+        placeholder={t.breakdown.findPlaceholder}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
@@ -197,6 +197,7 @@ function Find(): React.JSX.Element {
 
 export function Breakdown(): React.JSX.Element {
   const { d, state, amt } = useReport()
+  const t = useT()
   /* Memoised for its identity rather than its cost -- a ledger walk is microseconds, and the
      memoised rows below it are what actually want a stable `L`. */
   const L = useMemo(
@@ -207,10 +208,10 @@ export function Breakdown(): React.JSX.Element {
   return (
     <section className="bsec">
       <div className="bhead">
-        <h2>Breakdown</h2>
+        <h2>{t.breakdown.title}</h2>
         <div className="bctl">
           <Find />
-          <Seg options={VIEWS} value={state.view} onPick={pickView} />
+          <Seg options={views(t)} value={state.view} onPick={pickView} />
         </div>
       </div>
       <Reveal key={state.view}>
@@ -218,9 +219,7 @@ export function Breakdown(): React.JSX.Element {
       </Reveal>
       <div className="reconline">
         <span>{note}</span>
-        <span>
-          Reconciled: <strong>{amt(L.recon)}</strong>
-        </span>
+        <span>{t.breakdown.reconciledIs(amt(L.recon))}</span>
       </div>
     </section>
   )
@@ -228,67 +227,50 @@ export function Breakdown(): React.JSX.Element {
 
 export function Footnotes(): React.JSX.Element {
   const { data, d, amt } = useReport()
+  const t = useT()
   const I = d.insights
   const lensGap = Math.abs(data.datasets["1h"].total - data.datasets["5m"].total)
   const density = data.density
-    ? `${data.density.code.toFixed(2)} chars/token for machine text and ` +
-      `${data.density.text.toFixed(2)} for prose, ` +
-      (data.densityCalibrated
-        ? "both measured from this dataset"
-        : "defaults, too few samples to measure")
-    : "~4 chars/token"
+    ? t.foot.densityMeasured(
+        data.density.code.toFixed(2),
+        data.density.text.toFixed(2),
+        data.densityCalibrated,
+      )
+    : t.foot.densityFallback
 
   return (
     <section className="foot">
       <div>
-        <h3>What to change on Monday</h3>
+        <h3>{t.foot.monday}</h3>
         <ul>
           <li>
-            <strong>Cut the intake, not the output.</strong> {amt(I.ingest)} of the bill is content
-            tools pulled <em>into</em> context, against {amt(I.emit)} of arguments sent out and{" "}
-            {amt(I.typed)} for everything you typed
-            {I.typed > 0 ? ` (${(I.ingest / I.typed).toFixed(0)}× less)` : ""}. Tool output lands in
-            the prefix whole and is re-billed until it falls out — ask for narrower slices.
+            {t.foot.intake({
+              ingest: amt(I.ingest),
+              emit: amt(I.emit),
+              typed: amt(I.typed),
+              ratio: I.typed > 0 ? (I.ingest / I.typed).toFixed(0) : null,
+            })}
           </li>
-          <li>
-            <strong>Trim the preamble.</strong> {amt(I.fixed)} of fixed overhead is the only line
-            you can delete once and stop paying {count(d.requests)} times.
-          </li>
-          <li>
-            <strong>Compact sooner.</strong> Carry cost is linear in how long a result survives, not
-            in how big it looked.
-          </li>
+          <li>{t.foot.preamble(amt(I.fixed), count(d.requests))}</li>
+          <li>{t.foot.compact}</li>
         </ul>
       </div>
       <div>
-        <h3>Caveats</h3>
+        <h3>{t.foot.caveats}</h3>
         <ul className="cav">
+          <li>{t.foot.ttlCaveat(money(lensGap))}</li>
+          <li>{t.foot.outputCaveat}</li>
+          <li>{t.foot.foldCaveat((FOLD_MIN * 100).toFixed(1) + "%")}</li>
+          <li>{t.foot.densityCaveat(density)}</li>
           <li>
-            Cache writes bill at 2× input on a 1h TTL and 1.25× on 5m. Where the transcript records
-            which applied, that is used verbatim; the switch only reprices what it omitted, which is
-            why the two lenses differ by just {money(lensGap)} here.
-          </li>
-          <li>
-            “Model output” exceeds output-token spend because prose written once is re-billed as
-            input on every later request.
-          </li>
-          <li>
-            Blocks under {(FOLD_MIN * 100).toFixed(1)}% of their parent are folded into a labelled
-            “other”; nothing is dropped. Identity is carried by the table as well as by hue.
-          </li>
-          <li>
-            Totals are exact; the split across line items is estimated from character counts at{" "}
-            {density}.
-          </li>
-          <li>
-            Cache-write TTL was recorded for{" "}
-            {data.ttlMeasuredShare != null
-              ? (data.ttlMeasuredShare * 100).toFixed(1) + "%"
-              : "an unknown share"}{" "}
-            of written tokens, so the lens above only reprices the remainder.
-            {data.models && data.models.length
-              ? ` Models: ${data.models.map((m) => m.id).join(", ")}.`
-              : ""}
+            {t.foot.ttlShareCaveat(
+              data.ttlMeasuredShare != null
+                ? (data.ttlMeasuredShare * 100).toFixed(1) + "%"
+                : t.foot.unknownShare,
+              /* Model ids are not words -- they are what the API calls itself, and the same
+                 string in every language. */
+              data.models && data.models.length ? data.models.map((m) => m.id).join(", ") : null,
+            )}
           </li>
         </ul>
       </div>
@@ -302,15 +284,12 @@ export function Footnotes(): React.JSX.Element {
  *  tense when the numbers arrive. */
 export function CardBody(): React.JSX.Element {
   const { state } = useReport()
+  const t = useT()
   return (
     <>
       <Strip />
       <div className="mosaichead">
-        <span className="lbl">
-          {state.chart === "sun"
-            ? "Every line item · arc = share of the ring inside it · each ring one level deeper"
-            : "Every line item · column width = share of bill · block height = share of column"}
-        </span>
+        <span className="lbl">{state.chart === "sun" ? t.chart.headSun : t.chart.headMosaic}</span>
         <Crumbs />
       </div>
       {/* Keyed on the chart, so the picture the switch asks for arrives rather than
@@ -327,7 +306,7 @@ export function CardBody(): React.JSX.Element {
           breadcrumb, which addresses one block inside it. */}
       <div className="cardfoot">
         <HoverBar />
-        <Seg options={CHARTS} value={state.chart} onPick={pickChart} nosnap />
+        <Seg options={charts(t)} value={state.chart} onPick={pickChart} nosnap />
       </div>
     </>
   )
@@ -335,12 +314,6 @@ export function CardBody(): React.JSX.Element {
 
 /** How the card's header describes the dataset: what the report covers, said in the eyebrow
  *  beside the words that are there whether or not a file has been dropped. */
-export function scopeOf(d: Dataset): string {
-  return [
-    `${d.sessions} sessions`,
-    d.days ? `${d.days} days` : null,
-    `${count(d.requests)} requests`,
-  ]
-    .filter(Boolean)
-    .join(" · ")
+export function scopeOf(t: Dict, d: Dataset): string {
+  return t.card.scope(count(d.sessions), d.days, count(d.requests))
 }

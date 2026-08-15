@@ -13,6 +13,7 @@
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
+import { labelOf, useT } from "./copy.tsx"
 import { pctOf, sunburst, type SunBranch } from "./model.ts"
 import { hoverBind, setHover, setState, useHover } from "./store.ts"
 
@@ -56,6 +57,7 @@ const Sector = memo(function Sector({
   q: string
 }): React.JSX.Element {
   const { pal, amt, drill } = useReport()
+  const t = useT()
   const h = pal.hue(branch.group)
 
   return (
@@ -89,7 +91,7 @@ const Sector = memo(function Sector({
                 group: branch.group,
               })}
             >
-              <title>{`${a.name} · ${amt(a.cost)}`}</title>
+              <title>{`${labelOf(t, a.name)} · ${amt(a.cost)}`}</title>
             </path>
             {carry && !on && !dim ? (
               <path className="suncarry" d={arcPath(a.a0 + 0.6, a.a1 - 0.6, r0 + 1.6, r1 - 1.6)} />
@@ -113,19 +115,19 @@ function Core({
   kids: number
 }): React.JSX.Element {
   const { state, amt } = useReport()
+  const t = useT()
   const h = useHover()
   const up = state.path.length > 0
+  const pct = pctOf(h?.cost ?? 0, rootCost)
 
   const inner = h ? (
     <>
-      <span className="k">{h.under ? h.under : h.group}</span>
+      <span className="k">{labelOf(t, h.under ? h.under : h.group)}</span>
       <span className="v">{amt(h.cost)}</span>
       <span className="s">
-        {h.name}
+        {labelOf(t, h.name)}
         <br />
-        <span className="dim">
-          {pctOf(h.cost, rootCost).toFixed(pctOf(h.cost, rootCost) < 1 ? 2 : 1)}% of {label}
-        </span>
+        <span className="dim">{t.sun.ofLabel(pct.toFixed(pct < 1 ? 2 : 1) + "%", label)}</span>
       </span>
     </>
   ) : (
@@ -133,9 +135,9 @@ function Core({
       <span className="k">{label}</span>
       <span className="v">{amt(rootCost)}</span>
       <span className="s">
-        {kids} line items
+        {t.sun.lineItems(kids)}
         <br />
-        <span className="dim">{up ? "click to go back" : "click a sector to drill in"}</span>
+        <span className="dim">{up ? t.sun.goBack : t.sun.drillIn}</span>
       </span>
     </>
   )
@@ -145,7 +147,7 @@ function Core({
       {up ? (
         <button
           type="button"
-          title="Back one level"
+          title={t.sun.back}
           onClick={() => {
             setHover(null)
             setState({ path: state.path.slice(0, -1) })
@@ -174,19 +176,20 @@ const LegRow = memo(function LegRow({
   dim: boolean
 }): React.JSX.Element {
   const { amt, drill } = useReport()
+  const t = useT()
   const kids = branch.arcs.filter((a) => a.ring === 1)
   const note = branch.folded
-    ? "the folded tail · shown whole, listed in the table"
+    ? t.sun.foldedNote
     : branch.items
-      ? `${branch.items} item${branch.items === 1 ? "" : "s"}` +
+      ? t.sun.itemsNote(branch.items) +
         (kids.length
           ? " · " +
             kids
               .slice(0, 2)
-              .map((k) => `${k.name} ${amt(k.cost)}`)
+              .map((k) => `${labelOf(t, k.name)} ${amt(k.cost)}`)
               .join(" · ")
           : "")
-      : "single line item · no further breakdown"
+      : t.sun.leafNote
 
   return (
     <div
@@ -203,7 +206,7 @@ const LegRow = memo(function LegRow({
     >
       <span className="sw" style={{ background: hue }} />
       <button type="button" data-folded={branch.folded ? 1 : 0} onClick={() => drill(branch.name)}>
-        {branch.name}
+        {labelOf(t, branch.name)}
       </button>
       <span className="note">{note}</span>
       <span className="val">{amt(branch.cost)}</span>
@@ -213,6 +216,7 @@ const LegRow = memo(function LegRow({
 
 export function Sunburst(): React.JSX.Element {
   const { focus, state, pal, amt } = useReport()
+  const t = useT()
   const hover = useHover()
   const hk = hover?.key ?? null
   const q = state.query.trim().toLowerCase()
@@ -222,8 +226,11 @@ export function Sunburst(): React.JSX.Element {
      The layout walk is microseconds; what it buys is the arcs not being rebuilt. */
   const branches = useMemo(() => sunburst(focus), [focus])
 
-  const label = focus.node.name === "all" ? "the bill" : focus.node.name
-  if (!branches.length) return <div className="sunempty">No further breakdown under {label}.</div>
+  /* "all" is the synthetic root the drill-down starts from, and it is said as "the bill"
+     rather than by its own name -- which is the one place the tree's identifier would read as
+     a label if it were printed. */
+  const label = focus.node.name === "all" ? t.strip.theBill : labelOf(t, focus.node.name)
+  if (!branches.length) return <div className="sunempty">{t.sun.empty(label)}</div>
 
   return (
     <div className="sun">
@@ -231,10 +238,7 @@ export function Sunburst(): React.JSX.Element {
         <svg
           viewBox="-100 -100 200 200"
           role="img"
-          aria-label={
-            `Sunburst: ${branches.length} line items totalling ${amt(rootCost)}, ` +
-            "each ring a share of the one inside it"
-          }
+          aria-label={t.sun.aria(branches.length, amt(rootCost))}
         >
           {/* Sits under the arcs and catches everything they do not cover -- the margin
               outside the outer ring, the corners of the box -- so sliding off an arc into

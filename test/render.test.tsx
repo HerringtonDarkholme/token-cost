@@ -9,6 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { analyze, type Analysis } from "../src/engine.ts"
+import { LANGS } from "../src/i18n.ts"
 import { Page, type Dir } from "../src/Page.tsx"
 import { originOf, type Origin } from "../src/Upload.tsx"
 import { getHover, getState, resetState, setHover, setState, type ViewState } from "../src/store.ts"
@@ -42,6 +43,11 @@ afterAll(() => {
 beforeEach(() => {
   act(() => {
     resetState()
+    /* `resetState` deliberately keeps the language, the way it keeps the theme: both were
+       chosen for the session rather than for the file. That is right in the page and wrong
+       between two tests, so the language is put back by hand -- everything below that reads a
+       word off a button reads an English one. */
+    setState({ lang: "en" })
   })
 })
 
@@ -95,6 +101,44 @@ describe("view states", () => {
       show(patch)
       expectClean()
     })
+
+  /* Every language, through the states that carry the most interpolated copy. The type system
+     already says no key is missing; what it cannot say is that a dictionary's *arity* matches
+     what the call site hands over, or that a sentence assembled from three pieces still has
+     three pieces in it. Both of those reach the page as the word "undefined", which is what
+     `expectClean` is looking for.
+
+     Panels and the table rather than all four views, because between them they draw every
+     translated line item, both halves of the masked lens, and the two reconciliation notes. */
+  for (const { value: lang, label } of LANGS)
+    it(`${label} · panels and table`, () => {
+      show({ lang })
+      expectClean()
+      show({ lang, view: "table", pctOnly: true })
+      expectClean()
+      /* The heading is set word by word and each language chooses its own slots, so the one
+         thing to hold is that it chose some: an empty `ask` would leave the card titleless. */
+      show({ lang })
+      expect(container.querySelectorAll(".chead h1 [data-w]").length).toBeGreaterThan(1)
+    })
+
+  /* The heading lives inside a `TextSwap`, which holds its copy until its token moves -- and
+     the token is the card's face, which a change of language does not touch. So the words have
+     to be refreshed on the language instead, and this is the assertion that says they were:
+     without it the heading sits in English under a translated eyebrow, which is exactly the
+     shape the bug had. Asked of every language against every other, because the failure is a
+     stale *previous* language rather than a stale English. */
+  it("held copy follows the language, not just the face", () => {
+    const seen = new Map<string, string>()
+    for (const { value: lang, label } of LANGS) {
+      show({ lang })
+      const h1 = container.querySelector(".chead h1")?.textContent?.trim() ?? ""
+      expect(h1.length, `${label}: the heading is empty`).toBeGreaterThan(0)
+      for (const [prev, text] of seen)
+        expect(h1, `${label}: the heading is still showing ${prev}`).not.toBe(text)
+      seen.set(label, h1)
+    }
+  })
 
   it("hover readout", () => {
     const g = d.groups[0]
@@ -529,11 +573,15 @@ describe("the card's two faces", () => {
     const before = tip!.textContent
     act(() => sw!.click())
     expect(tip!.textContent).not.toBe(before)
-    /* One control, and it is the last one in the bar: the theme switch is the anchor
-       everything else grows leftward from, so it must not have anything to its right. */
+    /* Two controls, and the theme switch is the last one in the bar: it is the anchor
+       everything else grows leftward from, so it must not have anything to its right. The
+       language picker is the other -- both are lenses that exist before there is a bill and
+       outlive any one of them, so both stand on the empty face too. */
     const bar = [...box.querySelectorAll(".toolbar > *")]
     expect(bar.at(-1)?.classList.contains("seg")).toBe(true)
-    expect(box.querySelectorAll(".toolbar .seg")).toHaveLength(1)
+    expect(bar.at(-1)?.classList.contains("langseg")).toBe(false)
+    expect(box.querySelectorAll(".toolbar .seg")).toHaveLength(2)
+    expect(box.querySelectorAll(".toolbar .langsel option")).toHaveLength(6)
     // Absent rather than disabled: there is nothing yet to discard, copy or reprice.
     expect(box.querySelector('button[aria-label="New analysis"]')).toBeNull()
   })

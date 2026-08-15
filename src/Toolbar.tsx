@@ -2,7 +2,9 @@
    the current lens is announced rather than only coloured. */
 
 import { useId } from "react"
+import { LANGS, useT, type Dict } from "./copy.tsx"
 import type { TtlAssumption } from "./engine.ts"
+import type { Lang } from "./i18n.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
 import { CopyChartButton, ShareButton } from "./Share.tsx"
 import { setState, useViewState, type ThemeChoice } from "./store.ts"
@@ -42,27 +44,22 @@ function Moon(): React.JSX.Element {
   )
 }
 
-const THEMES: ReadonlyArray<SegOption<ThemeChoice>> = [
-  { value: "light", label: "Light theme", icon: <Sun />, tip: "Light, whatever the system says" },
-  {
-    value: "system",
-    label: "System theme",
-    icon: <Display />,
-    tip: "Follow the system’s light or dark setting",
-  },
-  { value: "dark", label: "Dark theme", icon: <Moon />, tip: "Dark, whatever the system says" },
+/* The options are built per render rather than written once at module scope, because a word in
+   them changes when the language does and a constant cannot. The glyphs do not change, so they
+   are still the same three elements every time. */
+const themes = (t: Dict): ReadonlyArray<SegOption<ThemeChoice>> => [
+  { value: "light", label: t.theme.light, icon: <Sun />, tip: t.theme.lightTip },
+  { value: "system", label: t.theme.system, icon: <Display />, tip: t.theme.systemTip },
+  { value: "dark", label: t.theme.dark, icon: <Moon />, tip: t.theme.darkTip },
 ]
 
 /* A cache write costs 2× input on a 1h TTL and 1.25× on 5m, so a bill read under the wrong
    assumption is wrong by that much on every write the transcript left unlabelled. That is
    what the switch is for, and what the hints say -- the abbreviation on its own says none of
-   it. */
-const TTL_HINT =
-  "Cache-write TTL. A write bills at 2× input on a 1h TTL and 1.25× on 5m; where the transcript recorded which applied, that is used verbatim, so this reprices only the rest."
-
-const TTLS: ReadonlyArray<SegOption<TtlAssumption>> = [
-  { value: "1h", label: "1h", tip: "Assume 1h: unrecorded cache writes at 2× input" },
-  { value: "5m", label: "5m", tip: "Assume 5m: unrecorded cache writes at 1.25× input" },
+   it. The abbreviations themselves are not translated: they are what the API calls them. */
+const ttls = (t: Dict): ReadonlyArray<SegOption<TtlAssumption>> => [
+  { value: "1h", label: "1h", tip: t.ttl.tip1h },
+  { value: "5m", label: "5m", tip: t.ttl.tip5m },
 ]
 
 /* The switches hand these down rather than closing over a fresh arrow each render. Nothing
@@ -70,6 +67,49 @@ const TTLS: ReadonlyArray<SegOption<TtlAssumption>> = [
    so they are written once, and the two theme switches are the same function. */
 const pickTtl = (ttl: TtlAssumption): void => setState({ ttl })
 const pickTheme = (theme: ThemeChoice): void => setState({ theme })
+
+/** A globe, for the one control whose options are words in scripts the rest of the toolbar
+ *  does not draw. Same recipe as its neighbours: one 16-unit box, stroked in `currentColor`,
+ *  so it takes the bar's ink without needing a colour of its own. */
+function Globe(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="6.4" />
+      <path d="M1.6 8h12.8M8 1.6c1.7 1.8 2.6 4 2.6 6.4S9.7 12.6 8 14.4C6.3 12.6 5.4 10.4 5.4 8s.9-4.6 2.6-6.4Z" />
+    </svg>
+  )
+}
+
+/** The language, as a select rather than as the segmented control every other lens here uses.
+ *  Six options is where that stops working: the pill measures its buttons, and six words in
+ *  six scripts is the widest thing on the page for a control pressed once a session -- and
+ *  pressed by someone who is, by definition, not reading the language it is currently in.
+ *
+ *  A native `<select>` also gets one thing no row of buttons does: the platform's own list,
+ *  which already knows how to render 简体中文 beside Français and how to be operated by a
+ *  keyboard, a screen reader and a thumb. The glyph beside it is what makes it findable
+ *  without a word, since the word would be in the language you are trying to leave. */
+function LangPicker(): React.JSX.Element {
+  const { lang } = useViewState()
+  const t = useT()
+  return (
+    <span className="seg langseg">
+      <Globe />
+      <select
+        className="langsel"
+        aria-label={t.language}
+        value={lang}
+        onChange={(e) => setState({ lang: e.target.value as Lang })}
+      >
+        {LANGS.map((l) => (
+          <option key={l.value} value={l.value}>
+            {l.label}
+          </option>
+        ))}
+      </select>
+    </span>
+  )
+}
 
 /** The eye every brokerage app puts over its balance. Stroked in `currentColor` so it
  *  inverts with the button rather than needing a second colour for the pressed state. */
@@ -95,24 +135,23 @@ function Eye({ off }: { off: boolean }): React.JSX.Element {
  *  `aria-describedby` means it is read out as well as drawn. */
 function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
   const tip = useId()
+  const t = useT()
   return (
     <>
       <button
         type="button"
         className="eyebtn t-tt-trigger"
         aria-pressed={on}
-        aria-label="Hide dollar amounts"
+        aria-label={t.mask.name}
         aria-describedby={tip}
         onClick={() => setState({ pctOnly: !on })}
       >
+        {/* Not translated, and not a word: the dollar sign is the thing being covered up,
+            drawn beside the eye that covers it. */}
         <span className="eyeamt">$</span>
         <Eye off={on} />
       </button>
-      <Tip id={tip}>
-        {on
-          ? "Show the dollars again"
-          : "Cover every dollar figure, leaving shares of the bill — for sharing a screen"}
-      </Tip>
+      <Tip id={tip}>{on ? t.mask.tipOn : t.mask.tipOff}</Tip>
     </>
   )
 }
@@ -136,21 +175,19 @@ function Fresh(): React.JSX.Element {
  *  drawn. No confirm step on top of that, because re-picking is two clicks. */
 function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
   const tip = useId()
+  const t = useT()
   return (
     <span className="seg t-tt-host">
       <button
         type="button"
         className="freshbtn t-tt-trigger"
-        aria-label="New analysis"
+        aria-label={t.reset.name}
         aria-describedby={tip}
         onClick={onReset}
       >
         <Fresh />
       </button>
-      <Tip id={tip}>
-        Discard this report and pick different transcripts. Nothing was uploaded, so these numbers
-        only exist in this page — they are gone once you do.
-      </Tip>
+      <Tip id={tip}>{t.reset.tip}</Tip>
     </span>
   )
 }
@@ -190,6 +227,7 @@ export function Toolbar({
   onReset: () => void
 }): React.JSX.Element {
   const state = useViewState()
+  const t = useT()
 
   return (
     <div className="toolbar" data-leaving={leaving ? "1" : undefined}>
@@ -211,11 +249,21 @@ export function Toolbar({
             </span>
           </span>
           <span className="t-grow" data-i="0">
-            <Seg label="TTL" hint={TTL_HINT} options={TTLS} value={state.ttl} onPick={pickTtl} />
+            <Seg
+              label={t.ttl.label}
+              hint={t.ttl.hint}
+              options={ttls(t)}
+              value={state.ttl}
+              onPick={pickTtl}
+            />
           </span>
         </>
       ) : null}
-      <Seg options={THEMES} value={state.theme} onPick={pickTheme} />
+      {/* Inside the anchor rather than beside it: language and theme are the two controls that
+          exist before there is a bill and outlive any one of them, so they hold the same
+          ground on both faces of the card and everything else grows leftward past them. */}
+      <LangPicker />
+      <Seg options={themes(t)} value={state.theme} onPick={pickTheme} />
     </div>
   )
 }

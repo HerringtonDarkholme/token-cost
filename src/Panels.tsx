@@ -4,7 +4,8 @@
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
-import { fold, kidsOf, maxCost, pctOf, type CostNode } from "./model.ts"
+import { nodeName, useT } from "./copy.tsx"
+import { fold, kidsOf, maxCost, moneyFine, pctOf, type CostNode } from "./model.ts"
 import { vtName } from "./Motion.tsx"
 import { hoverBind, useHover } from "./store.ts"
 
@@ -26,6 +27,7 @@ const Panel = memo(function Panel({
   anyHover: boolean
 }): React.JSX.Element {
   const { state, pal, amt, reqs, drill } = useReport()
+  const t = useT()
   const h = pal.hue(gname)
   const key = gname + "›" + panel.name
   const dim = anyHover && !hit
@@ -37,10 +39,10 @@ const Panel = memo(function Panel({
   const kidsAll = kidsOf(panel) || []
   const shown = kids.reduce((a, k) => a + k.cost, 0)
   const foot = !kidsAll.length
-    ? "single line item · no further breakdown"
+    ? t.panels.leaf
     : Math.abs(shown - panel.cost) < 0.01
       ? ""
-      : `shown: ${amt(shown)} of ${amt(panel.cost)}`
+      : t.panels.shown(amt(shown), amt(panel.cost))
 
   /* Named for the filter transition -- see `vtName`. The key is the panel's identity rather
      than its place in the grid, which is the whole point: a query that removes the third
@@ -55,7 +57,7 @@ const Panel = memo(function Panel({
           onClick={() => drill(panel.name)}
           {...hoverBind({ key, name: panel.name, cost: panel.cost, under: null, group: gname })}
         >
-          {panel.name}
+          {nodeName(t, panel)}
         </button>
         <span className="pc">{amt(panel.cost)}</span>
       </div>
@@ -70,7 +72,9 @@ const Panel = memo(function Panel({
           />
         </span>
         <span className="pr">
-          {state.pctOnly ? `${amt(panel.cost)} of bill` : `$${(panel.cost / reqs).toFixed(4)}/req`}
+          {state.pctOnly
+            ? t.panels.ofBill(amt(panel.cost))
+            : t.panels.perReq(moneyFine(panel.cost / reqs, 4))}
         </span>
       </div>
       <div className="panitems">
@@ -96,7 +100,7 @@ const Panel = memo(function Panel({
                 data-folded={k.folded ? 1 : 0}
                 onClick={() => drill(panel.name)}
               >
-                {k.name}
+                {nodeName(t, k)}
               </button>
               <span className="tk">
                 <span

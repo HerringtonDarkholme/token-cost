@@ -46,10 +46,9 @@ import {
   type Analysis,
   type Scanned,
 } from "./engine.ts"
+import { useT, type Dict, type Os } from "./copy.tsx"
 import { TextSwap } from "./Motion.tsx"
 import { Tip } from "./Tip.tsx"
-
-type Os = "mac" | "win" | "linux"
 
 /* The three platforms, each a mark and a word. Same recipe as every other glyph on the page: one
    16-unit box, stroked in `currentColor` at one weight, no fills -- a solid silhouette could not
@@ -93,6 +92,8 @@ function TuxMark(): React.JSX.Element {
   )
 }
 
+/* The three names are not translated, because they are not words: macOS, Windows and Linux
+   are what the platforms call themselves in every language the page speaks. */
 const PLATFORMS: ReadonlyArray<{ value: Os; label: string; mark: React.JSX.Element }> = [
   { value: "mac", label: "macOS", mark: <AppleMark /> },
   { value: "win", label: "Windows", mark: <WindowsMark /> },
@@ -122,6 +123,7 @@ function FolderMark(): React.JSX.Element {
  *  a click rather than by a permanent row -- press it and it walks to the next platform. */
 function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JSX.Element {
   const tip = useId()
+  const t = useT()
   const at = PLATFORMS.findIndex((p) => p.value === os)
   const next = PLATFORMS[(at + 1) % PLATFORMS.length]
   /* `t-tt-host` carries the hint's placement, and where it lands is a question of room -- see
@@ -151,9 +153,7 @@ function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JS
           <path d="m3.6 6.2 4.4 4.4 4.4-4.4" />
         </svg>
       </button>
-      <Tip id={tip}>
-        Not {PLATFORMS[at].label}? Press for the {next.label} route.
-      </Tip>
+      <Tip id={tip}>{t.intake.osTip(PLATFORMS[at].label, next.label)}</Tip>
     </span>
   )
 }
@@ -167,37 +167,6 @@ function guessOs(): Os {
   if (/Mac|iPhone|iPad/.test(ua)) return "mac"
   if (/Win/.test(ua)) return "win"
   return "linux"
-}
-
-/** One line per platform, and it is the keystrokes rather than prose about them: this is read
- *  with a file dialog already open on top of it.
- *
- *  macOS gets both routes because they answer different questions. ⇧⌘. unhides every dotfile in
- *  the dialog, which is the one to reach for when you want to see where you are going; ⇧⌘G takes
- *  a typed path and skips the looking entirely. The other two have only the typed route -- their
- *  dialogs have a location box, so unhiding is not a separate trick. */
-const HOW: Record<Os, ReactNode> = {
-  mac: (
-    <>
-      In the dialog press <kbd>⇧</kbd>
-      <kbd>⌘</kbd>
-      <kbd>.</kbd> to reveal hidden folders. Or <kbd>⇧</kbd>
-      <kbd>⌘</kbd>
-      <kbd>G</kbd> and paste <code>~/.claude/projects</code>.
-    </>
-  ),
-  win: (
-    <>
-      Type <code>%USERPROFILE%\.claude\projects</code> into the dialog’s <em>Folder</em> box, press{" "}
-      <kbd>Enter</kbd>.
-    </>
-  ),
-  linux: (
-    <>
-      In the dialog press <kbd>Ctrl</kbd>
-      <kbd>L</kbd>, type <code>~/.claude/projects</code>, press <kbd>Enter</kbd>.
-    </>
-  ),
 }
 
 /** A file, and where it sat inside the folder that was chosen. A `File` on its own cannot say:
@@ -373,7 +342,7 @@ interface Run {
  *  column is translated up a row per line and transitions between the two, which is a composited
  *  transform for the same reason the typing is one. The cursor on the line under the last name is
  *  what says the machine has not stopped -- a prompt, which is what this whole panel is. */
-function Reading({ run }: { run: Run }): React.JSX.Element {
+function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
   /* The prompt is a row like any other, so it counts: what the panel shows is the tail of the
      column with the cursor on the bottom line. */
   const roll = Math.max(0, run.lines.length + 1 - SHOWN)
@@ -386,7 +355,7 @@ function Reading({ run }: { run: Run }): React.JSX.Element {
           it is not announced: it changes hundreds of times, and a live region that says every
           one of them is a live region nobody can use. */}
       <div className="foundhead">
-        <span className="foundlbl">Reading</span>
+        <span className="foundlbl">{t.intake.reading}</span>
         {/* Padded rather than left to grow, so a count on its way to three digits does not shunt
             the line about underneath itself. `white-space: pre` is what keeps the padding. */}
         <span className="foundnum">
@@ -450,6 +419,7 @@ export function Intake({
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const [os, setOs] = useState<Os>(guessOs)
+  const t = useT()
   const dirPicker = useRef<HTMLInputElement>(null)
   const picks = useRef(0)
 
@@ -492,18 +462,11 @@ export function Intake({
     const where = originOf(picked.map((p) => p.path))
     if (!files.length) {
       stop(
-        !picked.length ? (
-          "No files selected."
-        ) : where.root ? (
-          <>
-            <b>{where.root}</b> holds no <code>.jsonl</code> transcripts. Claude Code writes one per
-            session, under <code>~/.claude/projects</code>.
-          </>
-        ) : (
-          <>
-            None of those {picked.length} file(s) are <code>.jsonl</code> transcripts.
-          </>
-        ),
+        !picked.length
+          ? t.intake.errNothing
+          : where.root
+            ? t.intake.errNoJsonl(<b>{where.root}</b>)
+            : t.intake.errLoose(picked.length),
       )
       return
     }
@@ -577,7 +540,7 @@ export function Intake({
         await step(i, files.length, p.file.name)
       }
     } catch (e) {
-      stop(`Could not read the files: ${(e as Error).message}`)
+      stop(t.intake.errRead((e as Error).message))
       return
     }
 
@@ -590,7 +553,7 @@ export function Intake({
       scanned = closed.scanned
       data = report(scanned, closed.alloc)
     } catch (e) {
-      stop(`Analysis failed: ${(e as Error).message}`)
+      stop(t.intake.errAnalysis((e as Error).message))
       console.error(e)
       return
     }
@@ -599,27 +562,11 @@ export function Intake({
          Code's and simply have nothing billed in them are a fact about the sessions; files that
          came from somewhere else entirely are a wrong turn, and the folder's own name is the
          quickest way to show which one happened. */
+      const root = where.root ? <b>{where.root}</b> : null
       stop(
-        where.claude ? (
-          <>
-            Read {scanned.filesUsed} transcript{scanned.filesUsed > 1 ? "s" : ""} from{" "}
-            {where.root ? <b>{where.root}</b> : "that folder"}, and none of them holds a priced API
-            request — nothing here has been billed.
-          </>
-        ) : (
-          <>
-            Those {scanned.filesUsed} <code>.jsonl</code> file{scanned.filesUsed > 1 ? "s" : ""}{" "}
-            hold no priced API request.{" "}
-            {where.root ? (
-              <>
-                <b>{where.root}</b> is not
-              </>
-            ) : (
-              "They did not come from"
-            )}{" "}
-            <code>~/.claude/projects</code>, which is where Claude Code keeps its transcripts.
-          </>
-        ),
+        where.claude
+          ? t.intake.errNoneBilled(scanned.filesUsed, root)
+          : t.intake.errNotClaude(scanned.filesUsed, root),
       )
       return
     }
@@ -680,9 +627,7 @@ export function Intake({
             one folder is a single pick that catches everything under it. Loose files dragged in
             still work -- the filter above does not care how they arrived -- there is just no
             longer a button that recommends it. */}
-        <h2>
-          Drop your <code>~/.claude/projects</code> folder here
-        </h2>
+        <h2>{t.intake.heading(<code>~/.claude/projects</code>)}</h2>
         {/* What pressing the button gets you, in one line, and it took five tries to get down to
             one. It was the method first -- per-request billing, re-billed context, the definition
             of carry cost -- which is the right paragraph in the wrong place: it argued for numbers
@@ -694,7 +639,7 @@ export function Intake({
             anything at all.
             What is left is a verb, the thing, and the three sizes the report actually resolves to.
             One line that fits on one line: a subtitle that wraps is a paragraph. */}
-        <p className="lede">Chart your bill: every tool, every subcommand, every dollar.</p>
+        <p className="lede">{t.intake.lede}</p>
         <div className="picks">
           <button
             className="btn primary"
@@ -704,7 +649,7 @@ export function Intake({
             }}
           >
             <FolderMark />
-            Choose folder
+            {t.intake.choose}
           </button>
         </div>
         {/* And the way in, in the card rather than under it. This used to stand in the help below
@@ -740,14 +685,14 @@ export function Intake({
                 the folder is hidden is in the help below the card; what a reader stuck at a
                 dialog needs is the keystrokes. */}
             <div className="howhead">
-              <span className="howlbl">The folder is hidden</span>
+              <span className="howlbl">{t.intake.hidden}</span>
               <OsSwitch os={os} onPick={setOs} />
             </div>
             {/* Keyed on the platform, so switching plays the same swap the report's figures do
                 rather than substituting the words underneath the reader. Inside the paragraph
                 rather than around it: `TextSwap` is a span, and a span may not hold a `<p>`. */}
             <p>
-              <TextSwap token={os}>{HOW[os]}</TextSwap>
+              <TextSwap token={os}>{t.intake.how[os]}</TextSwap>
             </p>
           </div>
           {/* The other face. Mounted from the first pick onward rather than only while the work
@@ -756,7 +701,7 @@ export function Intake({
               it look busy. */}
           {run ? (
             <div className="found" data-on={busy ? "1" : "0"} data-busy={busy ? "1" : "0"}>
-              <Reading run={run} />
+              <Reading run={run} t={t} />
             </div>
           ) : null}
         </div>
@@ -784,7 +729,7 @@ export function Intake({
           )
         }}
       />
-      <p className="privacy">Parsed in this page · nothing is uploaded</p>
+      <p className="privacy">{t.intake.privacy}</p>
     </div>
   )
 }
@@ -799,46 +744,29 @@ export function Intake({
  *  is what the folder holds, the terminal way round, and the answer to the question a page that
  *  asks for a whole folder of transcripts has to answer. */
 export function Where(): React.JSX.Element {
+  const t = useT()
   return (
     <div className="where">
       <div>
         <p className="whead">
-          <strong>What you are handing over</strong>
+          <strong>{t.where.handingOver}</strong>
         </p>
-        <p>
-          One <code>.jsonl</code> file per session, in one folder per project, under{" "}
-          <code>~/.claude/projects/</code> — a dotfile, which is why every file picker hides it
-          until you ask for it by name. Everything you pick is combined into a single report — the
-          breakdown is by what spent the money, not by which folder it was spent in, so pick one
-          project&apos;s folder if that is the bill you want.
-        </p>
+        <p>{t.where.handingOverBody}</p>
         <p className="whead">
-          <strong>Prefer the terminal?</strong>
+          <strong>{t.where.terminal}</strong>
         </p>
-        <p>
-          Open the folder in your file manager, then drag it onto the card above:{" "}
-          <code>open ~/.claude/projects</code>
-        </p>
-        <p>
-          Largest projects first: <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
-        </p>
+        <p>{t.where.terminalBody}</p>
+        <p>{t.where.largest}</p>
       </div>
       <div>
         <p className="whead">
-          <strong>Nothing is uploaded</strong>
+          <strong>{t.where.noUpload}</strong>
         </p>
-        <p>
-          The files are read and the bill worked out in this page: there is no server to send a
-          transcript to, and the build fails if anything in here reaches the network. Save the page
-          and it works the same from disk.
-        </p>
+        <p>{t.where.noUploadBody}</p>
         <p className="whead">
-          <strong>A shared link carries the view, not the bill</strong>
+          <strong>{t.where.linkTitle}</strong>
         </p>
-        <p>
-          The address records which lens and which block you are looking at — never the numbers.
-          Whoever opens it gets an empty card and drops their own transcripts in.
-        </p>
+        <p>{t.where.linkBody}</p>
       </div>
     </div>
   )

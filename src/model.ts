@@ -8,6 +8,8 @@
    code. */
 
 import type { Analysis, Dataset, GroupId } from "./engine.ts"
+import { lang, tag, type Lang } from "./i18n.ts"
+import { postCopy, type PostCopy } from "./post-copy.ts"
 
 /* Every level of the tree -- group, item, child, and the synthetic "other" row folding
    produces -- is drawn by the same components, so they share one shape. The engine's
@@ -19,6 +21,10 @@ export interface CostNode {
   items?: CostNode[]
   children?: CostNode[] | null
   folded?: boolean
+  /** How many rows the folded tail stands for. Held as a number beside the name rather than
+   *  written into it, because "other (7 items)" is a sentence and sentences are translated --
+   *  see `nodeName` in `copy.tsx`. */
+  foldCount?: number
   self?: boolean
   id?: GroupId
   short?: string
@@ -37,10 +43,37 @@ export const pctOf = (v: number, max: number): number => (max > 0 && v >= 0 ? (v
 export const maxCost = (list: CostNode[] | null | undefined): number =>
   list && list.length ? Math.max(...list.map((x) => x.cost || 0)) : 0
 
-export const money = (n: number): string =>
-  "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/* Both formatters ask `i18n` for the current tag rather than taking one, because they are
+   called by name from inside JSX at some fifteen sites and threading a language through all of
+   them would put a fact about the toolbar into the arithmetic. See the mirror in `i18n.ts`.
 
-export const count = (n: number): string => n.toLocaleString("en-US")
+   The currency stays USD in every language -- it is what the API bills in, and a figure
+   converted for the sake of the reader's locale would be a number this page cannot stand
+   behind. What changes is how the digits are grouped and where the symbol sits, which is the
+   part `Intl` actually knows.
+
+   `narrowSymbol` is what keeps the symbol a bare `$`. The default disambiguates it against
+   every other dollar -- `US$7,869.77` in Chinese, `7 869,77 $US` in French -- which is the
+   right call for a page that might also be quoting Canadian dollars and the wrong one for a
+   page where every figure is the same currency and says so once, in the eye that covers them
+   all. The disambiguation costs three characters on the largest number on the page to answer a
+   question nothing here raises. */
+const fmt = (digits: number): Intl.NumberFormat =>
+  new Intl.NumberFormat(tag(), {
+    style: "currency",
+    currency: "USD",
+    currencyDisplay: "narrowSymbol",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
+
+export const money = (n: number): string => fmt(2).format(n)
+
+/** The same, at the precision the per-request figures want. A cent is too coarse for a number
+ *  that is a bill divided by a few thousand. */
+export const moneyFine = (n: number, digits: number): string => fmt(digits).format(n)
+
+export const count = (n: number): string => n.toLocaleString(tag())
 
 /** Keep the top items, fold the tail into one labelled row. Nothing is dropped. */
 export function fold(
@@ -56,10 +89,14 @@ export function fold(
   sorted.forEach((n, i) => (i < FOLD_MAX && n.cost >= parentCost * FOLD_MIN ? keep : rest).push(n))
   if (rest.length)
     keep.push({
-      name: `other (${rest.length} items)`,
+      /* The name is an identifier here, not a label: it keys the hover, the view-transition
+         name and the drill path, all of which have to survive a change of language. What the
+         reader sees is `nodeName`. */
+      name: "other",
       cost: +rest.reduce((s, n) => s + n.cost, 0).toFixed(2),
       children: null,
       folded: true,
+      foldCount: rest.length,
     })
   return keep
 }
@@ -340,24 +377,19 @@ export function ledger(
  *  of, so the ceiling is enforced rather than assumed. */
 export const POST_MAX = 280
 
+/** The characters X counts double: CJK ideographs, kana, hangul and the fullwidth forms. Its
+ *  weighted-length rule is the reason this cannot be `.length` once the page speaks Japanese
+ *  -- a caption that fits by character count would be refused by the composer at twice the
+ *  weight, and the reader would find that out in X's own box rather than here. */
+const WIDE = /[ᄀ-ᇿ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/
+
 /** X bills a link at 23 characters however long it is, so the ceiling is measured the way
  *  the composer measures it rather than on the raw string. */
-export const postLength = (s: string): number => s.replace(/https?:\/\/\S+/g, "x".repeat(23)).length
-
-/** How a group is said out loud. The chart's names are column headings -- "Tools · content
- *  read in" -- and a heading dropped into a sentence reads as a spreadsheet. A post is a
- *  sentence, so each group gets a phrase. Anything unmapped falls back to the heading. */
-const SAID: Partial<Record<GroupId, string>> = {
-  shell: "shell commands",
-  ingest: "what tools read into the context",
-  emit: "what tools wrote back out",
-  twoway: "tool traffic, both directions",
-  output: "the model's own output",
-  preamble: "the system prompt and tool schemas",
-  harness: "harness scaffolding and reminders",
-  media: "images and attachments",
-  typed: "the part I actually typed",
-}
+export const postLength = (s: string): number =>
+  [...s.replace(/https?:\/\/\S+/g, "x".repeat(23))].reduce(
+    (n, ch) => n + (WIDE.test(ch) ? 2 : 1),
+    0,
+  )
 
 /** Programs a caption is allowed to name out loud.
  *
@@ -467,9 +499,12 @@ const share = (cost: number, total: number): string => {
  *  `amt` and `outOf` are the masked lens in one place: a reader who covered the dollars to
  *  share their screen has said they do not want the total published, and a variant that
  *  had to remember that itself would eventually forget. */
-interface Facts {
+export interface Facts {
   d: Dataset
   masked: boolean
+  /** The sentences, in the language the page is currently in. Held on the facts rather than
+   *  passed beside them because every variant needs it and none of them needs anything else. */
+  c: PostCopy
   scope: string
   /** Nameable leaves from the tool-shaped groups, biggest first. Vouched, and item names
    *  only -- never a child, which for a shell row is the full command line the reader ran. */
@@ -490,7 +525,8 @@ interface Facts {
   sayable: (cost: number) => boolean
 }
 
-function factsOf(d: Dataset, pctOnly: boolean): Facts {
+function factsOf(d: Dataset, pctOnly: boolean, l: Lang): Facts {
+  const c = postCopy(l)
   const amt = (cost: number): string => (pctOnly ? share(cost, d.total) : money(cost))
   const sayable = (cost: number): boolean => /[1-9]/.test(amt(cost))
 
@@ -505,9 +541,8 @@ function factsOf(d: Dataset, pctOnly: boolean): Facts {
   return {
     d,
     masked: pctOnly,
-    scope: d.days
-      ? `${d.days} day${d.days === 1 ? "" : "s"}`
-      : `${count(d.sessions)} session${d.sessions === 1 ? "" : "s"}`,
+    c,
+    scope: d.days ? c.scopeDays(d.days) : c.scopeSessions(d.sessions, count(d.sessions)),
     tools: leaves("shell", "ingest", "emit", "twoway"),
     progs: leaves("shell"),
     typed: (d.groups.find((g) => g.id === "typed") as CostNode | undefined) || null,
@@ -515,7 +550,7 @@ function factsOf(d: Dataset, pctOnly: boolean): Facts {
     amt,
     sayable,
     outOf: (cost) =>
-      pctOnly ? `${share(cost, d.total)} of it` : `${money(cost)} of ${money(d.total)}`,
+      pctOnly ? c.outOfMasked(share(cost, d.total)) : c.outOf(money(cost), money(d.total)),
   }
 }
 
@@ -525,7 +560,7 @@ function factsOf(d: Dataset, pctOnly: boolean): Facts {
  *  before the fold and is never cut; anything after it is dropped from the end until the
  *  post fits, because a trailing claim is the one part the image already makes on its own.
  *  The link is never a candidate -- an invitation that got truncated is just a boast. */
-interface Draft {
+export interface Draft {
   lines: string[]
   cta: string
 }
@@ -546,17 +581,18 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
     const [a, b] = f.tools
     if (!a) return null
     /* Covered, the scope has nowhere good to sit: "12% of it over 31 days" reads as a rate
-       rather than as a share of one bill, and the image carries the span anyway. */
-    const mine = f.masked
-      ? `Mine's ${a.name}, at ${f.amt(a.cost)} of the bill.`
-      : `Mine's ${a.name}, at ${f.outOf(a.cost)} over ${f.scope}.`
-    return {
-      lines: [
-        "What's the most expensive tool on your Claude Code bill?",
-        b ? `${mine} Second was ${b.name}, at ${f.amt(b.cost)}.` : mine,
-      ],
-      cta: "Find yours",
-    }
+       rather than as a share of one bill, and the image carries the span anyway. That is why
+       `masked` reaches the dictionary rather than being resolved here -- it picks between two
+       sentences, and which two is the language's business. */
+    return f.c.a({
+      name: a.name,
+      amt: f.amt(a.cost),
+      outOf: f.outOf(a.cost),
+      scope: f.scope,
+      masked: f.masked,
+      second: b ? b.name : null,
+      secondAmt: b ? f.amt(b.cost) : "",
+    })
   },
 
   /* B. The commands nobody prices. The escalation is the joke, so it wants two names at
@@ -564,46 +600,33 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
   (f) => {
     if (f.progs.length < 2) return null
     const [a, ...rest] = f.progs.slice(0, 3)
-    return {
-      lines: [
-        `Guess what ${a.name} costs you in Claude Code.`,
-        (f.masked
-          ? `Mine was ${f.amt(a.cost)} of my bill. `
-          : `Mine was ${f.amt(a.cost)} over ${f.scope}. `) +
-          rest.map((n) => `${n.name} was ${f.amt(n.cost)}.`).join(" "),
-        "Every command's output sits in your context and gets re-billed on every turn after it.",
-      ],
-      cta: "Yours",
-    }
+    return f.c.b({
+      name: a.name,
+      amt: f.amt(a.cost),
+      scope: f.scope,
+      masked: f.masked,
+      rest: rest.map((n) => ({ name: n.name, amt: f.amt(n.cost) })),
+    })
   },
 
   /* C. The agent framing, and the one that is always viable: it asks nothing of the shape
         of the tree, so there is never a dataset with no caption to pick. */
-  (f) => ({
-    lines: [
-      "What's your AI agent actually costing you?",
-      `Mine: ${f.masked || !f.sayable(f.d.total) ? "" : `${money(f.d.total)} over `}` +
-        `${f.scope} and ${count(f.d.requests)} requests.` +
-        (f.typed && /[1-9]/.test(share(f.typed.cost, f.d.total))
-          ? ` I typed ${share(f.typed.cost, f.d.total)} of it.`
-          : ""),
-    ],
-    cta: "Itemise yours",
-  }),
+  (f) => {
+    const typedShare = f.typed ? share(f.typed.cost, f.d.total) : null
+    return f.c.c({
+      total: f.masked || !f.sayable(f.d.total) ? null : money(f.d.total),
+      scope: f.scope,
+      requests: count(f.d.requests),
+      typedShare: typedShare && /[1-9]/.test(typedShare) ? typedShare : null,
+    })
+  },
 
   /* D. The self-own. It needs the reader's typing to actually be the small number -- on a
         transcript where they did most of the talking the line is true but no longer funny,
         and a joke that lands wrong reads as a lie about the chart underneath it. */
   (f) => {
     if (!f.typed || !f.sayable(f.typed.cost) || pctOf(f.typed.cost, f.d.total) >= 5) return null
-    return {
-      lines: [
-        "Quick — what's the biggest line on your Claude Code bill?",
-        `It isn't what you type. That was ${f.outOf(f.typed.cost)}.`,
-        "The rest is rent on context you never see.",
-      ],
-      cta: "See yours",
-    }
+    return f.c.d({ outOf: f.outOf(f.typed.cost) })
   },
 
   /* E. Generation against carry, which is this page's whole thesis in one ratio. Below 2×
@@ -611,17 +634,12 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
   (f) => {
     if (f.carry < 2) return null
     const { proseGen, proseCarry } = f.d.insights
-    const times = `${f.carry.toFixed(0)}×`
-    return {
-      lines: [
-        "Which costs more in Claude Code: what the model writes, or what it re-reads?",
-        f.masked || !f.sayable(proseGen)
-          ? `Mine: re-reading its own prose cost ${times} what writing it did.`
-          : `Mine: ${money(proseGen)} to write. ${money(proseCarry)} to re-read the same ` +
-            `prose on later turns. ${times}.`,
-      ],
-      cta: "Check yours",
-    }
+    const open = !f.masked && f.sayable(proseGen)
+    return f.c.e({
+      times: `${f.carry.toFixed(0)}×`,
+      gen: open ? money(proseGen) : null,
+      carry: open ? money(proseCarry) : "",
+    })
   },
 
   /* F. The receipt: a statement where the others ask, so the rotation is not five questions
@@ -631,18 +649,13 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
   (f) => {
     const top = f.d.groups[0]
     if (!top || !(f.d.total > 0)) return null
-    const heading = SAID[top.id] || top.name.toLowerCase()
-    const said = heading.length > 44 ? heading.slice(0, 43).trimEnd() + "…" : heading
-    return {
-      lines: [
-        f.masked || !f.sayable(f.d.total)
-          ? `Itemised ${f.scope} of my Claude Code bill.`
-          : `${money(f.d.total)} of Claude Code over ${f.scope}, itemised.`,
-        `Biggest line: ${said}, ${share(top.cost, f.d.total)} of it.`,
-        "You don't pay for what the model writes — you pay rent on your context.",
-      ],
-      cta: "Show me yours",
-    }
+    const heading = f.c.said[top.id] || top.name.toLowerCase()
+    return f.c.f({
+      total: f.masked || !f.sayable(f.d.total) ? null : money(f.d.total),
+      scope: f.scope,
+      said: heading.length > 44 ? heading.slice(0, 43).trimEnd() + "…" : heading,
+      share: share(top.cost, f.d.total),
+    })
   },
 ]
 
@@ -667,8 +680,16 @@ function assemble(draft: Draft, home?: string | null): string {
 /** Every caption this dataset can honestly carry, in a stable order. Exported so the tests
  *  can hold all of them to the ceiling and to the mask, rather than whichever one a random
  *  draw happened to return. */
-export function postVariants(d: Dataset, pctOnly: boolean, home?: string | null): string[] {
-  const f = factsOf(d, pctOnly)
+export function postVariants(
+  d: Dataset,
+  pctOnly: boolean,
+  home?: string | null,
+  /** Which language to write them in. Defaults to the page's, and is taken as an argument so
+   *  the suite can hold all six to the ceiling rather than only whichever one the machine
+   *  running it happens to be set to. */
+  l: Lang = lang(),
+): string[] {
+  const f = factsOf(d, pctOnly, l)
   return VARIANTS.map((v) => v(f))
     .filter((x): x is Draft => x !== null)
     .map((draft) => assemble(draft, home))
@@ -687,8 +708,9 @@ export function postText(
   pctOnly: boolean,
   home?: string | null,
   pick: number = Math.random(),
+  l: Lang = lang(),
 ): string {
-  const all = postVariants(d, pctOnly, home)
+  const all = postVariants(d, pctOnly, home, l)
   const i = Math.min(all.length - 1, Math.max(0, Math.floor(pick * all.length)))
   return all[i]
 }

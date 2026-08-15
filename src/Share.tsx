@@ -20,6 +20,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useReport } from "./context.ts"
+import { useT, type Dict } from "./copy.tsx"
 import { postText } from "./model.ts"
 import { TextSwap } from "./Motion.tsx"
 import { download, snapshot } from "./snapshot.ts"
@@ -90,19 +91,19 @@ function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
   return [at, run]
 }
 
-const COPY: Record<Outcome, string> = {
-  busy: "Rendering…",
-  copied: "Chart copied",
-  saved: "Chart saved as a PNG",
-  failed: "Could not render the chart",
-}
+const copyWords = (t: Dict): Record<Outcome, string> => ({
+  busy: t.share.copyBusy,
+  copied: t.share.copyDone,
+  saved: t.share.copySaved,
+  failed: t.share.copyFailed,
+})
 
-const SHARE: Record<Outcome, string> = {
-  busy: "Rendering…",
-  copied: "Image copied — paste it into the post",
-  saved: "Image saved — attach it to the post",
-  failed: "Could not render the image",
-}
+const shareWords = (t: Dict): Record<Outcome, string> => ({
+  busy: t.share.busy,
+  copied: t.share.copied,
+  saved: t.share.saved,
+  failed: t.share.failed,
+})
 
 /** The X mark, filled with `currentColor` so it inverts with the button like the eye does.
  *  It stands in for the word at the end of the label rather than leading it as an icon --
@@ -120,6 +121,8 @@ function XMark(): React.JSX.Element {
 
 export function CopyChartButton(): React.JSX.Element {
   const [at, run] = useChartPng()
+  const t = useT()
+  const words = copyWords(t)
   return (
     <button
       type="button"
@@ -130,7 +133,7 @@ export function CopyChartButton(): React.JSX.Element {
         void run()
       }}
     >
-      <TextSwap token={at || "idle"}>{at ? COPY[at] : "Copy chart"}</TextSwap>
+      <TextSwap token={at || "idle"}>{at ? words[at] : t.share.copy}</TextSwap>
     </button>
   )
 }
@@ -138,6 +141,8 @@ export function CopyChartButton(): React.JSX.Element {
 export function ShareButton(): React.JSX.Element {
   const { d, state } = useReport()
   const [at, run] = useChartPng()
+  const t = useT()
+  const words = shareWords(t)
 
   const share = (): void => {
     /* Where the invitation points: this page, if it is somewhere a reader can be sent. A
@@ -166,14 +171,14 @@ export function ShareButton(): React.JSX.Element {
       data-on={at && at !== "busy" ? 1 : 0}
       disabled={at === "busy"}
       onClick={share}
-      aria-label={at ? SHARE[at] : "Share to X"}
+      aria-label={at ? words[at] : t.share.name}
     >
       <TextSwap token={at || "idle"}>
         {at ? (
-          SHARE[at]
+          words[at]
         ) : (
           <>
-            Share to
+            {t.share.to}
             <XMark />
           </>
         )}
