@@ -1127,7 +1127,10 @@ tfoot .n {
   font-size: 13px;
   line-height: 1.55;
   color: var(--ink2);
-  max-width: 52ch;
+  /* The measure is capped in `em` rather than `ch`, because `ch` is cut from the `0` and a
+     Japanese glyph is twice that wide -- 52ch is a full line of English and half a line of
+     Japanese, which is what left both columns short of their own width. */
+  max-width: 44em;
 }
 .foot .cav {
   font-size: 12.5px;
