@@ -245,22 +245,28 @@ const EN = {
   /* the empty card */
   intake: {
     heading: (folder: React.ReactNode): React.ReactNode => <>Drop your {folder} folder here</>,
-    /** What the heading says on a device that probably cannot reach the folder: the two-step,
-     *  since the example is here and the real thing is where the transcripts are. */
-    headingTouch: "Try it here, open it on your dev machine",
+    /** The heading on a device that probably cannot reach the folder. It says what the page does
+     *  rather than what to do next: a reader who has not been told what this is cannot be sent
+     *  anywhere. Where to go is the note at the foot of the card. */
+    headingTouch: "Visualize your AI bill",
     lede: "Chart your AI bill: every tool, every subcommand, every dollar.",
+    /** The same line with the heading's words taken out of it, since the heading above now says
+     *  them -- and with where the numbers come from put in, which is the other half of what this
+     *  page is. */
+    ledeTouch: "Every tool, every subcommand, every dollar, read out of your Claude Code sessions.",
     choose: "Choose folder",
     /** The other way in, for a reader with no `~/.claude` to point at -- a phone, or a machine
      *  Claude Code has never run on. */
     example: "Try an example",
     hidden: "The folder is hidden",
-    /** The help a phone gets in place of the keystrokes. Where the folder is and what to do about
-     *  it -- not a claim about what this device has, which the page cannot see. */
-    yours: "Your own transcripts",
+    /** The help a phone gets in place of the keystrokes: the one step that gets this reader their
+     *  own numbers. An instruction, not a claim about what the device has -- the page reads a
+     *  pointer type, and cannot see whether the folder is there. */
+    yours: "To chart your own",
     yoursBody: (
       <>
-        They sit in <code>~/.claude/projects</code> on the machine you run Claude Code on. Open this
-        page there to read yours.
+        Open this page on the machine you run Claude Code on, and point it at{" "}
+        <code>~/.claude/projects</code>.
       </>
     ),
     osTip: (current: string, next: string): string =>
@@ -576,16 +582,16 @@ const ZH: Dict = {
   },
   intake: {
     heading: (folder) => <>把你的 {folder} 文件夹拖到这里</>,
-    headingTouch: "先在这里试试，真数据请在开发机上打开",
+    headingTouch: "把你的 AI 账单画出来",
     lede: "把 AI 账单画出来：每个工具、每条子命令、每一块钱。",
+    ledeTouch: "每个工具、每条子命令、每一块钱，都从你的 Claude Code 会话记录里读出来。",
     choose: "选择文件夹",
     example: "查看示例",
     hidden: "这个文件夹是隐藏的",
-    yours: "你自己的记录",
+    yours: "想看自己的账单",
     yoursBody: (
       <>
-        它们在你运行 Claude Code 的那台机器的 <code>~/.claude/projects</code>{" "}
-        里。在那台机器上打开本页即可读取。
+        在你运行 Claude Code 的那台机器上打开本页，然后选择 <code>~/.claude/projects</code>。
       </>
     ),
     osTip: (current, next) => `不是 ${current}？点一下切到 ${next} 的说明。`,
@@ -895,16 +901,18 @@ const JA: Dict = {
   },
   intake: {
     heading: (folder) => <>{folder} フォルダをここにドロップ</>,
-    headingTouch: "ここで試して、自分のデータは開発マシンで",
+    headingTouch: "AI の請求を図にする",
     lede: "AI の請求を図にする：すべてのツール、すべてのサブコマンド、すべてのドル。",
+    ledeTouch:
+      "すべてのツール、すべてのサブコマンド、すべてのドルを、Claude Code のセッション記録から読み取ります。",
     choose: "フォルダを選ぶ",
     example: "サンプルを見る",
     hidden: "このフォルダは隠されています",
-    yours: "あなた自身の記録",
+    yours: "自分の請求を見るには",
     yoursBody: (
       <>
-        Claude Code を動かしているマシンの <code>~/.claude/projects</code>{" "}
-        にあります。そのマシンでこのページを開いてください。
+        Claude Code を動かしているマシンでこのページを開き、<code>~/.claude/projects</code>{" "}
+        を選んでください。
       </>
     ),
     osTip: (current, next) => `${current} ではない？押すと ${next} の手順に切り替わります。`,
@@ -1225,16 +1233,18 @@ const ES: Dict = {
   },
   intake: {
     heading: (folder) => <>Suelta aquí tu carpeta {folder}</>,
-    headingTouch: "Pruébalo aquí, ábrelo en tu máquina de trabajo",
+    headingTouch: "Visualiza tu factura de IA",
     lede: "Grafica tu factura de IA: cada herramienta, cada subcomando, cada dólar.",
+    ledeTouch:
+      "Cada herramienta, cada subcomando, cada dólar, leídos de tus sesiones de Claude Code.",
     choose: "Elegir carpeta",
     example: "Ver un ejemplo",
     hidden: "La carpeta está oculta",
-    yours: "Tus propias transcripciones",
+    yours: "Para ver la tuya",
     yoursBody: (
       <>
-        Están en <code>~/.claude/projects</code>, en la máquina donde ejecutas Claude Code. Abre
-        esta página allí para leerlas.
+        Abre esta página en la máquina donde ejecutas Claude Code y elige la carpeta{" "}
+        <code>~/.claude/projects</code>.
       </>
     ),
     osTip: (current, next) => `¿No usas ${current}? Pulsa para la ruta de ${next}.`,
@@ -1558,16 +1568,18 @@ const FR: Dict = {
   },
   intake: {
     heading: (folder) => <>Déposez ici votre dossier {folder}</>,
-    headingTouch: "Essayez ici, ouvrez la page sur votre machine de dev",
+    headingTouch: "Visualisez votre facture d’IA",
     lede: "Cartographiez votre facture d’IA : chaque outil, chaque sous-commande, chaque dollar.",
+    ledeTouch:
+      "Chaque outil, chaque sous-commande, chaque dollar, lus dans vos sessions Claude Code.",
     choose: "Choisir un dossier",
     example: "Voir un exemple",
     hidden: "Le dossier est masqué",
-    yours: "Vos propres transcriptions",
+    yours: "Pour voir la vôtre",
     yoursBody: (
       <>
-        Elles sont dans <code>~/.claude/projects</code>, sur la machine où vous lancez Claude Code.
-        Ouvrez cette page là-bas pour les lire.
+        Ouvrez cette page sur la machine où vous lancez Claude Code, puis choisissez le dossier{" "}
+        <code>~/.claude/projects</code>.
       </>
     ),
     osTip: (current, next) => `Pas ${current} ? Appuyez pour la marche à suivre ${next}.`,
@@ -1890,16 +1902,18 @@ const DE: Dict = {
   },
   intake: {
     heading: (folder) => <>Lege deinen Ordner {folder} hier ab</>,
-    headingTouch: "Hier ausprobieren, am Entwicklungsrechner öffnen",
+    headingTouch: "Visualisiere deine KI-Rechnung",
     lede: "Zeichne deine KI-Rechnung: jedes Tool, jedes Unterkommando, jeden Dollar.",
+    ledeTouch:
+      "Jedes Tool, jedes Unterkommando, jeden Dollar — gelesen aus deinen Claude-Code-Sitzungen.",
     choose: "Ordner wählen",
     example: "Beispiel ansehen",
     hidden: "Der Ordner ist versteckt",
-    yours: "Deine eigenen Transkripte",
+    yours: "Für deine eigene Rechnung",
     yoursBody: (
       <>
-        Sie liegen in <code>~/.claude/projects</code>, auf dem Rechner, auf dem du Claude Code
-        ausführst. Öffne diese Seite dort, um sie zu lesen.
+        Öffne diese Seite auf dem Rechner, auf dem du Claude Code ausführst, und wähle den Ordner{" "}
+        <code>~/.claude/projects</code>.
       </>
     ),
     osTip: (current, next) => `Nicht ${current}? Drücken für den Weg unter ${next}.`,

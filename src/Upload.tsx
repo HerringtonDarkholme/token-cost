@@ -586,8 +586,10 @@ export function Intake({
             one folder is a single pick that catches everything under it. Loose files dragged in
             still work -- the filter above does not care how they arrived -- there is just no
             longer a button that recommends it. */}
-        {/* Where a folder is unlikely to be droppable, the heading is the two-step instead: have a
-            look here, come back at the machine that has the folder. */}
+        {/* Where a folder is unlikely to be droppable, the heading names the page instead of asking
+            for something the reader cannot hand over -- being sent to a desktop is only worth
+            reading once you know what is waiting there, and that note is at the foot of the
+            card. */}
         <h2>
           {HANDHELD ? t.intake.headingTouch : t.intake.heading(<code>~/.claude/projects</code>)}
         </h2>
@@ -602,7 +604,7 @@ export function Intake({
             anything at all.
             What is left is a verb, the thing, and the three sizes the report actually resolves to.
             One line that fits on one line: a subtitle that wraps is a paragraph. */}
-        <p className="lede">{t.intake.lede}</p>
+        <p className="lede">{HANDHELD ? t.intake.ledeTouch : t.intake.lede}</p>
         {/* Two ways in rather than one. The folder is the real one and keeps the weight, but it
             is only open to a reader sitting at the machine Claude Code runs on -- on a phone
             there is no `~/.claude` to point at, and the page as it stood had nothing to show
