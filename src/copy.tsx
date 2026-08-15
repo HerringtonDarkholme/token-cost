@@ -262,13 +262,15 @@ const EN = {
     example: "Try an example",
     hidden: "The folder is hidden",
     /** The help a phone gets in place of the keystrokes: the one step that gets this reader their
-     *  own numbers. An instruction, not a claim about what the device has -- the page reads a
-     *  pointer type, and cannot see whether the folder is there. */
+     *  own numbers, and then the thing they can do without leaving the phone, because a note that
+     *  only sends the reader away leaves nothing to do here. An instruction, not a claim about
+     *  what the device has -- the page reads a pointer type, and cannot see whether the folder is
+     *  there. */
     yours: "To chart your own",
     yoursBody: (
       <>
         Open this page on the machine you run Claude Code on, and point it at{" "}
-        <code>~/.claude/projects</code>.
+        <code>~/.claude/projects</code>. Or preview the example bill above.
       </>
     ),
     osTip: (current: string, next: string): string =>
@@ -593,7 +595,10 @@ const ZH: Dict = {
     yours: "想看自己的账单",
     yoursBody: (
       <>
-        在你运行 Claude Code 的那台机器上打开本页，然后选择 <code>~/.claude/projects</code>。
+        {/* The break goes before the path, never after it: a line that starts with 。 puts a
+            space in front of a full stop. */}
+        在你运行 Claude Code 的那台机器上打开本页，然后选择 <code>~/.claude/projects</code>
+        。或者先看看上面的示例账单。
       </>
     ),
     osTip: (current, next) => `不是 ${current}？点一下切到 ${next} 的说明。`,
@@ -914,7 +919,7 @@ const JA: Dict = {
     yoursBody: (
       <>
         Claude Code を動かしているマシンでこのページを開き、<code>~/.claude/projects</code>{" "}
-        を選んでください。
+        を選んでください。または、上のサンプル請求を見てみてください。
       </>
     ),
     osTip: (current, next) => `${current} ではない？押すと ${next} の手順に切り替わります。`,
@@ -1246,7 +1251,7 @@ const ES: Dict = {
     yoursBody: (
       <>
         Abre esta página en la máquina donde ejecutas Claude Code y elige la carpeta{" "}
-        <code>~/.claude/projects</code>.
+        <code>~/.claude/projects</code>. O mira antes la factura de ejemplo de arriba.
       </>
     ),
     osTip: (current, next) => `¿No usas ${current}? Pulsa para la ruta de ${next}.`,
@@ -1581,7 +1586,7 @@ const FR: Dict = {
     yoursBody: (
       <>
         Ouvrez cette page sur la machine où vous lancez Claude Code, puis choisissez le dossier{" "}
-        <code>~/.claude/projects</code>.
+        <code>~/.claude/projects</code>. Ou prévisualisez la facture d’exemple ci-dessus.
       </>
     ),
     osTip: (current, next) => `Pas ${current} ? Appuyez pour la marche à suivre ${next}.`,
@@ -1915,7 +1920,7 @@ const DE: Dict = {
     yoursBody: (
       <>
         Öffne diese Seite auf dem Rechner, auf dem du Claude Code ausführst, und wähle den Ordner{" "}
-        <code>~/.claude/projects</code>.
+        <code>~/.claude/projects</code>. Oder sieh dir oben die Beispielrechnung an.
       </>
     ),
     osTip: (current, next) => `Nicht ${current}? Drücken für den Weg unter ${next}.`,
