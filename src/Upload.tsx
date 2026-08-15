@@ -38,15 +38,13 @@
 
 import { useId, useRef, useState, type ReactNode } from "react"
 import {
-  allocOne,
-  closeAlloc,
   billedSoFar,
-  closeScan,
-  openAlloc,
-  openScan,
+  closeWalk,
+  openWalk,
   report,
-  scanOne,
+  walkOne,
   type Analysis,
+  type Scanned,
 } from "./engine.ts"
 import { TextSwap } from "./Motion.tsx"
 import { Tip } from "./Tip.tsx"
@@ -336,14 +334,14 @@ const MAX_WRITE = 260
  *  the next name has started. */
 const MAX_SLIDE = 150
 
-/** How many names each pass puts up. A share of the folder rather than a count: a name goes up
- *  every `total / PER_PASS` files, so the stream starts with the first file, ends with the last,
+/** How many names the read puts up. A share of the folder rather than a count: a name goes up
+ *  every `total / NAMES` files, so the stream starts with the first file, ends with the last,
  *  and lasts exactly as long as the reading does -- whether that is a tenth of a second or a
  *  minute. Nothing is truncated, because nothing was promising to list them all. */
-const PER_PASS = 24
+const NAMES = 24
 
 /** How often the count is allowed to repaint. Sixty is four or five times a second, which reads
- *  as continuous, and it is the yield as much as the paint: the passes hand the frame back here,
+ *  as continuous, and it is the yield as much as the paint: the walk hands the frame back here,
  *  and this is the only reason the page can move while it works. */
 const PAINT = 60
 
@@ -354,20 +352,13 @@ interface Line {
   ms: number
 }
 
-/** Which pass is running, in the words the head says. Reading is pass 1 -- dedupe the sessions
- *  and calibrate; pricing is pass 2, which allocates every request's cost. Both walk every file,
- *  which is why both are worth a name: the second is not a spinner, it is half the work. */
-const VERB: Record<"read" | "price", string> = { read: "Reading", price: "Pricing" }
-
-/** How far the two passes have got, as the panel shows it. */
+/** How far the read has got, as the panel shows it. */
 interface Run {
   /** The pick this belongs to, so a second folder starts a fresh column. */
   id: number
-  phase: "read" | "price"
   done: number
   total: number
-  /** The names put up so far, oldest first. Both passes write into the one column: the work is
-   *  continuous, so the stream is. */
+  /** The names put up so far, oldest first. */
   lines: Line[]
 }
 
@@ -390,13 +381,12 @@ function Reading({ run }: { run: Run }): React.JSX.Element {
   return (
     <>
       {/* The verb stands where "The folder is hidden" stood, in the same mono caps on the same
-          line, and it is swapped rather than substituted when the second pass starts. The count
-          beside it is not announced: it changes hundreds of times, and a live region that says
-          every one of them is a live region nobody can use. */}
+          line, and there is only one of it now: reading and pricing are one walk, so a label
+          that changed halfway would be describing two things that are not two. The count beside
+          it is not announced: it changes hundreds of times, and a live region that says every
+          one of them is a live region nobody can use. */}
       <div className="foundhead">
-        <span className="foundlbl" aria-live="polite">
-          <TextSwap token={run.phase}>{VERB[run.phase]}</TextSwap>
-        </span>
+        <span className="foundlbl">Reading</span>
         {/* Padded rather than left to grow, so a count on its way to three digits does not shunt
             the line about underneath itself. `white-space: pre` is what keeps the padding. */}
         <span className="foundnum">
@@ -450,8 +440,8 @@ export function Intake({
 }: {
   onData: (data: Analysis) => void
   /** The bill so far, handed up on the beat the panel repaints, for the figure in the header
-   *  to count towards. Nothing is reported through it during pass 1 -- that pass calibrates
-   *  and prices nothing -- so the figure holds at zero until the pricing walk starts. */
+   *  to count towards. It starts moving on the first file and stops on the last, because the
+   *  total is the one number the walk never had to wait for a constant to know. */
   onTally: (usd: number) => void
 }): React.JSX.Element {
   const [err, setErr] = useState<ReactNode>(null)
@@ -523,40 +513,36 @@ export function Intake({
     const id = ++picks.current
     /* Empty, and up before a byte has been read: the panel is the answer to the pick, and the
        first file is not always quick. A prompt blinking over nothing read yet is the truth. */
-    setRun({ id, phase: "read", done: 0, total: files.length, lines: [] })
+    setRun({ id, done: 0, total: files.length, lines: [] })
     /* Back to zero with the panel, not with the first priced file: a second pick has to start
        its count where the first one started, or the figure would appear to carry over. */
     onTally(0)
     setBusy(true)
 
-    /* Both passes are driven from here rather than handed the corpus, which is the whole shape of
-       this: `openScan`/`openAlloc` take one file at a time, so the page holds one transcript
-       instead of the whole folder, and gets the frame back between them. That is what makes the
-       panel able to say something true -- the count is files actually finished, and a name goes up
-       because a file was actually read.
+    /* The walk is driven from here rather than handed the corpus, which is the whole shape of
+       this: `walkOne` takes one file at a time, so the page holds one transcript instead of the
+       whole folder, and gets the frame back between them. That is what makes the panel able to
+       say something true -- the count is files actually finished, and a name goes up because a
+       file was actually read.
 
-       What it costs is reading each file twice: pass 1 calibrates against the whole corpus before
-       pass 2 can price anything, and nothing keeps the text. Bytes off a disk are cheap next to a
-       few hundred megabytes of string resident at once. */
+       One walk, not two. The engine used to calibrate on a first pass and price on a second,
+       which meant every transcript was read off the disk and parsed twice while the figure in
+       the header had nothing to show for the first half of it. The bill needs no calibration --
+       see `billedSoFar` -- so it is exact from the first file, and what the second pass was for
+       is now a beat at the end that walks nothing. */
     const lines: Line[] = []
-    const every = Math.max(1, Math.ceil(files.length / PER_PASS))
+    const every = Math.max(1, Math.ceil(files.length / NAMES))
     let wrote = performance.now()
     let painted = 0
 
     /** One file done. Puts a name up when this is one of the files whose turn it is, repaints if
      *  it has been long enough, and hands the frame back when it does. */
-    const step = async (
-      phase: Run["phase"],
-      i: number,
-      total: number,
-      name: string,
-      tally?: number,
-    ): Promise<void> => {
+    const step = async (i: number, total: number, name: string, tally: number): Promise<void> => {
       const now = performance.now()
       const last = i + 1 >= total
       if (i % every === 0 || last) {
         lines.push({
-          key: `${phase}${i}`,
+          key: `f${i}`,
           name,
           /* Written in the time it took to get here, so the caret runs at the speed of the work.
              Clamped at both ends: a folder on a fast disk would be a flicker, a slow one would
@@ -567,44 +553,41 @@ export function Intake({
       }
       if (now - painted < PAINT && !last) return
       painted = now
-      setRun({ id, phase, done: i + 1, total, lines: [...lines] })
+      setRun({ id, done: i + 1, total, lines: [...lines] })
       /* On the repaint beat rather than per file: the figure is one more thing drawn in the
          gap this leaves, and a folder of several hundred transcripts would otherwise ask the
          header to re-render several hundred times for digits nobody could read going past. */
-      if (tally !== undefined) onTally(tally)
+      onTally(tally)
       // The yield. Everything the panel does, it does in the gaps this leaves.
       await new Promise((r) => setTimeout(r, 0))
     }
 
-    /* oxlint-disable no-await-in-loop -- awaiting each file in turn is the point of both loops
-       rather than an oversight in them. `Promise.all` over the reads is what this replaced: it
+    /* oxlint-disable no-await-in-loop -- awaiting each file in turn is the point of the loop
+       rather than an oversight in it. `Promise.all` over the reads is what this replaced: it
        resolves with every transcript in the folder held at once, which for a real store is a few
        hundred megabytes of string and twice that in memory, and it hands the page a single
        uninterruptible block of work at the end. One at a time costs wall-clock and buys back the
-       memory and the frame. A block rather than two line comments, since which line the `await`
+       memory and the frame. A block rather than a line comment, since which line the `await`
        lands on is the formatter's to decide. */
-    const sc = openScan()
-    const kept: Picked[] = []
+    const w = openWalk()
     try {
       for (const [i, p] of files.entries()) {
-        const text = await p.file.text()
-        if (scanOne(sc, { name: p.file.name, text })) kept.push(p)
-        await step("read", i, files.length, p.file.name)
+        walkOne(w, { name: p.file.name, text: await p.file.text() })
+        await step(i, files.length, p.file.name, billedSoFar(w))
       }
     } catch (e) {
       stop(`Could not read the files: ${(e as Error).message}`)
       return
     }
-    const scanned = closeScan(sc)
 
-    let data: Analysis
+    let data: Analysis, scanned: Scanned
     try {
-      const al = openAlloc(scanned)
-      for (const [i, p] of kept.entries()) {
-        allocOne(al, { name: p.file.name, text: await p.file.text() })
-        await step("price", i, kept.length, p.file.name, billedSoFar(al))
-      }
-      data = report(scanned, closeAlloc(al))
+      /* The one place the whole corpus is spoken for at once, and it walks no transcripts:
+         the densities are fitted, the dispatchers are judged, and everything the read held
+         back is scored against them. */
+      const closed = closeWalk(w)
+      scanned = closed.scanned
+      data = report(scanned, closed.alloc)
     } catch (e) {
       stop(`Analysis failed: ${(e as Error).message}`)
       console.error(e)
@@ -640,7 +623,7 @@ export function Intake({
       return
     }
     /* oxlint-enable no-await-in-loop */
-    /* Handed over only once both passes are done, so the card's turn plays against a free main
+    /* Handed over only once the walk is done and scored, so the card's turn plays against a free main
        thread rather than against the tail of the work. */
     onData(data)
   }

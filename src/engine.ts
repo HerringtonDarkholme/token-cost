@@ -17,13 +17,12 @@
  *      builtins, the Anthropic rate card, the transcript schema). It is never a list
  *      of the things one particular author happens to use.
  *
- * PASSES. Both walks are fed one file at a time -- open, one per file, close -- because a folder
+ * ONE PASS. The walk is fed one file at a time -- open, one per file, close -- because a folder
  * of transcripts is bigger than a page should hold at once, and because a caller that gets the
  * frame back between files can say where it has got to. analyze() is the same thing in one call
  * for callers that already hold everything.
- *   openScan/scanOne/closeScan   -- cheap: calibrate chars-per-token, learn which programs
- *                                   dispatch subcommands, dedupe sessions.
- *   openAlloc/allocOne/closeAlloc-- full walk: build the per-key cost accumulators.
+ *   openWalk/walkOne/closeWalk -- read each transcript exactly once; see `the walk`.
+ *   billedSoFar()-- the running total, mid-walk, for a caller that wants to show it.
  *   price()      -- O(keys), so any TTL assumption or rate card is free to re-apply.
  *   buildTree()  -- decides direction splits and grouping from the measured costs.
  *   report()     -- arithmetic on the accumulators; walks nothing.
@@ -186,7 +185,7 @@ export function resolveRate(model: unknown): RateResolution {
 /* ------------------------------------------------------- shell interpretation --
  * The sets below are the shell language, not a taste list: POSIX special builtins
  * and reserved words. Everything program-specific (which commands take subcommands,
- * which ones matter) is learned from the corpus in pass 1.
+ * which ones matter) is learned from the corpus as it is read.
  */
 const KEYWORDS = new Set([
   "for",
@@ -382,7 +381,7 @@ export function splitSegments(cmd: string): string[] {
 }
 
 /** Could this word be a subcommand verb? A bare lowercase-ish token -- not a flag,
- *  path, filename, number, URL or variable. Whether it IS one is decided by pass 1. */
+ *  path, filename, number, URL or variable. Whether it IS one is decided by the corpus. */
 function isVerbShaped(w: string): boolean {
   return (
     !!w &&
@@ -443,24 +442,30 @@ export function resolveSegment(seg: string): Segment | null {
 }
 
 /** Every (program, candidate-verb) pair a Bash invocation contains -- the raw material
- *  pass 1 aggregates to learn which programs actually dispatch subcommands. */
+ *  the walk aggregates to learn which programs actually dispatch subcommands. */
 export function shellCandidates(cmd: string): Segment[] {
   return splitSegments(cmd)
     .map(resolveSegment)
     .filter((s): s is Segment => s !== null)
 }
 
+/** Which segment of a command line is doing the real work. Lowest rank wins, and the first
+ *  of a tie: a pipeline's payload is the thing that is not a builtin. */
+function pickSegment(cands: readonly Segment[]): Segment | null {
+  let pick: Segment | null = null
+  for (const c of cands) if (!pick || c.rank < pick.rank) pick = c
+  return pick
+}
+
 /** Label an invocation: pick the segment doing real work, then apply the learned
  *  vocabulary to decide whether its second token is a subcommand.
- *  @param dispatchers programs pass 1 observed dispatching subcommands */
+ *  @param dispatchers programs the walk observed dispatching subcommands */
 export function labelShell(
   cmd: string,
   dispatchers?: Set<string> | null,
 ): { prog: string; verb: string | null } {
-  const cands = shellCandidates(cmd)
-  if (!cands.length) return { prog: "(no command)", verb: null }
-  let pick = cands[0]
-  for (const c of cands) if (c.rank < pick.rank) pick = c // lowest rank wins
+  const pick = pickSegment(shellCandidates(cmd))
+  if (!pick) return { prog: "(no command)", verb: null }
   const verb = pick.verb && dispatchers && dispatchers.has(pick.prog) ? pick.verb : null
   return { prog: pick.prog, verb }
 }
@@ -729,23 +734,36 @@ export function classifyUserBlock(text: string, rec?: TranscriptRecord): UserSpa
   return out
 }
 
-/** A tool's input often carries a natural sub-key. Detected by FIELD SHAPE, not by
- *  tool name, so it works for a shell tool or file tool nobody has registered:
- *    - a `command`-ish string  -> the program (and subcommand) it runs
+/** What a tool call says about itself. Detected by FIELD SHAPE, not by tool name, so it works
+ *  for a shell tool or file tool nobody has registered:
+ *    - a `command`-ish string  -> the program it runs, and the word after it
  *    - a path-ish string       -> the file extension
- *  Returns {sub, shell} where shell marks command-running tools. */
+ *
+ *  `verb` is that word after the program, and it stays a *candidate*: whether it is a
+ *  subcommand or an operand is a question about the whole corpus, and the corpus has not been
+ *  read yet when this is asked. See `Slot`.
+ *
+ *  `cands` is the raw material for that same question -- every (program, candidate verb) pair
+ *  in the command line -- handed back rather than left to be recomputed, because the walk needs
+ *  both answers about the same string and splitting a command line is not free. */
 const PATH_FIELDS = ["file_path", "filePath", "path", "notebook_path", "notebookPath", "file"]
-function subKeyOf(
-  input: unknown,
-  dispatchers?: Set<string> | null,
-): { sub: string | null; shell: boolean } {
-  if (!input || typeof input !== "object") return { sub: null, shell: false }
+interface ToolKey {
+  sub: string | null
+  verb: string | null
+  shell: boolean
+  cands: readonly Segment[]
+}
+const NO_KEY: ToolKey = { sub: null, verb: null, shell: false, cands: [] }
+function readTool(input: unknown): ToolKey {
+  if (!input || typeof input !== "object") return NO_KEY
   const rec = input as Record<string, unknown>
   for (const f of ["command", "cmd", "script", "shell_command"]) {
     const v = rec[f]
     if (typeof v === "string" && v.trim()) {
-      const { prog, verb } = labelShell(v, dispatchers)
-      return { sub: verb ? prog + " " + verb : prog, shell: true }
+      const cands = shellCandidates(v)
+      const pick = pickSegment(cands)
+      if (!pick) return { sub: "(no command)", verb: null, shell: true, cands }
+      return { sub: pick.prog, verb: pick.verb, shell: true, cands }
     }
   }
   for (const f of PATH_FIELDS) {
@@ -754,10 +772,10 @@ function subKeyOf(
       const base = v.split(/[\\/]/).pop() || ""
       const dot = base.lastIndexOf(".")
       const ext = dot > 0 ? base.slice(dot).toLowerCase() : "(no extension)"
-      return { sub: ext.length <= 12 ? "*" + ext : "(other)", shell: false }
+      return { sub: ext.length <= 12 ? "*" + ext : "(other)", verb: null, shell: false, cands: [] }
     }
   }
-  return { sub: null, shell: false }
+  return NO_KEY
 }
 
 /** Display name for a tool. MCP's `mcp__<server>__<tool>` is a protocol convention,
@@ -768,11 +786,40 @@ export function toolDisplay(tool: string): string {
   return p.length >= 3 ? `${p[1]} · ${p.slice(2).join("__")}` : tool
 }
 
-/* --------------------------------------------------------------------- pass 1 --
- * Cheap scan: dedupe sessions, calibrate chars-per-token, learn which programs
- * dispatch subcommands.
+/* ------------------------------------------------------------------- the walk --
+ * One pass. Every transcript is opened once, parsed once, and let go of.
+ *
+ * It used to be two, and the second one existed for two constants. A first pass calibrated
+ * chars-per-token and learned which programs dispatch subcommands; a second re-read every file
+ * to spend them. That is the folder off the disk twice and -- far more expensive -- a few
+ * hundred megabytes of JSON.parse twice, to reach numbers the first walk had already gone past.
+ *
+ * What actually needs the calibration is only the SPLIT. The bill itself is arithmetic on
+ * `usage` and a published rate: it needs no constant this file fits, so it is added up as the
+ * files go by and is exact from the first one -- which is what lets a caller show a total that
+ * climbs while the folder is being read, rather than a figure that sits at nothing until the
+ * end. What is deferred is the attribution, and it is deferred as measurements rather than as
+ * text: each piece of content that enters a context keeps its bucket and its character count,
+ * and each request keeps what it cost and how big the context it paid for was. Nothing else is
+ * kept, and the transcript is dropped at the end of the file it came out of.
+ *
+ * That held half is smaller than what it came from by two orders of magnitude. Measured on a
+ * real store: 363MB of transcript leaves about 96,000 of these records and 10MB of memory at
+ * the end of the read. So reading the folder once and holding the measurements beats reading it
+ * twice and holding nothing.
  */
 const SESSION_RE = /"sessionId"\s*:\s*"([^"]+)"/
+
+/** A copy of `s` that no longer points at whatever it was cut out of.
+ *
+ *  A substring is a VIEW, not a copy: V8 records it as a pointer to the original string and two
+ *  offsets. So keeping a 36-character session id out of a transcript keeps the whole
+ *  megabyte the id was found in, and keeping one per file keeps the folder -- which is exactly
+ *  what a walk that holds one transcript at a time is written to avoid. Measured on a real
+ *  store: 331 files, 363MB of text, all of it still resident at the end of the read because a
+ *  `Set` of ids was holding it. Concatenating and re-slicing forces the characters to be
+ *  copied, and the transcript goes when the file does. */
+const detach = (s: string): string => (" " + s).slice(1)
 
 /* Which programs dispatch subcommands is LEARNED, because any list of them is a list of
  * one author's toolchain. Three properties separate a real multiplexer from a program
@@ -796,9 +843,9 @@ const DISPATCH_MIN_CALLS = 5,
   DISPATCH_MIN_COVERAGE = 0.6,
   DISPATCH_MAX_RATIO = 0.5
 
-/** What pass 1 learned: how many files were worth reading, and the constants pass 2 needs.
- *  A count rather than the files themselves, because holding them is the thing this is written
- *  to avoid -- see `openScan`. */
+/** What the corpus turned out to be: how many files were worth reading, and the constants that
+ *  could not be known until all of them had been. A count rather than the files themselves,
+ *  because holding them is the thing this is written to avoid -- see the walk, above. */
 export interface Scanned {
   filesUsed: number
   duplicatesDropped: number
@@ -809,18 +856,58 @@ export interface Scanned {
   densityCalibrated: boolean
 }
 
-/** Pass 1, mid-flight.
+/** A bucket the walk has met, and the one thing about it the walk cannot settle: whether the
+ *  word after a program is a subcommand or an operand, which is a question about the corpus
+ *  rather than about the call. Slots are interned, so a hundred thousand context additions
+ *  carry an index each rather than a record each. */
+interface Slot {
+  rec: Bucket
+  /** The candidate subcommand, or `null` where there is no question to answer. */
+  verb: string | null
+}
+
+/** Content that entered a context, held until there is a density to size it with: which slot
+ *  it belongs to, how much of it there was, and what that measurement is in. Characters,
+ *  except for images -- they bill by pixel dimensions, so they arrive already in tokens. */
+interface Add {
+  slot: number
+  amt: number
+  cls: "code" | "text" | "tokens"
+}
+
+/** A request that was billed. What it cost is already exact; what it cost *for* is not, so the
+ *  context it paid for is recorded as a position in the file's additions rather than as a
+ *  share of anything. The output split is held as characters for the same reason the input is. */
+interface Charge {
+  /** How many of the file's additions were in context when this request was made. */
+  at: number
+  ctxTokens: number
+  /** TTL-invariant input cost, TTL-dependent input cost, output cost. */
+  f: number
+  v: number
+  outCost: number
+  /** Output tokens, which is what the split of the output cost is a split of. */
+  outTokens: number
+  proseChars: number
+  argsChars: number
+}
+
+/** One file's half of the deferral. Per file, because a context is per session: the map the
+ *  additions build up is thrown away at the end of each one. */
+interface Held {
+  adds: Add[]
+  charges: Charge[]
+}
+
+/** The walk, mid-flight.
  *
- *  Both passes are fed one file at a time rather than handed the corpus, and that is the whole
- *  point of them being shaped this way: a few hundred megabytes of transcript is a few hundred
- *  megabytes of JavaScript string, twice that in memory, and reading the lot before starting
- *  means the page holds all of it while it works. Fed a file at a time, it holds one -- and the
- *  caller gets the event loop back between them, which is what lets a progress display be
- *  something other than a lie.
- *
- *  What it costs is a second read of each file for pass 2, since nothing keeps the text. That is
- *  the trade: bytes off the disk twice against every byte of the folder resident at once. */
-export interface Scan {
+ *  It is fed one file at a time rather than handed the corpus, and that is the whole point of
+ *  it being shaped this way: a few hundred megabytes of transcript is a few hundred megabytes
+ *  of JavaScript string, twice that in memory, and reading the lot before starting means the
+ *  page holds all of it while it works. Fed a file at a time it holds one -- and the caller
+ *  gets the event loop back between them, which is what lets a progress display be something
+ *  other than a lie. */
+export interface Walk {
   seen: Set<string>
   /** prog -> {calls, withVerb, set:Set<verb>} */
   verbs: Map<string, { calls: number; withVerb: number; set: Set<string> }>
@@ -829,9 +916,45 @@ export interface Scan {
   filesUsed: number
   duplicatesDropped: number
   badLines: number
+  /** The interned buckets, and the index each one was given. */
+  slots: Slot[]
+  slotAt: Map<string, number>
+  /** What each file left to be scored once the corpus had been read. */
+  held: Held[]
+  /* Everything below needs no calibration, so it is final the moment the file is read. */
+  billed: { f: number; v: number; out: number }
+  /** raw id -> {n, basis, rate} */
+  models: Map<string, ModelSighting>
+  /** raw id -> requests skipped from pricing */
+  unpriced: Map<string, number>
+  ttl: TtlTokens
+  requests: number
+  sessions: number
+  sidechainRequests: number
+  tMin: number | null
+  tMax: number | null
+  firstCtx: number[]
 }
 
-export function openScan(): Scan {
+/** The preamble -- system prompt and tool schemas -- is slot 0. It is the one bucket that is
+ *  not measured from anything in the transcript, so nothing can add to it and it needs no
+ *  interning; every file's first request finds it already there. */
+const PRE_REC: Bucket = { role: "preamble" }
+const PRE_SLOT = 0
+
+/** The three things output is split into. Fixed buckets, so their keys are worth having once. */
+const OUT_RECS: readonly Bucket[] = [
+  { role: "assistant", kind: "thinking" },
+  { role: "assistant", kind: "prose" },
+  { role: "assistant", kind: "tool-args" },
+]
+const OUT_KEYS = OUT_RECS.map(keyOf)
+
+/** A slot is a bucket plus its unanswered question, so it is keyed by both. The separator is
+ *  the one character a tool name, a path or a program cannot contain. */
+const slotKey = (rec: Bucket, verb: string | null): string => keyOf(rec) + "\u0000" + (verb || "")
+
+export function openWalk(): Walk {
   return {
     seen: new Set(),
     verbs: new Map(),
@@ -839,15 +962,53 @@ export function openScan(): Scan {
     filesUsed: 0,
     duplicatesDropped: 0,
     badLines: 0,
+    slots: [{ rec: PRE_REC, verb: null }],
+    slotAt: new Map([[slotKey(PRE_REC, null), PRE_SLOT]]),
+    held: [],
+    billed: { f: 0, v: 0, out: 0 },
+    models: new Map(),
+    unpriced: new Map(),
+    ttl: { "1h": 0, "5m": 0, unknown: 0 },
+    requests: 0,
+    sessions: 0,
+    sidechainRequests: 0,
+    tMin: null,
+    tMax: null,
+    firstCtx: [],
   }
 }
 
-/** Scan one file into `st`. `false` means it was a duplicate of one already scanned and pass 2
- *  must skip it too -- which is why the answer goes back to the caller rather than being kept
- *  here: the caller is the one holding the handles it would have to read again. */
-export function scanOne(st: Scan, f: RawFile): boolean {
+/** Note content that has entered the context. Nothing is sized here -- that is the point --
+ *  but nothing empty is kept either: a block of no characters costs nothing under any density,
+ *  and a transcript is full of them. */
+function hold(
+  st: Walk,
+  h: Held,
+  rec: Bucket,
+  verb: string | null,
+  amt: number,
+  cls: Add["cls"],
+): void {
+  if (!(amt > 0)) return
+  const k = slotKey(rec, verb)
+  let slot = st.slotAt.get(k)
+  if (slot === undefined) {
+    slot = st.slots.length
+    st.slots.push({ rec, verb })
+    st.slotAt.set(k, slot)
+  }
+  h.adds.push({ slot, amt, cls })
+}
+
+/** Read one file into `st`. `false` means it was a duplicate of one already read -- the answer
+ *  goes back to the caller because the caller is the one keeping count of what it handed over.
+ *
+ *  Two jobs at once, on one parse of each line: what this file *costs*, which is exact, and
+ *  what it *teaches* -- the calibration samples and the dispatcher vote -- which is only worth
+ *  anything once every other file has voted too. */
+export function walkOne(st: Walk, f: RawFile): boolean {
   const m = SESSION_RE.exec(f.text || "")
-  const id = (m ? m[1] : f.name) + "::" + (f.text || "").length
+  const id = detach((m ? m[1] : f.name) + "::" + (f.text || "").length)
   if (st.seen.has(id)) {
     st.duplicatesDropped++
     return false
@@ -855,104 +1016,238 @@ export function scanOne(st: Scan, f: RawFile): boolean {
   st.seen.add(id)
   st.filesUsed++
 
-  const { verbs, S } = st
-  {
-    let prevTokens: number | null = null,
-      prevOut = 0,
-      codeChars = 0,
-      textChars = 0,
-      dirty = false
-    for (const line of f.text.split("\n")) {
-      const s = line.trim()
-      if (!s) continue
-      let rec: TranscriptRecord
-      try {
-        rec = JSON.parse(s) as TranscriptRecord
-      } catch {
-        st.badLines++
-        continue
-      }
-      const msg = rec && rec.message
-      if (!msg || typeof msg !== "object") continue
-      let content: ContentBlock[]
-      if (typeof msg.content === "string") content = [{ type: "text", text: msg.content }]
-      else if (Array.isArray(msg.content)) content = msg.content as ContentBlock[]
-      else content = []
+  const { verbs, S, billed, models, unpriced, ttl, firstCtx } = st
+  const h: Held = { adds: [], charges: [] }
+  st.held.push(h)
 
-      if (msg.role === "assistant") {
-        const u = msg.usage || {}
-        const tokens =
-          (u.input_tokens || 0) +
-          (u.cache_read_input_tokens || 0) +
-          (u.cache_creation_input_tokens || 0)
-        if (tokens) {
-          // Δcontext − previous output_tokens == tokens for the user-side content we
-          // can actually measure. Anything invisible is accounted for by the first term.
-          const chars = codeChars + textChars
-          if (prevTokens !== null && !dirty && chars > 400) {
-            const y = tokens - prevTokens - prevOut
-            // Keep only physically plausible observations; a delta outside this band
-            // means the prefix was rewritten, not appended to.
-            if (y > 50 && chars / y >= CPT_MIN / 2 && chars / y <= CPT_MAX * 2) {
-              const c = codeChars,
-                t = textChars
-              S.cc += c * c
-              S.ct += c * t
-              S.tt += t * t
-              S.cy += c * y
-              S.ty += t * y
-              S.yy += y * y
-              S.code += c
-              S.text += t
-              S.tok += y
-              S.n++
-            }
+  /* Per file, and thrown away with it: what the calibration is measuring across the interval
+     between two requests, what the tool calls in this session were called, and whether this
+     session has been counted yet. */
+  let prevTokens: number | null = null,
+    prevOut = 0,
+    codeChars = 0,
+    textChars = 0,
+    dirty = false,
+    sawRequest = false
+  const toolOf = new Map<
+    string,
+    { tool: string; sub: string | null; verb: string | null; shell: boolean }
+  >()
+
+  for (const line of f.text.split("\n")) {
+    const s = line.trim()
+    if (!s) continue
+    let rec: TranscriptRecord
+    try {
+      rec = JSON.parse(s) as TranscriptRecord
+    } catch {
+      st.badLines++
+      continue
+    }
+    if (typeof rec.timestamp === "string") {
+      const t = Date.parse(rec.timestamp)
+      if (!isNaN(t)) {
+        if (st.tMin === null || t < st.tMin) st.tMin = t
+        if (st.tMax === null || t > st.tMax) st.tMax = t
+      }
+    }
+    const msg = rec.message
+    if (!msg || typeof msg !== "object") continue
+    let content: ContentBlock[]
+    if (typeof msg.content === "string") content = [{ type: "text", text: msg.content }]
+    else if (Array.isArray(msg.content)) content = msg.content as ContentBlock[]
+    else content = []
+
+    if (msg.role === "assistant") {
+      const u = msg.usage || {}
+      const inp = u.input_tokens || 0
+      const cr = u.cache_read_input_tokens || 0
+      const cw = u.cache_creation_input_tokens || 0
+      const out = u.output_tokens || 0
+      const ctxTokens = inp + cr + cw
+
+      if (ctxTokens) {
+        // Δcontext − previous output_tokens == tokens for the user-side content we
+        // can actually measure. Anything invisible is accounted for by the first term.
+        const chars = codeChars + textChars
+        if (prevTokens !== null && !dirty && chars > 400) {
+          const y = ctxTokens - prevTokens - prevOut
+          // Keep only physically plausible observations; a delta outside this band
+          // means the prefix was rewritten, not appended to.
+          if (y > 50 && chars / y >= CPT_MIN / 2 && chars / y <= CPT_MAX * 2) {
+            const c = codeChars,
+              t = textChars
+            S.cc += c * c
+            S.ct += c * t
+            S.tt += t * t
+            S.cy += c * y
+            S.ty += t * y
+            S.yy += y * y
+            S.code += c
+            S.text += t
+            S.tok += y
+            S.n++
           }
-          prevTokens = tokens
-          prevOut = u.output_tokens || 0
-          codeChars = 0
-          textChars = 0
-          dirty = false
         }
+        prevTokens = ctxTokens
+        prevOut = out
+        codeChars = 0
+        textChars = 0
+        dirty = false
+      }
+
+      const { rate, basis } = resolveRate(msg.model)
+      if (msg.model) {
+        const e = models.get(msg.model) || { n: 0, basis, rate }
+        e.n++
+        models.set(msg.model, e)
+      }
+
+      if (rate && ctxTokens) {
+        st.requests++
+        if (rec.isSidechain === true) st.sidechainRequests++
+        if (!sawRequest) {
+          st.sessions++
+          sawRequest = true
+          firstCtx.push(ctxTokens)
+        }
+        const [pIn, pOut] = rate
+
+        // The transcript records the cache-write TTL split per request. Use it, and
+        // only fall back to an assumed multiplier for the residual it omits.
+        const cc =
+          u.cache_creation && typeof u.cache_creation === "object" ? u.cache_creation : null
+        let w1 = 0,
+          w5 = 0
+        if (cc) {
+          w1 = cc.ephemeral_1h_input_tokens || 0
+          w5 = cc.ephemeral_5m_input_tokens || 0
+          if (w1 + w5 > cw) {
+            const k = cw / (w1 + w5)
+            w1 *= k
+            w5 *= k
+          } // trust the total
+        }
+        const wUnknown = Math.max(0, cw - w1 - w5)
+        ttl["1h"] += w1
+        ttl["5m"] += w5
+        ttl.unknown += wUnknown
+
+        const fixedIn =
+          (inp * pIn +
+            cr * pIn * CACHE_READ_MULT +
+            w1 * pIn * CACHE_WRITE_MULT["1h"] +
+            w5 * pIn * CACHE_WRITE_MULT["5m"]) /
+          1e6
+        const varIn = (wUnknown * pIn) / 1e6
+        const outCost = (out * pOut) / 1e6
+        billed.f += fixedIn
+        billed.v += varIn
+        billed.out += outCost
+
+        // What the output was spent on, in characters. Thinking text is not persisted (only
+        // a signature), so it is the remainder after the prose and tool arguments we can see
+        // -- which is a subtraction in tokens, and so has to wait for the density too.
+        let proseChars = 0,
+          argsChars = 0
         for (const b of content) {
           if (!b || typeof b !== "object") continue
-          if (b.type === "tool_use") {
-            const inp = b.input || {}
-            for (const fld of ["command", "cmd", "script", "shell_command"]) {
-              const cmd = inp[fld]
-              if (typeof cmd !== "string") continue
-              for (const c of shellCandidates(cmd)) {
-                if (c.rank !== 0) continue // builtins never dispatch
-                let e = verbs.get(c.prog)
-                if (!e) {
-                  e = { calls: 0, withVerb: 0, set: new Set() }
-                  verbs.set(c.prog, e)
-                }
-                e.calls++
-                if (c.verb) {
-                  e.withVerb++
-                  e.set.add(c.verb)
-                }
-              }
-              break
+          if (b.type === "text") proseChars += (b.text || "").length
+          else if (b.type === "tool_use") argsChars += JSON.stringify(b.input || {}).length
+        }
+        h.charges.push({
+          at: h.adds.length,
+          ctxTokens,
+          f: fixedIn,
+          v: varIn,
+          outCost,
+          outTokens: out,
+          proseChars,
+          argsChars,
+        })
+      } else if (ctxTokens && basis !== "synthetic") {
+        const model = msg.model || "(no model field)"
+        unpriced.set(model, (unpriced.get(model) || 0) + 1)
+      }
+
+      // This assistant message now becomes part of the context for later requests.
+      for (const b of content) {
+        if (!b || typeof b !== "object") continue
+        if (b.type === "text") {
+          hold(
+            st,
+            h,
+            { role: "assistant", kind: "prose-carried" },
+            null,
+            (b.text || "").length,
+            "text",
+          )
+        } else if (b.type === "thinking" || b.type === "redacted_thinking") {
+          hold(st, h, { role: "assistant", kind: "thinking-carried" }, null, charsOf(b), "text")
+        } else if (b.type === "tool_use") {
+          const tool = b.name || "(unnamed tool)"
+          const t = readTool(b.input)
+          // The dispatcher vote, from the same reading of the command line. Builtins never
+          // dispatch, so they are not asked.
+          for (const c of t.cands) {
+            if (c.rank !== 0) continue
+            let e = verbs.get(c.prog)
+            if (!e) {
+              e = { calls: 0, withVerb: 0, set: new Set() }
+              verbs.set(c.prog, e)
+            }
+            e.calls++
+            if (c.verb) {
+              e.withVerb++
+              e.set.add(c.verb)
             }
           }
+          if (b.id) toolOf.set(b.id, { tool, sub: t.sub, verb: t.verb, shell: t.shell })
+          hold(
+            st,
+            h,
+            { role: "tool", tool, dir: "call", sub: t.sub, shell: t.shell },
+            t.verb,
+            JSON.stringify(b.input || {}).length,
+            "code",
+          )
         }
-      } else if (msg.role === "user") {
-        // Compaction rewrites the prefix, so deltas across it are not calibration data.
-        if (rec.isCompactSummary === true) dirty = true
-        for (const b of content) {
-          if (!b || typeof b !== "object") {
-            textChars += charsOf(b)
-            continue
+      }
+    } else if (msg.role === "user") {
+      // Compaction rewrites the prefix, so deltas across it are not calibration data.
+      if (rec.isCompactSummary === true) dirty = true
+      for (const b of content) {
+        /* Two questions of the same block, and they are not the same question: what it is
+           worth is which bucket it belongs to, what it is *for* here is whether it is text
+           this file can measure against the token delta. An image is neither -- it is context
+           with no characters in it, so the interval it sits in stops being calibration data. */
+        const bt = b && typeof b === "object" ? b.type : "text"
+        if (bt === "tool_result") {
+          const chars = charsOf(b)
+          codeChars += chars
+          const t = (b.tool_use_id ? toolOf.get(b.tool_use_id) : undefined) || {
+            tool: "(unmatched tool result)",
+            sub: null,
+            verb: null,
+            shell: false,
           }
-          if (b.type === "image") {
-            dirty = true
-            continue
-          }
-          // Tool output is machine text; what a person (or the harness) writes is prose.
-          if (b.type === "tool_result") codeChars += charsOf(b)
-          else textChars += charsOf(b)
+          hold(
+            st,
+            h,
+            { role: "tool", tool: t.tool, dir: "result", sub: t.sub, shell: t.shell },
+            t.verb,
+            chars,
+            "code",
+          )
+        } else if (bt === "image") {
+          dirty = true
+          hold(st, h, { role: "image", kind: "image" }, null, imageTokens(b), "tokens")
+        } else if (bt === "document") {
+          hold(st, h, { role: "image", kind: "document" }, null, charsOf(b), "code")
+        } else {
+          textChars += charsOf(b)
+          for (const part of classifyUserBlock(textOf(b), rec))
+            hold(st, h, { role: part.role, sub: part.sub }, null, part.chars, "text")
         }
       }
     }
@@ -960,37 +1255,11 @@ export function scanOne(st: Scan, f: RawFile): boolean {
   return true
 }
 
-/** Close pass 1: judge which programs dispatch subcommands, and fit the densities. */
-export function closeScan(st: Scan): Scanned {
-  const dispatchers = new Set<string>()
-  for (const [prog, e] of st.verbs) {
-    if (e.calls < DISPATCH_MIN_CALLS || e.set.size < 2) continue
-    if (e.withVerb / e.calls < DISPATCH_MIN_COVERAGE) continue
-    if (e.set.size / e.withVerb > DISPATCH_MAX_RATIO) continue
-    dispatchers.add(prog)
-  }
-  const fit = solveDensities(st.S)
-  return {
-    filesUsed: st.filesUsed,
-    duplicatesDropped: st.duplicatesDropped,
-    badLines: st.badLines,
-    dispatchers,
-    density: fit || {
-      code: CPT_FALLBACK,
-      text: CPT_FALLBACK,
-      basis: "default",
-      pooled: CPT_FALLBACK,
-    },
-    densitySamples: st.S.n,
-    densityCalibrated: !!fit,
-  }
-}
-
-/* --------------------------------------------------------------------- pass 2 --
- * Allocate every request's exact billed cost across the content in its context.
- * Two accumulators per key: `f` is TTL-invariant, `v` scales with whatever multiplier
- * is assumed for cache writes whose TTL the transcript did not record. So re-pricing
- * costs O(keys), not another walk.
+/* ------------------------------------------------------------------ the score --
+ * Spend the two constants: allocate every request's exact billed cost across the content
+ * that was in its context. Two accumulators per key: `f` is TTL-invariant, `v` scales with
+ * whatever multiplier is assumed for cache writes whose TTL the transcript did not record.
+ * So re-pricing costs O(keys), not another walk.
  */
 
 /** Per-bucket cost accumulators. `f` is TTL-invariant, `v` scales with the assumption. */
@@ -1028,284 +1297,153 @@ export interface Allocation {
   firstCtx: number[]
 }
 
-/** Pass 2, mid-flight -- everything the walk accumulates, and the two constants pass 1 fitted.
- *  Same shape and the same reason as `Scan`: one file in at a time, nothing kept. */
-export interface Alloc {
-  /** chars per token, by content class */
-  CODE: number
-  TEXT: number
-  dispatchers: Set<string>
-  acc: Map<string, AccEntry>
-  /** key -> its record, so nothing re-parses keys */
-  recOf: Map<string, Bucket>
-  billed: { f: number; v: number; out: number }
-  /** raw id -> {n, basis, rate} */
-  models: Map<string, ModelSighting>
-  /** raw id -> requests skipped from pricing */
-  unpriced: Map<string, number>
-  ttl: TtlTokens
-  requests: number
-  sessions: number
-  sidechainRequests: number
-  tMin: number | null
-  tMax: number | null
-  firstCtx: number[]
-}
-
-export function openAlloc(scanned: Scanned): Alloc {
-  return {
-    CODE: scanned.density.code,
-    TEXT: scanned.density.text,
-    dispatchers: scanned.dispatchers,
-    acc: new Map(),
-    recOf: new Map<string, Bucket>([[PRE_KEY, PRE_REC]]),
-    billed: { f: 0, v: 0, out: 0 },
-    models: new Map(),
-    unpriced: new Map(),
-    ttl: { "1h": 0, "5m": 0, unknown: 0 },
-    requests: 0,
-    sessions: 0,
-    sidechainRequests: 0,
-    tMin: null,
-    tMax: null,
-    firstCtx: [],
-  }
-}
-
-function addCtx(st: Alloc, ctx: Map<string, number>, rec: Bucket, tokens: number): void {
-  if (!(tokens > 0)) return
-  const k = keyOf(rec)
-  if (!st.recOf.has(k)) st.recOf.set(k, rec)
-  ctx.set(k, (ctx.get(k) || 0) + tokens)
-}
-
-function bump(st: Alloc, rec: Bucket, f: number, v: number, out: number): void {
-  const k = keyOf(rec)
-  let e = st.acc.get(k)
+function bump(
+  acc: Map<string, AccEntry>,
+  key: string,
+  rec: Bucket,
+  f: number,
+  v: number,
+  out: number,
+): void {
+  let e = acc.get(key)
   if (!e) {
     e = { rec, f: 0, v: 0, out: 0 }
-    st.acc.set(k, e)
+    acc.set(key, e)
   }
   e.f += f
   e.v += v
   e.out += out
 }
 
-/** Allocate one file's requests. Only files pass 1 kept -- a duplicate walked twice is a bill
- *  charged twice. */
-export function allocOne(st: Alloc, file: RawFile): void {
-  const { CODE, TEXT, dispatchers, recOf, billed, models, unpriced, ttl, firstCtx } = st
-  {
-    const ctx = new Map<string, number>() // key -> estimated tokens in context
-    // tool_use id -> {tool, sub}
-    const toolOf = new Map<string, { tool: string; sub: string | null; shell: boolean }>()
-    let preamble: number | null = null,
-      sawRequest = false
+/** Score one file, now that the corpus has spoken. `home` sends each slot to the one that
+ *  owns its final bucket, which is what puts `git` back together with `git` once the vote has
+ *  said that whatever followed it was an operand rather than a subcommand. */
+function score(
+  h: Held,
+  code: number,
+  text: number,
+  home: readonly number[],
+  recs: readonly Bucket[],
+  keys: readonly string[],
+  acc: Map<string, AccEntry>,
+): void {
+  const ctx = new Map<number, number>() // slot -> estimated tokens in context
+  let preamble: number | null = null,
+    at = 0
+  for (const ch of h.charges) {
+    for (; at < ch.at; at++) {
+      const a = h.adds[at]
+      const slot = home[a.slot]
+      const t = a.cls === "code" ? a.amt / code : a.cls === "text" ? a.amt / text : a.amt
+      ctx.set(slot, (ctx.get(slot) || 0) + t)
+    }
 
-    for (const line of file.text.split("\n")) {
-      const s = line.trim()
-      if (!s) continue
-      let rec: TranscriptRecord
-      try {
-        rec = JSON.parse(s) as TranscriptRecord
-      } catch {
-        continue
+    // Preamble (system prompt + tool schemas) is measured ONCE per session, at the
+    // first request, where almost no conversation exists yet. Holding it fixed
+    // matters: char-based sizing undercounts, and a preamble recomputed every turn
+    // would absorb the entire shortfall and grow without bound.
+    let mine = 0
+    for (const v of ctx.values()) mine += v
+    if (preamble === null) preamble = Math.max(0, ch.ctxTokens - mine)
+    const body = Math.max(0, ch.ctxTokens - preamble)
+    const shares: Array<[number, number]> = []
+    let denom = 0
+    if (mine > 0) {
+      const k = body / mine
+      for (const [slot, v] of ctx) {
+        const t = v * k
+        shares.push([slot, t])
+        denom += t
       }
-      if (typeof rec.timestamp === "string") {
-        const t = Date.parse(rec.timestamp)
-        if (!isNaN(t)) {
-          if (st.tMin === null || t < st.tMin) st.tMin = t
-          if (st.tMax === null || t > st.tMax) st.tMax = t
-        }
-      }
-      const msg = rec.message
-      if (!msg || typeof msg !== "object") continue
-      let content: ContentBlock[]
-      if (typeof msg.content === "string") content = [{ type: "text", text: msg.content }]
-      else if (Array.isArray(msg.content)) content = msg.content as ContentBlock[]
-      else content = []
+    }
+    const pre = Math.min(preamble, ch.ctxTokens)
+    if (pre > 0) {
+      shares.push([PRE_SLOT, pre])
+      denom += pre
+    }
+    for (const [slot, t] of denom > 0 ? shares : [])
+      bump(acc, keys[slot], recs[slot], ch.f * (t / denom), ch.v * (t / denom), 0)
 
-      if (msg.role === "assistant") {
-        const u = msg.usage || {}
-        const inp = u.input_tokens || 0
-        const cr = u.cache_read_input_tokens || 0
-        const cw = u.cache_creation_input_tokens || 0
-        const out = u.output_tokens || 0
-        const ctxTokens = inp + cr + cw
-        const { rate, basis } = resolveRate(msg.model)
-
-        if (msg.model) {
-          const e = models.get(msg.model) || { n: 0, basis, rate }
-          e.n++
-          models.set(msg.model, e)
-        }
-
-        if (rate && ctxTokens) {
-          st.requests++
-          if (rec.isSidechain === true) st.sidechainRequests++
-          if (!sawRequest) {
-            st.sessions++
-            sawRequest = true
-            firstCtx.push(ctxTokens)
-          }
-          const [pIn, pOut] = rate
-
-          // The transcript records the cache-write TTL split per request. Use it, and
-          // only fall back to an assumed multiplier for the residual it omits.
-          const cc =
-            u.cache_creation && typeof u.cache_creation === "object" ? u.cache_creation : null
-          let w1 = 0,
-            w5 = 0
-          if (cc) {
-            w1 = cc.ephemeral_1h_input_tokens || 0
-            w5 = cc.ephemeral_5m_input_tokens || 0
-            if (w1 + w5 > cw) {
-              const k = cw / (w1 + w5)
-              w1 *= k
-              w5 *= k
-            } // trust the total
-          }
-          const wUnknown = Math.max(0, cw - w1 - w5)
-          ttl["1h"] += w1
-          ttl["5m"] += w5
-          ttl.unknown += wUnknown
-
-          const fixedIn =
-            (inp * pIn +
-              cr * pIn * CACHE_READ_MULT +
-              w1 * pIn * CACHE_WRITE_MULT["1h"] +
-              w5 * pIn * CACHE_WRITE_MULT["5m"]) /
-            1e6
-          const varIn = (wUnknown * pIn) / 1e6
-          const outCost = (out * pOut) / 1e6
-          billed.f += fixedIn
-          billed.v += varIn
-          billed.out += outCost
-
-          // Preamble (system prompt + tool schemas) is measured ONCE per session, at the
-          // first request, where almost no conversation exists yet. Holding it fixed
-          // matters: char-based sizing undercounts, and a preamble recomputed every turn
-          // would absorb the entire shortfall and grow without bound.
-          let mine = 0
-          for (const v of ctx.values()) mine += v
-          if (preamble === null) preamble = Math.max(0, ctxTokens - mine)
-          const body = Math.max(0, ctxTokens - preamble)
-          const shares: Array<[string, number]> = []
-          let denom = 0
-          if (mine > 0) {
-            const k = body / mine
-            for (const [key, v] of ctx) {
-              const t = v * k
-              shares.push([key, t])
-              denom += t
-            }
-          }
-          const pre = Math.min(preamble, ctxTokens)
-          if (pre > 0) {
-            shares.push([PRE_KEY, pre])
-            denom += pre
-          }
-          for (const [key, t] of denom > 0 ? shares : []) {
-            const r = recOf.get(key)
-            if (r) bump(st, r, fixedIn * (t / denom), varIn * (t / denom), 0)
-          }
-
-          // Output. Thinking text is not persisted (only a signature), so it is the
-          // remainder after the prose and tool arguments we can actually see.
-          let prose = 0,
-            args = 0
-          for (const b of content) {
-            if (!b || typeof b !== "object") continue
-            if (b.type === "text") prose += (b.text || "").length / TEXT
-            else if (b.type === "tool_use") args += JSON.stringify(b.input || {}).length / CODE
-          }
-          const think = Math.max(0, out - prose - args)
-          const d2 = prose + args + think
-          if (d2 > 0) {
-            bump(st, { role: "assistant", kind: "thinking" }, 0, 0, (outCost * think) / d2)
-            bump(st, { role: "assistant", kind: "prose" }, 0, 0, (outCost * prose) / d2)
-            bump(st, { role: "assistant", kind: "tool-args" }, 0, 0, (outCost * args) / d2)
-          }
-        } else if (ctxTokens && basis !== "synthetic") {
-          const id = msg.model || "(no model field)"
-          unpriced.set(id, (unpriced.get(id) || 0) + 1)
-        }
-
-        // This assistant message now becomes part of the context for later requests.
-        for (const b of content) {
-          if (!b || typeof b !== "object") continue
-          if (b.type === "text") {
-            addCtx(
-              st,
-              ctx,
-              { role: "assistant", kind: "prose-carried" },
-              (b.text || "").length / TEXT,
-            )
-          } else if (b.type === "thinking" || b.type === "redacted_thinking") {
-            addCtx(st, ctx, { role: "assistant", kind: "thinking-carried" }, charsOf(b) / TEXT)
-          } else if (b.type === "tool_use") {
-            const tool = b.name || "(unnamed tool)"
-            const { sub, shell } = subKeyOf(b.input, dispatchers)
-            if (b.id) toolOf.set(b.id, { tool, sub, shell })
-            addCtx(
-              st,
-              ctx,
-              { role: "tool", tool, dir: "call", sub, shell },
-              JSON.stringify(b.input || {}).length / CODE,
-            )
-          }
-        }
-      } else if (msg.role === "user") {
-        for (const b of content) {
-          const bt = b && typeof b === "object" ? b.type : "text"
-          if (bt === "tool_result") {
-            const t = (b.tool_use_id ? toolOf.get(b.tool_use_id) : undefined) || {
-              tool: "(unmatched tool result)",
-              sub: null,
-              shell: false,
-            }
-            addCtx(
-              st,
-              ctx,
-              { role: "tool", tool: t.tool, dir: "result", sub: t.sub, shell: t.shell },
-              charsOf(b) / CODE,
-            )
-          } else if (bt === "image") {
-            addCtx(st, ctx, { role: "image", kind: "image" }, imageTokens(b))
-          } else if (bt === "document") {
-            addCtx(st, ctx, { role: "image", kind: "document" }, charsOf(b) / CODE)
-          } else {
-            for (const part of classifyUserBlock(textOf(b), rec))
-              addCtx(st, ctx, { role: part.role, sub: part.sub }, part.chars / TEXT)
-          }
-        }
-      }
+    const prose = ch.proseChars / text,
+      args = ch.argsChars / code
+    const think = Math.max(0, ch.outTokens - prose - args)
+    const d2 = prose + args + think
+    if (d2 > 0) {
+      for (const [i, part] of [think, prose, args].entries())
+        bump(acc, OUT_KEYS[i], OUT_RECS[i], 0, 0, (ch.outCost * part) / d2)
     }
   }
 }
 
-export function closeAlloc(st: Alloc): Allocation {
+/** Close the walk: judge which programs dispatch subcommands, fit the densities, and spend
+ *  both on everything that was held back. Nothing is read again -- this is arithmetic over the
+ *  measurements, which is why it is a beat at the end rather than a second pass. */
+export function closeWalk(st: Walk): { scanned: Scanned; alloc: Allocation } {
+  const dispatchers = new Set<string>()
+  for (const [prog, e] of st.verbs) {
+    if (e.calls < DISPATCH_MIN_CALLS || e.set.size < 2) continue
+    if (e.withVerb / e.calls < DISPATCH_MIN_COVERAGE) continue
+    if (e.set.size / e.withVerb > DISPATCH_MAX_RATIO) continue
+    dispatchers.add(prog)
+  }
+  const fit = solveDensities(st.S)
+  const scanned: Scanned = {
+    filesUsed: st.filesUsed,
+    duplicatesDropped: st.duplicatesDropped,
+    badLines: st.badLines,
+    dispatchers,
+    density: fit || {
+      code: CPT_FALLBACK,
+      text: CPT_FALLBACK,
+      basis: "default",
+      pooled: CPT_FALLBACK,
+    },
+    densitySamples: st.S.n,
+    densityCalibrated: !!fit,
+  }
+
+  /* A candidate verb is a subcommand only if its program was seen dispatching. Slots that
+     lose the vote collapse onto each other -- `grep foo` and `grep bar` are both `grep` -- so
+     they are pointed at whichever of them was met first before anything is scored. */
+  const recs = st.slots.map((s) =>
+    s.verb && s.rec.sub && dispatchers.has(s.rec.sub)
+      ? { ...s.rec, sub: s.rec.sub + " " + s.verb }
+      : s.rec,
+  )
+  const keys = recs.map(keyOf)
+  const first = new Map<string, number>()
+  const home = keys.map((k, i) => {
+    const j = first.get(k)
+    if (j !== undefined) return j
+    first.set(k, i)
+    return i
+  })
+
+  const acc = new Map<string, AccEntry>()
+  for (const h of st.held)
+    score(h, scanned.density.code, scanned.density.text, home, recs, keys, acc)
+
   const { tMin, tMax } = st
   const days =
     tMin !== null && tMax !== null ? Math.max(1, Math.round((tMax - tMin) / 86400000)) : null
   return {
-    acc: st.acc,
-    billed: st.billed,
-    requests: st.requests,
-    sessions: st.sessions,
-    sidechainRequests: st.sidechainRequests,
-    models: st.models,
-    unpriced: st.unpriced,
-    ttl: st.ttl,
-    days,
-    spanFrom: tMin,
-    spanTo: tMax,
-    firstCtx: st.firstCtx,
+    scanned,
+    alloc: {
+      acc,
+      billed: st.billed,
+      requests: st.requests,
+      sessions: st.sessions,
+      sidechainRequests: st.sidechainRequests,
+      models: st.models,
+      unpriced: st.unpriced,
+      ttl: st.ttl,
+      days,
+      spanFrom: tMin,
+      spanTo: tMax,
+      firstCtx: st.firstCtx,
+    },
   }
 }
-
-const PRE_REC: Bucket = { role: "preamble" }
-const PRE_KEY = keyOf(PRE_REC)
 
 /* ---------------------------------------------------------------------- price --
  * Apply a rate for the cache writes whose TTL was not recorded. O(keys).
@@ -1324,13 +1462,13 @@ export interface Priced {
   total: number
 }
 
-/** The bill as far as pass 2 has got, for a walk that is still going.
+/** The bill as far as the walk has got, for a walk that is still going.
  *
  *  `price` below is the same arithmetic on a finished `Allocation`; this one reads the live
- *  accumulator instead, so the page can put a figure on screen between files. It is the total
- *  only -- the rows are not summed, because nothing is drawing them yet -- and it is the
- *  cheapest thing in the loop, three numbers and a multiply. */
-export function billedSoFar(st: Alloc, ttlAssumption: TtlAssumption = "1h"): number {
+ *  accumulator instead, so the page can put a figure on screen between files. It is exact --
+ *  the total is the one thing that never waited for the calibration -- and it is the total
+ *  only: the rows are not summed, because nothing is drawing them yet. */
+export function billedSoFar(st: Walk, ttlAssumption: TtlAssumption = "1h"): number {
   const mult = CACHE_WRITE_MULT[ttlAssumption] ?? CACHE_WRITE_MULT["1h"]
   return st.billed.f + st.billed.v * mult + st.billed.out
 }
@@ -1659,9 +1797,9 @@ export interface Analysis {
   groupDefs: GroupDef[]
 }
 
-/** The bill, out of what the two passes accumulated. Nothing here walks a transcript again --
- *  it is arithmetic on the accumulators -- so it is the same call whether the passes were fed
- *  the corpus at once or a file at a time. */
+/** The bill, out of what the walk accumulated. Nothing here walks a transcript again -- it is
+ *  arithmetic on the accumulators -- so it is the same call whether the walk was fed the corpus
+ *  at once or a file at a time. */
 export function report(scanned: Scanned, alloc: Allocation): Analysis {
   const datasets = {} as Record<TtlAssumption, Dataset>
   for (const t of ["1h", "5m"] as const) datasets[t] = buildTree(alloc, t)
@@ -1725,14 +1863,12 @@ export function report(scanned: Scanned, alloc: Allocation): Analysis {
 }
 
 /** The whole thing in one call, for callers that already hold every file: the tests, and any
- *  script with a directory in hand. The page does not use it -- it drives the passes itself so
+ *  script with a directory in hand. The page does not use it -- it drives the walk itself so
  *  that it can say where it has got to. */
 export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analysis {
-  const sc = openScan()
-  const kept = rawFiles.filter((f) => scanOne(sc, f))
-  const scanned = closeScan(sc)
+  const w = openWalk()
+  for (const f of rawFiles) walkOne(w, f)
+  const { scanned, alloc } = closeWalk(w)
   if (!scanned.filesUsed) throw new Error("no readable transcript files")
-  const al = openAlloc(scanned)
-  for (const f of kept) allocOne(al, f)
-  return report(scanned, closeAlloc(al))
+  return report(scanned, alloc)
 }

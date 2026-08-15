@@ -634,7 +634,7 @@ describe("the card's two faces", () => {
       expect(found.getAttribute("data-on")).toBe("1")
       expect(found.getAttribute("data-busy")).toBe("1")
       /* The panel is up before a byte has been read, saying so: no names yet, nothing counted,
-         and the head naming the pass rather than a number nobody can check. */
+         and the head naming the work rather than a number nobody can check. */
       expect(found.querySelectorAll(".filenm")).toHaveLength(0)
       expect(found.querySelector(".foundlbl")?.textContent).toMatch(/Reading/)
       expect(found.querySelector(".foundnum")?.textContent).toBe("0 / 1")
@@ -652,12 +652,11 @@ describe("the card's two faces", () => {
       expect(box.querySelector(".status")?.textContent).toMatch(/-Users-me-code-thing/)
       expect(box.querySelector(".status")?.textContent).toMatch(/has been billed/)
 
-      /* And the panel it left behind holds what it wrote: the file named once per pass, because
-         both passes walk every file and the panel reports the work rather than the folder. Each
-         name is written out rather than printed -- one step per character, and "0f2c9a.jsonl" is
-         twelve of them. */
+      /* And the panel it left behind holds what it wrote: the file named once, because the walk
+         reads it once. It was named twice when there were two passes, which is the visible half
+         of what that cost. Each name is written out rather than printed -- one step per
+         character, and "0f2c9a.jsonl" is twelve of them. */
       expect([...found.querySelectorAll(".filenm")].map((e) => e.textContent)).toEqual([
-        "0f2c9a.jsonl",
         "0f2c9a.jsonl",
       ])
       for (const cover of found.querySelectorAll(".filenm .filecover"))

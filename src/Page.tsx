@@ -83,9 +83,9 @@ export function Page({
   const billed = ctx
     ? `Billed · ${state.pctOnly ? "amount hidden · " : ""}${state.ttl} cache TTL`
     : "Nothing dropped yet"
-  /* What the empty card's figure counts from, and what it counts through: the pricing walk
-     hands its running total up here, so the slot holds $0.00 before a folder is picked and
-     then climbs towards the bill as the transcripts are read. A dash stood here before, and a
+  /* What the empty card's figure counts from, and what it counts through: the walk hands its
+     running total up here, so the slot holds $0.00 before a folder is picked and then climbs
+     towards the bill from the first transcript to the last. A dash stood here before, and a
      dash is a slot waiting to be filled -- this is the same slot saying the same thing while
      also being true, and it gives the rolling digits the one thing they never had, which is a
      number that changes. It survives the turn: the header is outside the face that swaps, so
