@@ -108,6 +108,16 @@ pnpm dlx vercel --prod
 
 Connecting the repo in the Vercel dashboard builds the same way.
 
+The address is in two halves, split by what Back is for. The path is where the reader is —
+`/` before a folder is picked, `/report` once there is a bill, `/report/shell/git` a drill
+into a group and then an item — so each of those moves gets a history entry and the browser's
+own Back comes out of it. The settings held on that location ride in the hash: the TTL lens,
+which chart, panels-or-table, the query, whether amounts are covered, the theme and the
+language. They rewrite the entry they are on rather than pushing one, so Back is not a walk
+through every chart the reader tried. `vercel.json` rewrites `/report/*` to the document,
+since the path is the app's rather than the server's; the standalone file has no origin that
+could serve one, so there the address simply stays where it opened.
+
 It stays a static page with no backend, which is what keeps the privacy claim above true
 when it is hosted rather than opened from disk: there is nothing on the server side to send
 a transcript to. The one thing hosting changes is that the page now arrives over the
@@ -157,7 +167,7 @@ fetchable by any page that can reach localhost while the server runs.
 pnpm test                            # all three suites
 pnpm test:engine                     # synthetic corpus: unknown model, tool, command, tag
 pnpm test:model                      # folding, drill-down and reconciliation, no DOM
-pnpm test:render                     # every view state, rendered into a real DOM
+pnpm test:render                     # every view state, and the address, in a real DOM
 
 node test/engine.test.ts <dir>       # optionally also check a real transcript directory
 node test/model.test.ts <dir>
@@ -278,10 +288,10 @@ file tool under any name gets the same treatment.
 | file | what it is |
 |---|---|
 | `index.html` | document shell and Vite entry (needs the dev server) |
-| `vercel.json` | the deploy: `pnpm build`, serve `dist/` |
+| `vercel.json` | the deploy: `pnpm build`, serve `dist/`, hand `/report/*` to the document |
 | `src/engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
 | `src/model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
-| `src/store.ts` | view state, held outside the tree so the URL hash and the tests can drive it; hover is a separate slice |
+| `src/store.ts` | view state, held outside the tree so the address and the tests can drive it; also which half of the address each key lives in; hover is a separate slice |
 | `src/i18n.ts` | the language: which six ship, the guess at the reader's, and the tag the number formatters use |
 | `src/copy.tsx` | every word on the page, six times over, typed against English so a missing key is a build error |
 | `src/post-copy.ts` | the share captions, kept apart from the rest because `model.ts` builds them and runs under plain `node` |

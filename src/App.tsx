@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Analysis } from "./engine.ts"
-import { resetState, useViewState } from "./store.ts"
+import { applyUrl, readPath, resetState, useViewState } from "./store.ts"
 import { useT } from "./copy.tsx"
 import { tagOf } from "./i18n.ts"
 import { canTransition, cssMs, reduced, transition } from "./Motion.tsx"
@@ -43,6 +43,12 @@ interface Turn {
   dir: Dir
   /** The bill on show came from the example rather than from anyone's folder. */
   sample: boolean
+}
+
+/** The address is what says which face belongs on screen -- `/report` and everything under it is
+ *  the report, `/` is the empty card. */
+function addressed(): boolean {
+  return readPath(location.pathname).report
 }
 
 export function App(): React.JSX.Element {
@@ -97,11 +103,41 @@ export function App(): React.JSX.Element {
     timer.current = setTimeout(swap, exitMs())
   }, [])
 
+  /* The last bill read, kept so a Forward back into `/report` has something to show. Nothing else
+     can restore it: the address carries the view, but the transcripts came out of a folder this
+     page never gets to open twice. */
+  const last = useRef<{ data: Analysis; sample: boolean } | null>(null)
+
   const onData = useCallback(
-    (data: Analysis, sample: boolean) => turnTo(data, "fwd", sample),
+    (data: Analysis, sample: boolean) => {
+      last.current = { data, sample }
+      turnTo(data, "fwd", sample)
+    },
     [turnTo],
   )
+
+  /* Start over is a move home rather than an undo, so it goes forward to `/` and leaves the
+     report where it was: `history.back()` would have risen one drill level instead, since going
+     into a group is an entry of its own. */
   const onReset = useCallback(() => turnTo(null, "back", false, true), [turnTo])
+
+  /* Re-bound on every turn rather than once, because what a pop means depends on which face is
+     showing. */
+  useEffect(() => {
+    const onPop = (): void => {
+      const want = addressed() ? last.current : null
+      /* Out of the report: the view state is what the departing face is still drawn from, so it
+         is left alone here -- the reset rides with the swap. */
+      if (!want) {
+        if (turn.data) onReset()
+        return
+      }
+      applyUrl()
+      if (!turn.data) turnTo(want.data, "fwd", want.sample)
+    }
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
+  }, [turn.data, turnTo, onReset])
 
   return (
     <Page

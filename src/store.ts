@@ -188,8 +188,47 @@ export function resetState(): void {
   setState({ ...INITIAL, theme: state.theme, lang: state.lang })
 }
 
-/* URL state ---------- The hash is the whole shareable view: TTL lens, drill path, which chart,
-   panels-or-table, query, whether amounts are hidden, and the theme. */
+/* URL state ---------- The address is in two halves, split by what Back is for. The path is where
+   the reader is -- the report, and the drill inside it -- so going into `shell` is a move the
+   browser can undo. The hash is the settings held on that location: TTL lens, which chart,
+   panels-or-table, query, whether amounts are hidden, the theme and the language. */
+
+/** Where this copy lives, and whether it can hold a path at all: a page served as a file -- the
+ *  standalone `cost-report.html`, on `file://` or over http -- has no origin that would serve
+ *  `/report/shell` back, so there the address stays where it opened. */
+const HERE = typeof location === "object" ? location.pathname : "/"
+const ROUTED = !/\.html?$/i.test(HERE)
+const ROOT = HERE.replace(/\/report(\/.*)?$/, "").replace(/\/+$/, "") + "/"
+
+/** `/`, `/report`, `/report/shell`, `/report/shell/git`. */
+export function pathFor(report: boolean, path: string[]): string {
+  if (!ROUTED) return HERE
+  if (!report) return ROOT
+  return ROOT + ["report", ...path].map(encodeURIComponent).join("/")
+}
+
+export function readPath(pathname: string): { report: boolean; path: string[] } {
+  if (!ROUTED || !pathname.startsWith(ROOT)) return { report: false, path: [] }
+  const seg = pathname.slice(ROOT.length).split("/").filter(Boolean)
+  if (seg[0] !== "report") return { report: false, path: [] }
+  /* Two deep, the same bound the drill itself has. */
+  return { report: true, path: seg.slice(1, 3).map(decodeURIComponent) }
+}
+
+/** The address applied whole, which is what a Back or a Forward needs: keys the new address does
+ *  not carry go back to their defaults, since coming out of a view has to undo what going in
+ *  added. The exceptions are the two the reader chose for the session rather than for the file,
+ *  and the disclosure the address never carried. */
+export function applyUrl(): void {
+  setState({
+    ...INITIAL,
+    theme: state.theme,
+    lang: state.lang,
+    open: state.open,
+    path: readPath(location.pathname).path,
+    ...readHash(location.hash),
+  })
+}
 
 export function readHash(hash: string): Partial<ViewState> {
   const h = (hash || "").replace(/^#/, "")
@@ -201,7 +240,6 @@ export function readHash(hash: string): Partial<ViewState> {
   })
   const out: Partial<ViewState> = {}
   if (p.ttl === "5m" || p.ttl === "1h") out.ttl = p.ttl
-  if (p.p) out.path = p.p.split(">").filter(Boolean).slice(0, 2)
   if (p.c === "sun" || p.c === "mosaic") out.chart = p.c
   if (p.v === "table" || p.v === "panels") out.view = p.v
   if (p.q) out.query = p.q
@@ -214,7 +252,6 @@ export function readHash(hash: string): Partial<ViewState> {
 export function hashFor(s: ViewState): string {
   const parts: string[] = []
   if (s.ttl !== "1h") parts.push("ttl=" + s.ttl)
-  if (s.path.length) parts.push("p=" + encodeURIComponent(s.path.join(">")))
   /* Against the guess rather than against a constant, for the reason `lang` is below: on a phone
      the sunburst is where the page started, so it is the mosaic that is worth a key. */
   if (s.chart !== INITIAL.chart) parts.push("c=" + s.chart)

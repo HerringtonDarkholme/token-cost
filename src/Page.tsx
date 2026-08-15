@@ -6,10 +6,11 @@ import { ReportContext, useReportCtx } from "./context.ts"
 import { useT, type Dict, type Word } from "./copy.tsx"
 import { money } from "./model.ts"
 import {
+  applyUrl,
   hashFor,
   hoverClear,
-  readHash,
-  setState,
+  pathFor,
+  readPath,
   useNarrow,
   useViewState,
   type ViewState,
@@ -22,22 +23,43 @@ import { Intake, Where } from "./Upload.tsx"
 /** Which way the page is moving. */
 export type Dir = "fwd" | "back"
 
-/** The hash is the shareable view. */
-function useUrlSync(state: ViewState): void {
-  const hash = hashFor(state)
+/** The address, kept level with what the page is showing. The path is a place and earns an entry
+ *  of its own -- opening the report, and drilling into a group -- while the settings in the hash
+ *  rewrite the entry they are held on, so Back is not a walk through every chart the reader
+ *  tried. */
+function useUrlSync(state: ViewState, report: boolean, leaving: boolean): void {
+  const where = pathFor(report, state.path)
+  const url = where + location.search + hashFor(state)
+  const prev = useRef(where)
+
   useEffect(() => {
+    /* A face held mounted for its exit is showing a view the address has already left; writing
+       from it would put the departing report back over the entry the reader just returned to. */
+    if (leaving) return
+    const moved = prev.current !== where
+    prev.current = where
     try {
-      history.replaceState(null, "", hash || location.pathname + location.search)
+      /* Nothing to write when the browser is already there, which is how a Back or a Forward
+         arrives: the address moved first and the page followed it. Pushing here would bury the
+         entry the reader just came out of. */
+      if (location.pathname + location.search + location.hash === url) return
+      if (moved) history.pushState(null, "", url)
+      else history.replaceState(null, "", url)
     } catch {
       /* file:// can refuse */
     }
-  }, [hash])
+  }, [url, where, leaving])
 
+  /* An address typed or edited by hand, which `popstate` does not cover. A turn is in flight when
+     the two disagree, and that is the App's to finish -- applying the new view under the face on
+     its way out would reshape the picture as it leaves. */
   useEffect(() => {
-    const onHash = (): void => setState(readHash(location.hash))
+    const onHash = (): void => {
+      if (readPath(location.pathname).report === report) applyUrl()
+    }
     window.addEventListener("hashchange", onHash)
     return () => window.removeEventListener("hashchange", onHash)
-  }, [])
+  }, [report])
 }
 
 /** Where the footer points, in the order it reads them. The addresses are the only strings on the
@@ -125,13 +147,13 @@ export function Page({
 }): React.JSX.Element {
   const state = useViewState()
   const t = useT()
-  useUrlSync(state)
   const ctx = useReportCtx(data, state)
   const narrow = useNarrow()
 
   /* One string, so the two faces cannot mount different panels by disagreeing about which one is
      on show. */
   const face = ctx ? "report" : "empty"
+  useUrlSync(state, !!ctx, leaving)
 
   const billed = ctx ? t.card.billed(state.ttl, state.pctOnly) : t.card.nothingYet
   /* What the empty card's figure counts from, and what it counts through: the walk writes its
