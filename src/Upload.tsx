@@ -125,6 +125,14 @@ function guessOs(): Os {
   return "linux"
 }
 
+/** A reader with no `~/.claude` to point at. Touch as the *only* pointer is what says phone or
+ *  tablet rather than a laptop with a touchscreen, which has a mouse and a real folder both.
+ *  Taken once: pointer hardware does not change under a reader the way an orientation does. */
+const HANDHELD: boolean =
+  typeof matchMedia === "function" &&
+  matchMedia("(pointer: coarse)").matches &&
+  !matchMedia("(any-hover: hover)").matches
+
 /** A file, and where it sat inside the folder that was chosen. */
 interface Picked {
   file: File
@@ -512,6 +520,37 @@ export function Intake({
     }
   }
 
+  /* Which of the two carries the weight is the device's answer, so both are written once and the
+     order and the emphasis are decided below. */
+  const folderBtn = (
+    <button
+      key="folder"
+      className={HANDHELD ? "btn" : "btn primary"}
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        void choose()
+      }}
+    >
+      <FolderMark />
+      {t.intake.choose}
+    </button>
+  )
+  const exampleBtn = (
+    <button
+      key="example"
+      className={HANDHELD ? "btn primary" : "btn"}
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        void example()
+      }}
+    >
+      <SampleMark />
+      {t.intake.example}
+    </button>
+  )
+
   return (
     <div
       className="dropzone"
@@ -546,7 +585,11 @@ export function Intake({
             one folder is a single pick that catches everything under it. Loose files dragged in
             still work -- the filter above does not care how they arrived -- there is just no
             longer a button that recommends it. */}
-        <h2>{t.intake.heading(<code>~/.claude/projects</code>)}</h2>
+        {/* Nothing to drop on a phone, and no folder under it to drop: there the heading is the
+            two-step instead -- have a look here, come back at the machine that has the folder. */}
+        <h2>
+          {HANDHELD ? t.intake.headingTouch : t.intake.heading(<code>~/.claude/projects</code>)}
+        </h2>
         {/* What pressing the button gets you, in one line, and it took five tries to get down to
             one. It was the method first -- per-request billing, re-billed context, the definition
             of carry cost -- which is the right paragraph in the wrong place: it argued for numbers
@@ -563,30 +606,7 @@ export function Intake({
             is only open to a reader sitting at the machine Claude Code runs on -- on a phone
             there is no `~/.claude` to point at, and the page as it stood had nothing to show
             them at all. The example is the same report drawn from invented transcripts. */}
-        <div className="picks">
-          <button
-            className="btn primary"
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              void choose()
-            }}
-          >
-            <FolderMark />
-            {t.intake.choose}
-          </button>
-          <button
-            className="btn"
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              void example()
-            }}
-          >
-            <SampleMark />
-            {t.intake.example}
-          </button>
-        </div>
+        <div className="picks">{HANDHELD ? [exampleBtn, folderBtn] : [folderBtn, exampleBtn]}</div>
         {/* And the way in, in the card rather than under it. This used to stand in the help below
             the fold, which assumed the reader would go looking: `.claude` is a dotfile, so the
             picker they are about to open hides the folder this page just asked for, and a reader
@@ -619,15 +639,17 @@ export function Intake({
                 as `.CLAUDE`, and the path is already the loudest thing in the heading above. Why
                 the folder is hidden is in the help below the card; what a reader stuck at a
                 dialog needs is the keystrokes. */}
+            {/* On a phone the same slot says where the reader's own transcripts are instead:
+                keystrokes for a dialog are no use to someone with no dialog and no folder. */}
             <div className="howhead">
-              <span className="howlbl">{t.intake.hidden}</span>
-              <OsSwitch os={os} onPick={setOs} />
+              <span className="howlbl">{HANDHELD ? t.intake.yours : t.intake.hidden}</span>
+              {HANDHELD ? null : <OsSwitch os={os} onPick={setOs} />}
             </div>
             {/* Keyed on the platform, so switching plays the same swap the report's figures do
                 rather than substituting the words underneath the reader. Inside the paragraph
                 rather than around it: `TextSwap` is a span, and a span may not hold a `<p>`. */}
             <p>
-              <TextSwap token={os}>{t.intake.how[os]}</TextSwap>
+              {HANDHELD ? t.intake.yoursBody : <TextSwap token={os}>{t.intake.how[os]}</TextSwap>}
             </p>
           </div>
           {/* The other face. Mounted from the first pick onward rather than only while the work
