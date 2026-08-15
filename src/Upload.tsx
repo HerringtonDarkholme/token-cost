@@ -13,6 +13,7 @@ import {
 } from "./engine.ts"
 import { useT, type Dict, type Os } from "./copy.tsx"
 import { TextSwap } from "./Motion.tsx"
+import { sampleFiles } from "./sample.ts"
 import { Tip } from "./Tip.tsx"
 
 /* The three platforms, each a mark and a word. */
@@ -63,6 +64,17 @@ function FolderMark(): React.JSX.Element {
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
       <path d="M1.9 12.7V3.5h4.2l1.5 1.9h6.5v7.3a.6.6 0 0 1-.6.6H2.5a.6.6 0 0 1-.6-.6Z" />
       <path d="M1.9 7.3h12.2" />
+    </svg>
+  )
+}
+
+/** Three columns of the mosaic, on the button that opens one nobody has to own a folder to see. */
+function SampleMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <rect x="1.7" y="6.4" width="4" height="7.9" />
+      <rect x="6.9" y="3.4" width="3" height="10.9" />
+      <rect x="11.1" y="8.9" width="3.2" height="5.4" />
     </svg>
   )
 }
@@ -297,11 +309,19 @@ function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
   )
 }
 
+/** One transcript, however it is going to be produced: a file off the disk, or a line of the
+ *  example built on demand. The walk below reads them strictly one at a time, so neither kind is
+ *  ever held in full. */
+interface Source {
+  name: string
+  read: () => Promise<string>
+}
+
 export function Intake({
   onData,
   sofar,
 }: {
-  onData: (data: Analysis) => void
+  onData: (data: Analysis, sample: boolean) => void
   /** Where to leave the bill as it stands, for the figure in the header to count towards. */
   sofar: React.RefObject<number>
 }): React.JSX.Element {
@@ -352,7 +372,25 @@ export function Intake({
       )
       return
     }
+    await walkFiles(
+      files.map((p) => ({ name: p.file.name, read: () => p.file.text() })),
+      where,
+      false,
+    )
+  }
 
+  /** The example, walked down the same path a folder takes -- same reading column, same engine,
+   *  same turn of the card -- because a demo that took a shortcut would be demonstrating the
+   *  shortcut. */
+  async function example(): Promise<void> {
+    await walkFiles(
+      sampleFiles().map((f) => ({ name: f.name, read: () => Promise.resolve(f.build()) })),
+      { root: null, claude: true },
+      true,
+    )
+  }
+
+  async function walkFiles(files: Source[], where: Origin, sample: boolean): Promise<void> {
     /* The pick answers the note, so the note goes: what stands in its place is the folder being
        read, a name at a time. */
     setErr(null)
@@ -407,7 +445,7 @@ export function Intake({
        rejection -- the `await` below still throws it. */
     const readAt = (i: number): Promise<string> | null => {
       if (i >= files.length) return null
-      const p = files[i].file.text()
+      const p = files[i].read()
       p.catch(() => {})
       return p
     }
@@ -416,12 +454,12 @@ export function Intake({
       for (const [i, p] of files.entries()) {
         const text = await ahead!
         ahead = readAt(i + 1)
-        walkOne(w, { name: p.file.name, text })
+        walkOne(w, { name: p.name, text })
         /* Left where the header can find it, on every file rather than on a beat: this is two
            adds and a multiply, and deciding how often it is worth looking at is the job of
            whoever is drawing it. */
         sofar.current = billedSoFar(w)
-        await step(i, files.length, p.file.name)
+        await step(i, files.length, p.name)
       }
     } catch (e) {
       stop(t.intake.errRead((e as Error).message))
@@ -454,7 +492,7 @@ export function Intake({
     /* oxlint-enable no-await-in-loop */
     /* Handed over only once the walk is done and scored, so the card's turn plays against a free
        main thread rather than against the tail of the work. */
-    onData(data)
+    onData(data, sample)
   }
 
   async function onDrop(e: React.DragEvent): Promise<void> {
@@ -521,16 +559,32 @@ export function Intake({
             What is left is a verb, the thing, and the three sizes the report actually resolves to.
             One line that fits on one line: a subtitle that wraps is a paragraph. */}
         <p className="lede">{t.intake.lede}</p>
+        {/* Two ways in rather than one. The folder is the real one and keeps the weight, but it
+            is only open to a reader sitting at the machine Claude Code runs on -- on a phone
+            there is no `~/.claude` to point at, and the page as it stood had nothing to show
+            them at all. The example is the same report drawn from invented transcripts. */}
         <div className="picks">
           <button
             className="btn primary"
             type="button"
+            disabled={busy}
             onClick={() => {
               void choose()
             }}
           >
             <FolderMark />
             {t.intake.choose}
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              void example()
+            }}
+          >
+            <SampleMark />
+            {t.intake.example}
           </button>
         </div>
         {/* And the way in, in the card rather than under it. This used to stand in the help below

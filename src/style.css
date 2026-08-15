@@ -1177,8 +1177,14 @@ tfoot .n {
   .foot {
     grid-template-columns: 1fr;
   }
-  .card {
+  /* The card stops being a frame with a picture fitted into it and becomes a column of blocks
+     that is as tall as they are. The sunburst's own ratio has to be named to be undone: it is a
+     class and an attribute, so a bare `.card` here loses to it and the card stays 4/3. */
+  .card,
+  .card[data-chart="sun"] {
     aspect-ratio: auto;
+    min-height: 0;
+    padding: 16px 15px 13px;
   }
   .cardfoot {
     flex-wrap: wrap;
@@ -1187,9 +1193,17 @@ tfoot .n {
   .cardfoot .hoverbar {
     flex-basis: 100%;
   }
+  /* `flex: 1` is `flex-basis: 0`, so a slot that keeps it contributes nothing to the height its
+     own contents need -- which on a fixed 16/9 frame is the point, and here is what drew the
+     sunburst straight through the strip above it. The rest of the column is answered at the foot
+     of this file; only `.sun` can be answered here, because only `.sun` is written above. */
   .sun {
+    flex: 0 0 auto;
     flex-direction: column;
     gap: 16px;
+    /* Anything left over goes below the chart rather than half above it, which is where centring
+       a column that overflows puts it. */
+    justify-content: flex-start;
   }
   .sunchart {
     height: auto;
@@ -1200,6 +1214,93 @@ tfoot .n {
   .sunlegend {
     width: 100%;
     max-height: none;
+    flex: 0 0 auto;
+  }
+  /* The mosaic is the other chart, and it is the one that cannot be made narrow: nine columns
+     with a name under each. It keeps its own scroller and is given a definite height, since the
+     slot around it no longer has one to hand down. */
+  .mosaicwrap {
+    flex: 0 0 auto;
+    height: min(56vh, 420px);
+    min-height: 300px;
+  }
+  .mosaic {
+    min-width: 620px;
+  }
+  /* The caption is three lines at this width, so the breadcrumb gets its own rather than sitting
+     against the end of the first one. */
+  .mosaichead {
+    flex-wrap: wrap;
+    row-gap: 5px;
+  }
+  .mosaichead .lbl {
+    flex: 1 1 100%;
+  }
+  .mosaichead .crumbs {
+    justify-content: flex-start;
+  }
+  .shell {
+    padding: 18px 16px 64px;
+  }
+  /* The find box and the view switch get their own line under the heading, and the box takes
+     whatever is left of it rather than the 230px it asks for on a desktop. */
+  .bctl {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .bctl input {
+    flex: 1 1 120px;
+    width: auto;
+    min-width: 0;
+  }
+}
+/* The narrowest band, where two of anything side by side is one too many. The help under the
+   empty card is not here because it folds on its own measure -- see `.where`. */
+@media (max-width: 560px) {
+  .strip {
+    grid-template-columns: 1fr;
+  }
+  /* The heading and the figure stop sharing a line: below this the two-column head left the
+     title about one word wide. Stacked, the caption lands directly over the figure it captions,
+     which is the pairing the two-column form was arranging by other means. */
+  .chead {
+    grid-template-columns: 1fr;
+    row-gap: 2px;
+  }
+  .chead .eyebrow,
+  .chead .billed,
+  .chead h1,
+  .chead .total {
+    grid-area: auto;
+    justify-self: start;
+  }
+  .chead .billed {
+    margin-top: 10px;
+  }
+  .cfig {
+    text-align: left;
+  }
+  .total {
+    justify-content: flex-start;
+  }
+}
+/* A finger is not a pointer: the toolbar's controls are sized off their 10.5px type, which on
+   a touch screen is a target smaller than the thing pressing it. */
+@media (pointer: coarse) {
+  .linkish {
+    padding: 11px 0 10px;
+  }
+  .seg button,
+  .seg .langsel {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .crumbs button {
+    padding: 8px 0;
+  }
+  .legrow {
+    padding-top: 9px;
+    padding-bottom: 9px;
   }
 }
 /* The empty face's contents, filling the whole interior of the card: the frame is the drop
@@ -1621,9 +1722,9 @@ tfoot .n {
   letter-spacing: -0.01em;
   user-select: all;
 }
-/* The one button on this face, and the only thing on the page a first-time reader has to press,
-   so it is sized for that rather than to the toolbar's scale: 13px on a 16/34 pad against the
-   11px on 9/16 it started at. */
+/* The two buttons on this face, and the only things on the page a first-time reader has to
+   press, so they are sized for that rather than to the toolbar's scale: 13px on a 16/34 pad
+   against the 11px on 9/16 it started at. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1660,6 +1761,19 @@ tfoot .n {
 .btn.primary:hover {
   background: var(--accent);
   border-color: var(--accent);
+}
+/* Both of them go out together while a walk is running: the second press would start a second
+   walk into the same column. */
+.btn:disabled {
+  cursor: progress;
+  opacity: 0.45;
+}
+.btn:disabled:hover {
+  background: var(--panel);
+}
+.btn.primary:disabled:hover {
+  background: var(--ink);
+  border-color: var(--ink);
 }
 @media (prefers-reduced-motion: reduce) {
   .btn {
@@ -2561,4 +2675,35 @@ tbody > tr:nth-child(n + 12) {
 [data-snapshot],
 [data-snapshot] * {
   animation: none !important;
+}
+
+/* The rest of the narrow window, down here rather than in the breakpoint block up the file.
+   ───────────────────────────────────────────────────────────────────────────── Every selector
+   below is one class deep and written *after* that block, so an override put beside its siblings
+   loses on source order and quietly does nothing -- which is how the drop zone came to be drawn
+   on top of the heading. The rule is the same one `.where` already carries: answer a late
+   selector from later still. */
+@media (max-width: 820px) {
+  /* The two panel slots and the empty face's own column: all four claim `flex: 1`, which is a
+     zero base size, so the card could never grow for what they hold. */
+  .cardslot,
+  .chartslot,
+  .dropzone,
+  .invite {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+  /* Nothing left to centre in, now that the card is only as tall as what it holds. */
+  .invite {
+    padding-top: 0;
+  }
+  /* Both buttons take the width, so neither is a target to aim at with a thumb. */
+  .picks {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .btn {
+    justify-content: center;
+    padding: 15px 20px;
+  }
 }

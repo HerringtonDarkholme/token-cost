@@ -32,12 +32,20 @@ export interface ViewState {
   lang: Lang
 }
 
+/** The mosaic is nine columns wide with a name and two figures under each, and a phone cannot
+ *  give it that -- so where the stylesheet stops laying the card out side by side, the sunburst
+ *  is what the card opens on. Taken once, at the width the page loaded at: this is which picture
+ *  to *start* with, and re-deciding it under a reader who has since picked the other one would
+ *  be a rotation undoing their choice. */
+const WIDE: boolean =
+  typeof matchMedia === "function" ? !matchMedia("(max-width: 820px)").matches : true
+
 const INITIAL: ViewState = {
   ttl: "1h",
   path: [],
   open: {},
   query: "",
-  chart: "mosaic",
+  chart: WIDE ? "mosaic" : "sun",
   view: "panels",
   pctOnly: false,
   theme: "system",
@@ -187,7 +195,9 @@ export function hashFor(s: ViewState): string {
   const parts: string[] = []
   if (s.ttl !== "1h") parts.push("ttl=" + s.ttl)
   if (s.path.length) parts.push("p=" + encodeURIComponent(s.path.join(">")))
-  if (s.chart !== "mosaic") parts.push("c=" + s.chart)
+  /* Against the guess rather than against a constant, for the reason `lang` is below: on a phone
+     the sunburst is where the page started, so it is the mosaic that is worth a key. */
+  if (s.chart !== INITIAL.chart) parts.push("c=" + s.chart)
   if (s.view !== "panels") parts.push("v=" + s.view)
   if (s.query) parts.push("q=" + encodeURIComponent(s.query))
   if (s.pctOnly) parts.push("u=pct")

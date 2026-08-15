@@ -28,7 +28,9 @@ beforeAll(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   act(() => {
-    root.render(<Page data={data} leaving={false} dir="fwd" onData={noop} onReset={noop} />)
+    root.render(
+      <Page data={data} leaving={false} dir="fwd" sample={false} onData={noop} onReset={noop} />,
+    )
   })
 })
 
@@ -607,7 +609,16 @@ describe("the card's two faces", () => {
     { leaving = false, dir = "fwd" }: { leaving?: boolean; dir?: Dir } = {},
   ): void => {
     act(() => {
-      r.render(<Page data={shown} leaving={leaving} dir={dir} onData={noop} onReset={noop} />)
+      r.render(
+        <Page
+          data={shown}
+          leaving={leaving}
+          dir={dir}
+          sample={false}
+          onData={noop}
+          onReset={noop}
+        />,
+      )
     })
   }
 
@@ -620,13 +631,19 @@ describe("the card's two faces", () => {
        the slot the pricing walk counts up through, so it has to start at a number. */
     expect(box.querySelector(".total")?.textContent).toBe("$0.00")
     expect(box.querySelector(".total")?.getAttribute("data-empty")).toBe("1")
-    /* One way in, and it is the folder: `webkitdirectory` is what makes a file input a folder
-       picker, and asking for files instead meant a hidden dotfile to defeat and dozens of
-       identically-named transcripts to multi-select. */
+    /* One way to a folder, and it is the folder rather than the files: `webkitdirectory` is what
+       makes a file input a folder picker, and asking for files instead meant a hidden dotfile to
+       defeat and dozens of identically-named transcripts to multi-select. */
     const inputs = [...box.querySelectorAll(".dropzone input")]
     expect(inputs).toHaveLength(1)
     expect(inputs[0].getAttribute("webkitdirectory")).toBe("")
-    expect(box.querySelectorAll(".picks .btn")).toHaveLength(1)
+    /* Two buttons, and only the folder is the primary one: the example is there for a reader who
+       has no `~/.claude` to point at -- a phone -- and must not read as the recommended route for
+       one who does. */
+    const picks = [...box.querySelectorAll<HTMLButtonElement>(".picks .btn")]
+    expect(picks).toHaveLength(2)
+    expect(picks[0].classList.contains("primary")).toBe(true)
+    expect(picks[1].classList.contains("primary")).toBe(false)
     /* And the route into that hidden folder is inside the card, beside the button that opens the
        dialog it describes, rather than in the help below the fold. */
     expect(box.querySelector(".invite .howto p")?.textContent).toMatch(/claude/)
@@ -874,7 +891,16 @@ describe("the TTL lens, where there is one to offer", () => {
     document.body.appendChild(box)
     r = createRoot(box)
     act(() => {
-      r.render(<Page data={legacy} leaving={false} dir="fwd" onData={noop} onReset={noop} />)
+      r.render(
+        <Page
+          data={legacy}
+          leaving={false}
+          dir="fwd"
+          sample={false}
+          onData={noop}
+          onReset={noop}
+        />,
+      )
     })
   })
 

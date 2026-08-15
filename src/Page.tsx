@@ -54,6 +54,7 @@ export function Page({
   data,
   leaving,
   dir,
+  sample,
   onData,
   onReset,
 }: {
@@ -62,7 +63,9 @@ export function Page({
   /** The face on show is on its way out: it is held mounted, playing its exit. */
   leaving: boolean
   dir: Dir
-  onData: (data: Analysis) => void
+  /** The bill came from the example rather than from a folder, which the eyebrow has to say. */
+  sample: boolean
+  onData: (data: Analysis, sample: boolean) => void
   onReset: () => void
 }): React.JSX.Element {
   const state = useViewState()
@@ -115,9 +118,14 @@ export function Page({
             <div>
               {/* The words are identical on both faces; what the report adds is the scope,
                   which arrives on the end rather than replacing the line. */}
+              {/* The example says so here rather than anywhere louder: it is the same report
+                  off the same engine, and what makes it an example is whose transcripts it
+                  read -- which is exactly what this line is for. */}
               <div className="eyebrow">
                 {t.card.eyebrow}
-                <TextSwap token={face}>{ctx ? " · " + scopeOf(t, ctx.d) : ""}</TextSwap>
+                <TextSwap token={face}>
+                  {ctx ? (sample ? " · " + t.card.example : "") + " · " + scopeOf(t, ctx.d) : ""}
+                </TextSwap>
               </div>
               {/* One sentence in two tenses, set word by word so the words can be told apart.
                   In English "Where", "your" and "money" are the same three words on both faces,

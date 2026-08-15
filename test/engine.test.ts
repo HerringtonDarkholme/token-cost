@@ -1,5 +1,6 @@
 import * as E from "../src/engine.ts"
 import type { Dataset, RawFile, Usage } from "../src/engine.ts"
+import { sampleCorpus } from "../src/sample.ts"
 import fs from "node:fs"
 import path from "node:path"
 
@@ -183,7 +184,41 @@ ok(
   `PNG dimensions read from header: ${JSON.stringify(dim)}`,
 )
 
-/* ================= 2. */
+/* ================= 2. The example the page offers a reader with no folder to point it at. It is
+   transcript lines rather than a canned report, so it is only worth anything if the real walk
+   still finds in it what it finds in a real corpus -- and if it carries nothing off the machine
+   that generated it. */
+console.log("\n== the example corpus ==")
+{
+  const S = E.analyze(sampleCorpus())
+  const D = S.datasets["1h"]
+  ok(D.total > 1, `it prices: ${money(D.total)}`)
+  ok(D.requests > 500 && D.sessions === 9, `${D.requests} requests over ${D.sessions} sessions`)
+  /* The densities the corpus is written to, recovered by the fit rather than assumed -- which is
+     also what keeps the footnote saying "measured from this dataset". */
+  ok(S.densityCalibrated, "the density fit calibrates")
+  ok(
+    Math.abs(S.density.code - 3.6) < 0.05 && Math.abs(S.density.text - 4.4) < 0.05,
+    `and recovers the corpus: ${S.density.code.toFixed(2)} / ${S.density.text.toFixed(2)}`,
+  )
+  /* The page's whole argument. Sessions long enough for prose to be re-read is what puts this
+     above 1, so a corpus trimmed for size would quietly start arguing the opposite. */
+  const ratio = D.insights.proseCarry / D.insights.proseGen
+  ok(ratio > 1, `carried costs more than generated: ${ratio.toFixed(2)}x`)
+  // Something for the TTL lens to reprice, and something for every view to draw.
+  ok(S.ttlTokens.unknown > 0, "some cache writes leave their TTL unrecorded")
+  ok(D.groups.length >= 7, `${D.groups.length} groups have cost in them`)
+  /* This repo is public and the example ships inside the page. Nothing in it may name the
+     machine it was written on. */
+  const all = sampleCorpus()
+    .map((f) => f.text)
+    .join("\n")
+  ok(!/\/Users\/|\/home\/|%USERPROFILE%/.test(all), "no path off anyone's machine in it")
+  // Same bill twice, or the figure would read as a live number rather than an example.
+  ok(E.analyze(sampleCorpus()).datasets["1h"].total === D.total, "and it is the same every time")
+}
+
+/* ================= 3. */
 const dir = process.argv[2]
 if (dir) {
   console.log(`\n== real transcripts: ${dir} ==`)

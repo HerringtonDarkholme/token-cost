@@ -14,6 +14,11 @@ open cost-report.html          # standalone build — no server needed
 
 `cost-report.html` is build output, not something the repo carries.
 
+No transcripts to hand it? **Try an example** builds a corpus in the page — nine invented
+sessions, priced by the same walk a real folder gets — so the report can be read on a phone,
+or on any machine Claude Code has never run on. The card says *example data* in its eyebrow
+for as long as that is what it is showing.
+
 Transcripts are parsed in the page. Nothing is uploaded, and the app makes no network
 request with your data. It reads only the files you hand it through the picker or a drop —
 it has no filesystem access of its own, and **nothing here points at or serves your
@@ -168,7 +173,9 @@ automatically; it must be passed in.
 
 The synthetic engine suite is the one that matters most: it feeds the engine a model id, an
 MCP tool, a shell program, a file type and a harness tag that appear nowhere in the source,
-and asserts each lands in the right group, drills correctly, and reconciles to the cent.
+and asserts each lands in the right group, drills correctly, and reconciles to the cent. It
+also walks the shipped example, which is where the claims that example makes on the reader's
+behalf — it prices, the density fit recovers it, carry beats generation — are checked.
 The model suite makes the same reconciliation claim about what the page actually *draws* —
 folded rows included, at every drill level, under both TTL lenses.
 
@@ -278,6 +285,7 @@ file tool under any name gets the same treatment.
 | `src/i18n.ts` | the language: which six ship, the guess at the reader's, and the tag the number formatters use |
 | `src/copy.tsx` | every word on the page, six times over, typed against English so a missing key is a build error |
 | `src/post-copy.ts` | the share captions, kept apart from the rest because `model.ts` builds them and runs under plain `node` |
+| `src/sample.ts` | the example corpus: invented transcript lines rather than a canned report, generated from a fixed seed so the button always draws the same bill |
 | `src/context.ts` | the one context the report's components read: dataset, state, palette, formatters |
 | `src/main.tsx` | entry: mounts `<App>` |
 | `src/App.tsx` | the turn: which face the card shows, and the exit phase in between; owns the theme attribute, the `lang` attribute and the title |

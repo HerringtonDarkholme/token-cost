@@ -65,6 +65,8 @@ const EN = {
      *  anyone has guessed anything. */
     title: "Where the money went — Claude Code cost attribution",
     nothingYet: "Nothing dropped yet",
+    /** Said in the eyebrow when the bill came from the example rather than from a folder. */
+    example: "Example data",
     /** What goes between the heading's words: a space, or nothing in the scripts that set none. */
     gap: " ",
     billed: (ttl: string, masked: boolean): string =>
@@ -238,6 +240,9 @@ const EN = {
     heading: (folder: React.ReactNode): React.ReactNode => <>Drop your {folder} folder here</>,
     lede: "Chart your bill: every tool, every subcommand, every dollar.",
     choose: "Choose folder",
+    /** The other way in, for a reader with no `~/.claude` to point at -- a phone, or a machine
+     *  Claude Code has never run on. */
+    example: "Try an example",
     hidden: "The folder is hidden",
     osTip: (current: string, next: string): string =>
       `Not ${current}? Press for the ${next} route.`,
@@ -414,6 +419,7 @@ const ZH: Dict = {
     eyebrow: "成本归因 · Claude Code",
     title: "钱花到哪儿去了 — Claude Code 成本归因",
     nothingYet: "还没有放入任何文件",
+    example: "示例数据",
     gap: "",
     billed: (ttl, masked) => `已计费 · ${masked ? "金额已隐藏 · " : ""}${ttl} 缓存 TTL`,
     ask: [
@@ -550,6 +556,7 @@ const ZH: Dict = {
     heading: (folder) => <>把你的 {folder} 文件夹拖到这里</>,
     lede: "把账单画出来：每个工具、每条子命令、每一块钱。",
     choose: "选择文件夹",
+    example: "查看示例",
     hidden: "这个文件夹是隐藏的",
     osTip: (current, next) => `不是 ${current}？点一下切到 ${next} 的说明。`,
     reading: "正在读取",
@@ -713,6 +720,7 @@ const JA: Dict = {
     eyebrow: "コスト配分 · Claude Code",
     title: "お金はどこへ — Claude Code コスト配分",
     nothingYet: "まだ何も渡されていません",
+    example: "サンプルデータ",
     gap: "",
     billed: (ttl, masked) => `課金済み · ${masked ? "金額は非表示 · " : ""}${ttl} キャッシュ TTL`,
     ask: [
@@ -856,6 +864,7 @@ const JA: Dict = {
     heading: (folder) => <>{folder} フォルダをここにドロップ</>,
     lede: "請求を図にする：すべてのツール、すべてのサブコマンド、すべてのドル。",
     choose: "フォルダを選ぶ",
+    example: "サンプルを見る",
     hidden: "このフォルダは隠されています",
     osTip: (current, next) => `${current} ではない？押すと ${next} の手順に切り替わります。`,
     reading: "読み込み中",
@@ -1021,6 +1030,7 @@ const ES: Dict = {
     eyebrow: "Atribución de costes · Claude Code",
     title: "En qué se fue el dinero — Atribución de costes de Claude Code",
     nothingYet: "Todavía no hay nada",
+    example: "Datos de ejemplo",
     gap: " ",
     billed: (ttl, masked) =>
       `Facturado · ${masked ? "importe oculto · " : ""}TTL de caché de ${ttl}`,
@@ -1172,6 +1182,7 @@ const ES: Dict = {
     heading: (folder) => <>Suelta aquí tu carpeta {folder}</>,
     lede: "Grafica tu factura: cada herramienta, cada subcomando, cada dólar.",
     choose: "Elegir carpeta",
+    example: "Ver un ejemplo",
     hidden: "La carpeta está oculta",
     osTip: (current, next) => `¿No usas ${current}? Pulsa para la ruta de ${next}.`,
     reading: "Leyendo",
@@ -1339,6 +1350,7 @@ const FR: Dict = {
     eyebrow: "Attribution des coûts · Claude Code",
     title: "Où est passé l’argent — Attribution des coûts Claude Code",
     nothingYet: "Rien n’a encore été déposé",
+    example: "Données d’exemple",
     gap: " ",
     billed: (ttl, masked) => `Facturé · ${masked ? "montant masqué · " : ""}TTL de cache ${ttl}`,
     ask: [
@@ -1491,6 +1503,7 @@ const FR: Dict = {
     heading: (folder) => <>Déposez ici votre dossier {folder}</>,
     lede: "Cartographiez votre facture : chaque outil, chaque sous-commande, chaque dollar.",
     choose: "Choisir un dossier",
+    example: "Voir un exemple",
     hidden: "Le dossier est masqué",
     osTip: (current, next) => `Pas ${current} ? Appuyez pour la marche à suivre ${next}.`,
     reading: "Lecture",
@@ -1657,6 +1670,7 @@ const DE: Dict = {
     eyebrow: "Kostenzuordnung · Claude Code",
     title: "Wohin das Geld geflossen ist — Claude-Code-Kostenzuordnung",
     nothingYet: "Noch nichts abgelegt",
+    example: "Beispieldaten",
     gap: " ",
     billed: (ttl, masked) =>
       `Abgerechnet · ${masked ? "Betrag ausgeblendet · " : ""}${ttl} Cache-TTL`,
@@ -1809,6 +1823,7 @@ const DE: Dict = {
     heading: (folder) => <>Lege deinen Ordner {folder} hier ab</>,
     lede: "Zeichne deine Rechnung: jedes Tool, jedes Unterkommando, jeden Dollar.",
     choose: "Ordner wählen",
+    example: "Beispiel ansehen",
     hidden: "Der Ordner ist versteckt",
     osTip: (current, next) => `Nicht ${current}? Drücken für den Weg unter ${next}.`,
     reading: "Lesen",

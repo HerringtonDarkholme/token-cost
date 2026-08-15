@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Analysis } from "./engine.ts"
-import { readHash, resetState, setState, useViewState } from "./store.ts"
+import { resetState, useViewState } from "./store.ts"
 import { useT } from "./copy.tsx"
 import { tagOf } from "./i18n.ts"
 import { canTransition, cssMs, reduced, transition } from "./Motion.tsx"
@@ -41,18 +41,19 @@ interface Turn {
   data: Analysis | null
   leaving: boolean
   dir: Dir
+  /** The bill on show came from the example rather than from anyone's folder. */
+  sample: boolean
 }
 
 export function App(): React.JSX.Element {
-  const [turn, setTurn] = useState<Turn>({ data: null, leaving: false, dir: "fwd" })
+  const [turn, setTurn] = useState<Turn>({
+    data: null,
+    leaving: false,
+    dir: "fwd",
+    sample: false,
+  })
   useTheme()
   useLangAttr()
-
-  /* Seed from the shared link before anything paints, so a link that says "dark, table view,
-     drilled into shell commands" arrives that way rather than snapping into it. */
-  useEffect(() => {
-    setState(readHash(location.hash))
-  }, [])
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(
@@ -64,13 +65,13 @@ export function App(): React.JSX.Element {
 
   /** Turn the card over to `next` -- inside a view transition where there is one, exit first
    *  where there is not. */
-  const turnTo = useCallback((next: Analysis | null, dir: Dir, home = false) => {
+  const turnTo = useCallback((next: Analysis | null, dir: Dir, sample: boolean, home = false) => {
     /* Cleared with the report rather than before it: the view state is what the departing face
        is still being drawn from, and dropping the drill-down under it would reshape the picture
        on its way out. */
     const swap = (): void => {
       if (!next) resetState()
-      setTurn({ data: next, leaving: false, dir })
+      setTurn({ data: next, leaving: false, dir, sample })
     }
 
     if (canTransition()) {
@@ -96,14 +97,18 @@ export function App(): React.JSX.Element {
     timer.current = setTimeout(swap, exitMs())
   }, [])
 
-  const onData = useCallback((data: Analysis) => turnTo(data, "fwd"), [turnTo])
-  const onReset = useCallback(() => turnTo(null, "back", true), [turnTo])
+  const onData = useCallback(
+    (data: Analysis, sample: boolean) => turnTo(data, "fwd", sample),
+    [turnTo],
+  )
+  const onReset = useCallback(() => turnTo(null, "back", false, true), [turnTo])
 
   return (
     <Page
       data={turn.data}
       leaving={turn.leaving}
       dir={turn.dir}
+      sample={turn.sample}
       onData={onData}
       onReset={onReset}
     />
