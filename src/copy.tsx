@@ -20,7 +20,11 @@ export interface Word {
 const EN = {
   /* the toolbar */
   language: "Language",
+  /** The bar folds into one button where there is no room for a row of them. */
+  menu: { name: "Tools", close: "Close" },
   theme: {
+    /** What the cycle picks, said in front of it where there is room for a word. */
+    name: "Theme",
     light: "Light theme",
     system: "System theme",
     dark: "Dark theme",
@@ -382,7 +386,9 @@ export type Dict = typeof EN
 
 const ZH: Dict = {
   language: "语言",
+  menu: { name: "工具", close: "关闭" },
   theme: {
+    name: "主题",
     light: "浅色主题",
     system: "跟随系统",
     dark: "深色主题",
@@ -681,7 +687,9 @@ const ZH: Dict = {
 
 const JA: Dict = {
   language: "言語",
+  menu: { name: "ツール", close: "閉じる" },
   theme: {
+    name: "テーマ",
     light: "ライトテーマ",
     system: "システムに従う",
     dark: "ダークテーマ",
@@ -990,7 +998,9 @@ const JA: Dict = {
 
 const ES: Dict = {
   language: "Idioma",
+  menu: { name: "Herramientas", close: "Cerrar" },
   theme: {
+    name: "Tema",
     light: "Tema claro",
     system: "Tema del sistema",
     dark: "Tema oscuro",
@@ -1310,7 +1320,9 @@ const ES: Dict = {
 
 const FR: Dict = {
   language: "Langue",
+  menu: { name: "Outils", close: "Fermer" },
   theme: {
+    name: "Thème",
     light: "Thème clair",
     system: "Thème du système",
     dark: "Thème sombre",
@@ -1631,7 +1643,9 @@ const FR: Dict = {
 
 const DE: Dict = {
   language: "Sprache",
+  menu: { name: "Werkzeuge", close: "Schließen" },
   theme: {
+    name: "Design",
     light: "Helles Design",
     system: "System-Design",
     dark: "Dunkles Design",

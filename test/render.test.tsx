@@ -661,10 +661,12 @@ describe("the card's two faces", () => {
     act(() => sw!.click())
     expect(tip!.textContent).not.toBe(before)
     /* Two controls, and the theme switch is the last one in the bar: it is the anchor everything
-       else grows leftward from, so it must not have anything to its right. */
-    const bar = [...box.querySelectorAll(".toolbar > *")]
-    expect(bar.at(-1)?.classList.contains("seg")).toBe(true)
-    expect(bar.at(-1)?.classList.contains("langseg")).toBe(false)
+       else grows leftward from, so it must not have anything to its right. Below the breakpoint
+       the same set is the panel's rows read top to bottom, which is why the order is counted in
+       `.tool` rather than in the bar's own children. */
+    const bar = [...box.querySelectorAll(".tools > .tool")]
+    expect(bar.at(-1)?.querySelector(".seg:not(.langseg)")).not.toBeNull()
+    expect(bar.at(-2)?.querySelector(".langseg")).not.toBeNull()
     expect(box.querySelectorAll(".toolbar .seg")).toHaveLength(2)
     expect(box.querySelectorAll(".toolbar .langsel option")).toHaveLength(6)
     // Absent rather than disabled: there is nothing yet to discard, copy or reprice.
@@ -809,7 +811,56 @@ describe("the card's two faces", () => {
     expect(
       [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")),
     ).toEqual(["3", "2", "1", "0"])
-    expect([...box.querySelectorAll(".toolbar > *")].at(-1)?.classList.contains("seg")).toBe(true)
+    expect(
+      [...box.querySelectorAll(".tools > .tool")].at(-1)?.querySelector(".seg:not(.langseg)"),
+    ).not.toBeNull()
+  })
+
+  /* Below the breakpoint the bar is a panel behind one button. Which of the two shapes is drawn
+     is the stylesheet's business, so what is checked here is the part that is not: the state the
+     button and the panel agree on, and every control still being in exactly one place. */
+  it("the bar folds into one button, and the panel it opens holds every control", () => {
+    turn(data)
+    const burger = box.querySelector<HTMLButtonElement>(".burger")!
+    const tools = box.querySelector<HTMLElement>(".tools")!
+    expect(burger.getAttribute("aria-controls")).toBe(tools.id)
+    expect(burger.getAttribute("aria-expanded")).toBe("false")
+    expect(tools.getAttribute("data-open")).toBe("0")
+    expect(box.querySelector(".scrim")?.getAttribute("data-open")).toBe("0")
+
+    /* One set of controls, not two: every control the bar holds is inside the panel element, so
+       there is no second copy to fall out of step with this one. Scoped to the bar because the
+       card runs its own switches off the same `.seg`. */
+    for (const sel of [".linkish", ".seg", ".freshbtn", ".eyebtn", ".langsel"])
+      expect(box.querySelectorAll(".toolbar " + sel).length, `${sel} outside the panel`).toBe(
+        box.querySelectorAll(".tools " + sel).length,
+      )
+    // And every row that is a lens rather than an action says what it sets.
+    const named = [...box.querySelectorAll(".tools > .tool")].filter((row) =>
+      row.querySelector(".toollbl"),
+    )
+    expect(named.map((row) => row.querySelector(".toollbl")!.textContent)).toEqual([
+      "New analysis",
+      "Hide dollar amounts",
+      "Language",
+      "Theme",
+    ])
+
+    act(() => burger.click())
+    expect(burger.getAttribute("aria-expanded")).toBe("true")
+    expect(tools.getAttribute("data-open")).toBe("1")
+    expect(box.querySelector(".scrim")?.getAttribute("data-open")).toBe("1")
+    // The page under the panel does not scroll while it is up.
+    expect(document.body.style.overflow).toBe("hidden")
+
+    /* Escape gives the page back, and gives the focus back to the button that took it -- closing
+       must not drop the reader at the top of the document. */
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))
+    })
+    expect(tools.getAttribute("data-open")).toBe("0")
+    expect(document.body.style.overflow).toBe("")
+    expect(document.activeElement).toBe(burger)
   })
 
   /* Reset is the leg that cannot be done in one state change: React would take the report's DOM

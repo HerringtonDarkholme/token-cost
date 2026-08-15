@@ -132,6 +132,19 @@ button {
   height: 9px;
   background: repeating-linear-gradient(to right, var(--rule) 0 1px, transparent 1px 9px);
 }
+/* Above the breakpoint there is no panel: the wrapper and the row labels fold away and every
+   control is a direct item of the bar again, which is what keeps this one set of controls
+   rather than two that have to be kept in step. */
+.tools,
+.tool {
+  display: contents;
+}
+.toollbl,
+.toolhead,
+.burger,
+.scrim {
+  display: none;
+}
 /* An action rather than a lens, so it is words on the paper with a rule under them rather than a
    button in a box. */
 .linkish {
@@ -345,6 +358,11 @@ button {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink3);
+}
+/* Drawn rather than written into the string, so that hiding the standing half of the line takes
+   the separator with it instead of leaving the scope opening on a bullet. */
+.eyebrow[data-scoped="1"] .ebrand::after {
+  content: " · ";
 }
 .chead h1 {
   grid-area: 2 / 1;
@@ -1179,12 +1197,136 @@ tfoot .n {
   }
   /* The card stops being a frame with a picture fitted into it and becomes a column of blocks
      that is as tall as they are. The sunburst's own ratio has to be named to be undone: it is a
-     class and an attribute, so a bare `.card` here loses to it and the card stays 4/3. */
+     class and an attribute, so a bare `.card` here loses to it and the card stays 4/3.
+     And it stops being a card at all: a frame costs about 30px of width and the same again in
+     height to say "these things belong together", which on a phone is the only thing on screen
+     anyway. The rule under the chart is left to do that job on its own. */
   .card,
-  .card[data-chart="sun"] {
+  .card[data-chart="sun"],
+  .card[data-face="empty"] {
     aspect-ratio: auto;
     min-height: 0;
-    padding: 16px 15px 13px;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .br {
+    display: none;
+  }
+  /* Nothing frames the drop target any more, so the answer to a folder held over the page is the
+     ground under it. */
+  .card:has([data-over="1"]) {
+    background: var(--accent-soft);
+  }
+  /* the bar, folded into one button ------- */
+  .burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--rule);
+    background: var(--panel);
+    color: var(--ink2);
+    cursor: pointer;
+  }
+  .burger .glyph {
+    width: 17px;
+    height: 17px;
+  }
+  .tools {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(310px, 82vw);
+    z-index: 60;
+    padding: 15px 18px 28px;
+    background: var(--panel);
+    border-left: 1px solid var(--ink);
+    overflow-y: auto;
+    /* The page under it does not take the scroll when the panel runs out of it. */
+    overscroll-behavior: contain;
+    transform: translateX(101%);
+    /* Hidden rather than merely off-screen, so a panel nobody has opened is not seven stops in
+       the tab order sitting past the right edge of the window. */
+    visibility: hidden;
+    transition:
+      transform var(--duration-medium) var(--ease-smooth-out),
+      visibility 0s linear var(--duration-medium);
+  }
+  .tools[data-open="1"] {
+    transform: none;
+    visibility: visible;
+    transition:
+      transform var(--duration-slow) var(--ease-smooth-out),
+      visibility 0s;
+  }
+  .toolhead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 11px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .toolttl {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink3);
+  }
+  .toolx {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-right: -8px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink2);
+    cursor: pointer;
+  }
+  .tool {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 54px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .toollbl {
+    display: block;
+    font-size: 12.5px;
+    line-height: 1.25;
+    color: var(--ink2);
+  }
+  /* The underline stays. It is what separates the two kinds of row here: an action is mono caps
+     with a rule under the words, a lens is a name with a control beside it -- and stripped of
+     the rule, the two actions read as headings for the rows below them. */
+  .tool .linkish {
+    font-size: 12px;
+  }
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    padding: 0;
+    border: 0;
+    background: color-mix(in srgb, var(--ink) 44%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    cursor: default;
+    transition: opacity var(--duration-medium) var(--ease-out);
+  }
+  .scrim[data-open="1"] {
+    opacity: 1;
+    pointer-events: auto;
   }
   .cardfoot {
     flex-wrap: wrap;
@@ -1257,8 +1399,28 @@ tfoot .n {
 /* The narrowest band, where two of anything side by side is one too many. The help under the
    empty card is not here because it folds on its own measure -- see `.where`. */
 @media (max-width: 560px) {
-  .strip {
-    grid-template-columns: 1fr;
+  /* The thesis is a sentence and takes the width; the three figures beside it are short enough
+     to pair up. Stacking all four was 90px of the first screen spent on saying the same things
+     one under the other. */
+  .strip > div:first-child,
+  .strip > div:last-child {
+    grid-column: 1 / -1;
+  }
+  /* What the page is called is already the headline, so the line above it carries only what the
+     headline does not say: which dataset, and how much of it. Only once there *is* a dataset --
+     on the empty face nothing else is competing for the line, and dropping the standing half
+     there would leave the row blank rather than shorter. */
+  .eyebrow[data-scoped="1"] .ebrand {
+    display: none;
+  }
+  /* Two figures to a row is about 165px each, and 21px mono broke both of them over two lines --
+     which costs more height than the second column saved. */
+  .big,
+  .carryrow .to {
+    font-size: 18px;
+  }
+  .big .sm {
+    font-size: 13px;
   }
   /* The heading and the figure stop sharing a line: below this the two-column head left the
      title about one word wide. Stacked, the caption lands directly over the figure it captions,
@@ -1266,6 +1428,9 @@ tfoot .n {
   .chead {
     grid-template-columns: 1fr;
     row-gap: 2px;
+  }
+  .chead h1 {
+    font-size: 27px;
   }
   .chead .eyebrow,
   .chead .billed,
@@ -1275,7 +1440,7 @@ tfoot .n {
     justify-self: start;
   }
   .chead .billed {
-    margin-top: 10px;
+    margin-top: 7px;
   }
   .cfig {
     text-align: left;
@@ -2088,6 +2253,23 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .t-tt {
     transition: none !important;
+  }
+}
+/* A hint is a hover affordance, and a device with no hover fires it on tap instead -- where it
+   lands on top of whatever the reader was about to press next. Clipped rather than removed: it
+   is still the control's accessible description, and `display: none` would take that off the
+   accessibility tree along with the box. Clipping also settles it whatever the placement rules
+   further up the file say, since a 1px box with its overflow hidden is invisible however
+   opaque something else decides to make it. */
+@media (hover: none) {
+  .t-tt {
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    transition: none;
   }
 }
 

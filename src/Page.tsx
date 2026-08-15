@@ -120,11 +120,15 @@ export function Page({
                   which arrives on the end rather than replacing the line. */}
               {/* The example says so here rather than anywhere louder: it is the same report
                   off the same engine, and what makes it an example is whose transcripts it
-                  read -- which is exactly what this line is for. */}
-              <div className="eyebrow">
-                {t.card.eyebrow}
+                  read -- which is exactly what this line is for.
+                  The standing half is its own element because a phone drops it: what the page
+                  is called is the one thing on this line the headline underneath already says,
+                  and it costs a whole line of the first screen to repeat it. Its separator goes
+                  with it, which is why that is drawn rather than written. */}
+              <div className="eyebrow" data-scoped={ctx ? 1 : 0}>
+                <span className="ebrand">{t.card.eyebrow}</span>
                 <TextSwap token={face}>
-                  {ctx ? (sample ? " · " + t.card.example : "") + " · " + scopeOf(t, ctx.d) : ""}
+                  {ctx ? (sample ? t.card.example + " · " : "") + scopeOf(t, ctx.d) : ""}
                 </TextSwap>
               </div>
               {/* One sentence in two tenses, set word by word so the words can be told apart.

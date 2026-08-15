@@ -1,6 +1,6 @@
 /* The instrument's controls. */
 
-import { useId } from "react"
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { LANGS, useT, type Dict } from "./copy.tsx"
 import type { TtlAssumption } from "./engine.ts"
 import type { Lang } from "./i18n.ts"
@@ -157,6 +157,35 @@ function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
   )
 }
 
+/** Three rules, on the one button the bar folds into. */
+function BurgerMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M2 4.4h12M2 8h12M2 11.6h12" />
+    </svg>
+  )
+}
+
+function CloseMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  )
+}
+
+/** One control in the panel, with the word for what it does beside it. Above the breakpoint both
+ *  the wrapper and the word go away -- `display: contents` -- and the control is a plain item in
+ *  the bar again, which is why there is one set of these rather than two. */
+function Tool({ label, children }: { label?: string; children: ReactNode }): React.JSX.Element {
+  return (
+    <div className="tool">
+      {label ? <span className="toollbl">{label}</span> : null}
+      {children}
+    </div>
+  )
+}
+
 /** The controls, and the order is the point. */
 export function Toolbar({
   report,
@@ -175,41 +204,125 @@ export function Toolbar({
 }): React.JSX.Element {
   const state = useViewState()
   const t = useT()
+  const [open, setOpen] = useState(false)
+  const burger = useRef<HTMLButtonElement>(null)
+  const panel = useId()
+
+  /* Focus goes back to the button that opened it, so closing does not drop the reader at the top
+     of the document. */
+  const close = useCallback(() => {
+    setOpen(false)
+    burger.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") close()
+    }
+    /* A window that grows past the breakpoint takes the panel with it: above that width these
+       controls are a row in the bar again and there is nothing left for "open" to mean. */
+    const wide = matchMedia("(min-width: 821px)")
+    const onWide = (): void => {
+      if (wide.matches) setOpen(false)
+    }
+    const held = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    document.addEventListener("keydown", onKey)
+    wide.addEventListener("change", onWide)
+    return () => {
+      document.body.style.overflow = held
+      document.removeEventListener("keydown", onKey)
+      wide.removeEventListener("change", onWide)
+    }
+  }, [open, close])
+
+  /* The one control here that replaces the page under the panel, so it is the one that has to
+     take the panel down with it. */
+  const reset = useCallback(() => {
+    setOpen(false)
+    onReset()
+  }, [onReset])
 
   /* Where the stagger starts counting. */
   const first = ttl ? 4 : 3
 
   return (
-    <div className="toolbar" data-leaving={leaving ? "1" : undefined}>
+    <div className="toolbar" data-leaving={leaving ? "1" : undefined} data-open={open ? "1" : "0"}>
       <span className="tick" />
-      {report ? (
-        <>
-          <span className="t-grow" data-i={first}>
-            <CopyChartButton />
-          </span>
-          <span className="t-grow" data-i={first - 1}>
-            <ShareButton />
-          </span>
-          <span className="t-grow" data-i={first - 2}>
-            <ResetButton onReset={onReset} />
-          </span>
-          <span className="t-grow" data-i={first - 3}>
-            <span className="seg t-tt-host">
-              <MaskToggle on={state.pctOnly} />
-            </span>
-          </span>
-          {ttl ? (
-            <span className="t-grow" data-i="0">
-              <Cycle name={t.ttl.name} options={ttls(t)} value={state.ttl} onPick={pickTtl} />
-            </span>
-          ) : null}
-        </>
-      ) : null}
-      {/* Inside the anchor rather than beside it: language and theme are the two controls that
-          exist before there is a bill and outlive any one of them, so they hold the same
-          ground on both faces of the card and everything else grows leftward past them. */}
-      <LangPicker />
-      <Cycle options={themes(t)} value={state.theme} onPick={pickTheme} />
+      {/* Below the breakpoint the whole bar is behind this; above it, this is not drawn. */}
+      <button
+        type="button"
+        ref={burger}
+        className="burger"
+        aria-label={t.menu.name}
+        aria-expanded={open}
+        aria-controls={panel}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <BurgerMark />
+      </button>
+      <div className="tools" id={panel} data-open={open ? "1" : "0"}>
+        {/* Panel furniture, and nothing above the breakpoint: there is no panel there to title
+            or to close. */}
+        <div className="toolhead">
+          <span className="toolttl">{t.menu.name}</span>
+          <button type="button" className="toolx" aria-label={t.menu.close} onClick={close}>
+            <CloseMark />
+          </button>
+        </div>
+        {report ? (
+          <>
+            <Tool>
+              <span className="t-grow" data-i={first}>
+                <CopyChartButton />
+              </span>
+            </Tool>
+            <Tool>
+              <span className="t-grow" data-i={first - 1}>
+                <ShareButton />
+              </span>
+            </Tool>
+            <Tool label={t.reset.name}>
+              <span className="t-grow" data-i={first - 2}>
+                <ResetButton onReset={reset} />
+              </span>
+            </Tool>
+            <Tool label={t.mask.name}>
+              <span className="t-grow" data-i={first - 3}>
+                <span className="seg t-tt-host">
+                  <MaskToggle on={state.pctOnly} />
+                </span>
+              </span>
+            </Tool>
+            {ttl ? (
+              <Tool label={t.ttl.name}>
+                <span className="t-grow" data-i="0">
+                  <Cycle name={t.ttl.name} options={ttls(t)} value={state.ttl} onPick={pickTtl} />
+                </span>
+              </Tool>
+            ) : null}
+          </>
+        ) : null}
+        {/* Inside the anchor rather than beside it: language and theme are the two controls that
+            exist before there is a bill and outlive any one of them, so they hold the same
+            ground on both faces of the card and everything else grows leftward past them. */}
+        <Tool label={t.language}>
+          <LangPicker />
+        </Tool>
+        <Tool label={t.theme.name}>
+          <Cycle options={themes(t)} value={state.theme} onPick={pickTheme} />
+        </Tool>
+      </div>
+      {/* Only ever drawn below the breakpoint, and only then when the panel is up. */}
+      <button
+        type="button"
+        className="scrim"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-open={open ? "1" : "0"}
+        onClick={close}
+      />
     </div>
   )
 }
