@@ -350,11 +350,6 @@ const EN = {
         <code>open ~/.claude/projects</code>
       </>
     ),
-    largest: (
-      <>
-        Largest projects first: <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
-      </>
-    ),
     noUpload: "Nothing is uploaded",
     noUploadBody:
       "The files are read and the bill worked out in this page: there is no server to send a " +
@@ -672,11 +667,6 @@ const ZH: Dict = {
         在文件管理器里打开这个文件夹，然后拖到上面的卡片上：<code>open ~/.claude/projects</code>
       </>
     ),
-    largest: (
-      <>
-        最大的项目排在前面：<code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
-      </>
-    ),
     noUpload: "不上传任何内容",
     noUploadBody:
       "文件的读取和账单的计算都在这个页面里完成：没有服务器可以把转录发过去，" +
@@ -992,11 +982,6 @@ const JA: Dict = {
       <>
         ファイルマネージャでフォルダを開き、上のカードにドラッグしてください：
         <code>open ~/.claude/projects</code>
-      </>
-    ),
-    largest: (
-      <>
-        大きいプロジェクトから：<code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
       </>
     ),
     noUpload: "何もアップロードされません",
@@ -1324,12 +1309,6 @@ const ES: Dict = {
       <>
         Abre la carpeta en tu gestor de archivos y arrástrala sobre la tarjeta de arriba:{" "}
         <code>open ~/.claude/projects</code>
-      </>
-    ),
-    largest: (
-      <>
-        Los proyectos más grandes primero:{" "}
-        <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
       </>
     ),
     noUpload: "No se sube nada",
@@ -1662,11 +1641,6 @@ const FR: Dict = {
         ci-dessus : <code>open ~/.claude/projects</code>
       </>
     ),
-    largest: (
-      <>
-        Les plus gros projets d’abord : <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
-      </>
-    ),
     noUpload: "Rien n’est envoyé",
     noUploadBody:
       "Les fichiers sont lus et la facture calculée dans cette page : il n’y a aucun serveur à qui " +
@@ -1994,11 +1968,6 @@ const DE: Dict = {
       <>
         Öffne den Ordner im Dateimanager und ziehe ihn auf die Karte oben:{" "}
         <code>open ~/.claude/projects</code>
-      </>
-    ),
-    largest: (
-      <>
-        Die größten Projekte zuerst: <code>du -sh ~/.claude/projects/*/ | sort -rh | head</code>
       </>
     ),
     noUpload: "Nichts wird hochgeladen",

@@ -710,7 +710,6 @@ export function Where(): React.JSX.Element {
           <strong>{t.where.terminal}</strong>
         </p>
         <p>{t.where.terminalBody}</p>
-        <p>{t.where.largest}</p>
       </div>
       <div>
         <p className="whead">
