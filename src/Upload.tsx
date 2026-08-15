@@ -40,6 +40,7 @@ import { useId, useRef, useState, type ReactNode } from "react"
 import {
   allocOne,
   closeAlloc,
+  billedSoFar,
   closeScan,
   openAlloc,
   openScan,
@@ -443,7 +444,16 @@ function Reading({ run }: { run: Run }): React.JSX.Element {
   )
 }
 
-export function Intake({ onData }: { onData: (data: Analysis) => void }): React.JSX.Element {
+export function Intake({
+  onData,
+  onTally,
+}: {
+  onData: (data: Analysis) => void
+  /** The bill so far, handed up on the beat the panel repaints, for the figure in the header
+   *  to count towards. Nothing is reported through it during pass 1 -- that pass calibrates
+   *  and prices nothing -- so the figure holds at zero until the pricing walk starts. */
+  onTally: (usd: number) => void
+}): React.JSX.Element {
   const [err, setErr] = useState<ReactNode>(null)
   const [run, setRun] = useState<Run | null>(null)
   const [busy, setBusy] = useState(false)
@@ -514,6 +524,9 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
     /* Empty, and up before a byte has been read: the panel is the answer to the pick, and the
        first file is not always quick. A prompt blinking over nothing read yet is the truth. */
     setRun({ id, phase: "read", done: 0, total: files.length, lines: [] })
+    /* Back to zero with the panel, not with the first priced file: a second pick has to start
+       its count where the first one started, or the figure would appear to carry over. */
+    onTally(0)
     setBusy(true)
 
     /* Both passes are driven from here rather than handed the corpus, which is the whole shape of
@@ -537,6 +550,7 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       i: number,
       total: number,
       name: string,
+      tally?: number,
     ): Promise<void> => {
       const now = performance.now()
       const last = i + 1 >= total
@@ -554,6 +568,10 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       if (now - painted < PAINT && !last) return
       painted = now
       setRun({ id, phase, done: i + 1, total, lines: [...lines] })
+      /* On the repaint beat rather than per file: the figure is one more thing drawn in the
+         gap this leaves, and a folder of several hundred transcripts would otherwise ask the
+         header to re-render several hundred times for digits nobody could read going past. */
+      if (tally !== undefined) onTally(tally)
       // The yield. Everything the panel does, it does in the gaps this leaves.
       await new Promise((r) => setTimeout(r, 0))
     }
@@ -584,7 +602,7 @@ export function Intake({ onData }: { onData: (data: Analysis) => void }): React.
       const al = openAlloc(scanned)
       for (const [i, p] of kept.entries()) {
         allocOne(al, { name: p.file.name, text: await p.file.text() })
-        await step("price", i, kept.length, p.file.name)
+        await step("price", i, kept.length, p.file.name, billedSoFar(al))
       }
       data = report(scanned, closeAlloc(al))
     } catch (e) {

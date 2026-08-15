@@ -500,8 +500,9 @@ describe("the card's two faces", () => {
     expect(box.querySelector(".card")?.getAttribute("data-face")).toBe("empty")
     // The drop target is the card's own interior rather than a second box inside it.
     expect(box.querySelector(".cardslot > .dropzone")).not.toBeNull()
-    // The figure's place is held by a dash, so the bill has somewhere to arrive.
-    expect(box.querySelector(".total")?.textContent).toBe("—")
+    /* The figure's place is held by a zero rather than a dash: the slot the bill arrives in
+       is the slot the pricing walk counts up through, so it has to start at a number. */
+    expect(box.querySelector(".total")?.textContent).toBe("$0.00")
     expect(box.querySelector(".total")?.getAttribute("data-empty")).toBe("1")
     /* One way in, and it is the folder: `webkitdirectory` is what makes a file input a folder
        picker, and asking for files instead meant a hidden dotfile to defeat and dozens of
@@ -708,7 +709,7 @@ describe("the card's two faces", () => {
     turn(null, { dir: "back" })
     expect(box.querySelector(".card")).toBe(card)
     expect(box.querySelector(".cardslot > .dropzone")).not.toBeNull()
-    expect(box.querySelector(".total")?.textContent).toBe("—")
+    expect(box.querySelector(".total")?.textContent).toBe("$0.00")
     expect(box.querySelector(".toolbar")?.getAttribute("data-leaving")).toBeNull()
   })
 })

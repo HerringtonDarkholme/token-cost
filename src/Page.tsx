@@ -15,7 +15,7 @@
    conditional provider is a different tree, and a different tree remounts the card. `null` is
    what it carries in between. */
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import type { Analysis } from "./engine.ts"
 import { ReportContext, useReportCtx } from "./context.ts"
 import { money } from "./model.ts"
@@ -83,10 +83,24 @@ export function Page({
   const billed = ctx
     ? `Billed · ${state.pctOnly ? "amount hidden · " : ""}${state.ttl} cache TTL`
     : "Nothing dropped yet"
-  /* The figure twice over: as a number for the rolling digits, and as text for the two states
-     that are not one. Only one of them is ever rendered -- see `Figure`. */
-  const total = ctx && !state.pctOnly ? ctx.d.total : null
-  const totalText = ctx ? (state.pctOnly ? "****" : money(ctx.d.total)) : "—"
+  /* What the empty card's figure counts from, and what it counts through: the pricing walk
+     hands its running total up here, so the slot holds $0.00 before a folder is picked and
+     then climbs towards the bill as the transcripts are read. A dash stood here before, and a
+     dash is a slot waiting to be filled -- this is the same slot saying the same thing while
+     also being true, and it gives the rolling digits the one thing they never had, which is a
+     number that changes. It survives the turn: the header is outside the face that swaps, so
+     the figure that arrives at the bill is the figure that was counting towards it. */
+  const [tally, setTally] = useState(0)
+
+  /* The tally belongs to one pick. Coming back to the empty card starts another. */
+  useEffect(() => {
+    if (!ctx) setTally(0)
+  }, [ctx])
+
+  /* The figure twice over: as a number for the rolling digits, and as text for the one state
+     that is not one. Only one of them is ever rendered -- see `Figure`. */
+  const total = ctx ? (state.pctOnly ? null : ctx.d.total) : tally
+  const totalText = ctx ? (state.pctOnly ? "****" : money(ctx.d.total)) : money(tally)
 
   return (
     <ReportContext.Provider value={ctx}>
@@ -160,7 +174,7 @@ export function Page({
               `closed` held from outside for the length of the exit, so the departing one has
               somewhere to go. */}
           <Reveal key={face} className="cardslot" closed={leaving}>
-            {ctx ? <CardBody /> : <Intake onData={onData} />}
+            {ctx ? <CardBody /> : <Intake onData={onData} onTally={setTally} />}
           </Reveal>
         </section>
         {/* What stands under the card: the breakdown and the footnotes, or the help for

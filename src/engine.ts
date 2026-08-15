@@ -1324,6 +1324,17 @@ export interface Priced {
   total: number
 }
 
+/** The bill as far as pass 2 has got, for a walk that is still going.
+ *
+ *  `price` below is the same arithmetic on a finished `Allocation`; this one reads the live
+ *  accumulator instead, so the page can put a figure on screen between files. It is the total
+ *  only -- the rows are not summed, because nothing is drawing them yet -- and it is the
+ *  cheapest thing in the loop, three numbers and a multiply. */
+export function billedSoFar(st: Alloc, ttlAssumption: TtlAssumption = "1h"): number {
+  const mult = CACHE_WRITE_MULT[ttlAssumption] ?? CACHE_WRITE_MULT["1h"]
+  return st.billed.f + st.billed.v * mult + st.billed.out
+}
+
 export function price(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"): Priced {
   const mult = CACHE_WRITE_MULT[ttlAssumption] ?? CACHE_WRITE_MULT["1h"]
   const rows: PricedRow[] = []
