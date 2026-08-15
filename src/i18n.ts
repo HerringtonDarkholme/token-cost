@@ -15,15 +15,28 @@
  *  it, so a key added here cannot be forgotten there. */
 export type Lang = "en" | "zh" | "ja" | "es" | "fr" | "de"
 
-/** Each language named in itself. A picker that says "Chinese" is a picker for people who
- *  already read English -- which is the one group that does not need it. */
+/** What the picker calls each one: the subtag where the script is Latin, the language's own
+ *  name where it is not.
+ *
+ *  A picker that says "Chinese" is a picker for people who already read English -- which is
+ *  the one group that does not need it -- so nothing here is named in English. But "EN", "ES",
+ *  "FR" and "DE" are not English either; they are the codes those readers already meet in
+ *  every other language menu, and they cost a quarter of the width of the words. The two that
+ *  stay written out are the two the codes would fail: "ZH" and "JA" are how *English* refers
+ *  to those languages, so they are the one form a reader scanning for their own would miss.
+ *
+ *  And the Chinese is "中文" rather than a script named alongside it. The dictionary is written
+ *  in one script and cannot honestly claim to be the other, but the picker's job is to say
+ *  which language is behind the option, and every reader of Chinese is looking for these two
+ *  characters. Naming the script in the toolbar answers a question nobody asked at the cost of
+ *  telling half the readers of that language the option is not for them. */
 export const LANGS: ReadonlyArray<{ value: Lang; label: string; tag: string }> = [
-  { value: "en", label: "English", tag: "en-US" },
-  { value: "zh", label: "简体中文", tag: "zh-CN" },
+  { value: "en", label: "EN", tag: "en-US" },
+  { value: "zh", label: "中文", tag: "zh-CN" },
   { value: "ja", label: "日本語", tag: "ja-JP" },
-  { value: "es", label: "Español", tag: "es-ES" },
-  { value: "fr", label: "Français", tag: "fr-FR" },
-  { value: "de", label: "Deutsch", tag: "de-DE" },
+  { value: "es", label: "ES", tag: "es-ES" },
+  { value: "fr", label: "FR", tag: "fr-FR" },
+  { value: "de", label: "DE", tag: "de-DE" },
 ]
 
 const TAGS = Object.fromEntries(LANGS.map((l) => [l.value, l.tag])) as Record<Lang, string>
@@ -37,10 +50,10 @@ export function isLang(v: string): v is Lang {
 /** The reader's language, from the browser's own ordered preference list.
  *
  *  Matched on the primary subtag alone, so `de-AT` and `fr-CA` land on their language rather
- *  than falling through to English for want of an exact tag. The one place that is a real
- *  loss is `zh-Hant`: only Simplified ships, and a Traditional reader gets it. That is a
- *  worse fit than English for some of them, which is exactly why the switch is in the toolbar
- *  rather than the guess being the last word.
+ *  than falling through to English for want of an exact tag -- and so every `zh-*` lands on
+ *  the one Chinese dictionary that ships, whichever script the reader's system asked for. A
+ *  guess is a guess, which is why the switch is in the toolbar rather than this being the
+ *  last word.
  *
  *  Guarded on `document` rather than on `navigator`, because Node has had a `navigator` with
  *  a `language` on it since v24 -- so the two suites that run as plain `node` scripts would

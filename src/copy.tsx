@@ -60,15 +60,16 @@ const EN = {
     light: "Light theme",
     system: "System theme",
     dark: "Dark theme",
-    lightTip: "Light, whatever the system says",
-    systemTip: "Follow the system’s light or dark setting",
-    darkTip: "Dark, whatever the system says",
+    /** The hint on a control that shows one option and walks to the next: what pressing does,
+     *  since which one is current is already the button's name. */
+    cycle: (next: string): string => `Press to switch to: ${next}`,
   },
   ttl: {
-    label: "TTL",
-    hint: "Cache-write TTL. A write bills at 2× input on a 1h TTL and 1.25× on 5m; where the transcript recorded which applied, that is used verbatim, so this reprices only the rest.",
-    tip1h: "Assume 1h: unrecorded cache writes at 2× input",
-    tip5m: "Assume 5m: unrecorded cache writes at 1.25× input",
+    name: "Cache-write TTL",
+    tip1h:
+      "Cache writes the transcript did not label are priced as a 1h TTL, at 2× input. Press to assume 5m instead, at 1.25×.",
+    tip5m:
+      "Cache writes the transcript did not label are priced as a 5m TTL, at 1.25× input. Press to assume 1h instead, at 2×.",
   },
   mask: {
     name: "Hide dollar amounts",
@@ -418,15 +419,12 @@ const ZH: Dict = {
     light: "浅色主题",
     system: "跟随系统",
     dark: "深色主题",
-    lightTip: "始终浅色，不看系统设置",
-    systemTip: "跟随系统的浅色／深色设置",
-    darkTip: "始终深色，不看系统设置",
+    cycle: (next) => `点一下切换到：${next}`,
   },
   ttl: {
-    label: "TTL",
-    hint: "缓存写入的 TTL。1h 的写入按输入的 2× 计费，5m 按 1.25×；转录里明确记录了哪一种的，直接照记录算，所以这个开关只重新定价其余部分。",
-    tip1h: "按 1h 算：未记录的缓存写入按输入的 2×",
-    tip5m: "按 5m 算：未记录的缓存写入按输入的 1.25×",
+    name: "缓存写入 TTL",
+    tip1h: "转录里没有标注 TTL 的缓存写入，按 1h 计价，即输入的 2×。点一下改按 5m，即 1.25×。",
+    tip5m: "转录里没有标注 TTL 的缓存写入，按 5m 计价，即输入的 1.25×。点一下改按 1h，即 2×。",
   },
   mask: {
     name: "隐藏金额",
@@ -714,15 +712,14 @@ const JA: Dict = {
     light: "ライトテーマ",
     system: "システムに従う",
     dark: "ダークテーマ",
-    lightTip: "システム設定にかかわらずライト",
-    systemTip: "システムのライト／ダーク設定に従う",
-    darkTip: "システム設定にかかわらずダーク",
+    cycle: (next) => `押すと ${next} に切り替わります`,
   },
   ttl: {
-    label: "TTL",
-    hint: "キャッシュ書き込みの TTL。1h なら入力の 2×、5m なら 1.25× で課金されます。どちらが適用されたか記録が残っているものはそのまま使うので、この切り替えが再計算するのは残りだけです。",
-    tip1h: "1h とみなす：記録のないキャッシュ書き込みを入力の 2× で",
-    tip5m: "5m とみなす：記録のないキャッシュ書き込みを入力の 1.25× で",
+    name: "キャッシュ書き込みの TTL",
+    tip1h:
+      "トランスクリプトに TTL の記録がないキャッシュ書き込みは、1h とみなして入力の 2× で計上しています。押すと 5m（1.25×）に切り替わります。",
+    tip5m:
+      "トランスクリプトに TTL の記録がないキャッシュ書き込みは、5m とみなして入力の 1.25× で計上しています。押すと 1h（2×）に切り替わります。",
   },
   mask: {
     name: "金額を隠す",
@@ -1022,15 +1019,14 @@ const ES: Dict = {
     light: "Tema claro",
     system: "Tema del sistema",
     dark: "Tema oscuro",
-    lightTip: "Claro, diga lo que diga el sistema",
-    systemTip: "Seguir el ajuste claro u oscuro del sistema",
-    darkTip: "Oscuro, diga lo que diga el sistema",
+    cycle: (next) => `Pulsa para cambiar a: ${next}`,
   },
   ttl: {
-    label: "TTL",
-    hint: "TTL de escritura en caché. Una escritura se cobra a 2× la entrada con TTL de 1h y a 1,25× con 5m; donde la transcripción registró cuál se aplicó, se usa tal cual, así que esto solo recalcula el resto.",
-    tip1h: "Suponer 1h: escrituras sin registrar a 2× la entrada",
-    tip5m: "Suponer 5m: escrituras sin registrar a 1,25× la entrada",
+    name: "TTL de escritura en caché",
+    tip1h:
+      "Las escrituras en caché que la transcripción no registró se tarifan como TTL de 1h, a 2× la entrada. Pulsa para suponer 5m, a 1,25×.",
+    tip5m:
+      "Las escrituras en caché que la transcripción no registró se tarifan como TTL de 5m, a 1,25× la entrada. Pulsa para suponer 1h, a 2×.",
   },
   mask: {
     name: "Ocultar los importes",
@@ -1337,15 +1333,14 @@ const FR: Dict = {
     light: "Thème clair",
     system: "Thème du système",
     dark: "Thème sombre",
-    lightTip: "Clair, quoi que dise le système",
-    systemTip: "Suivre le réglage clair ou sombre du système",
-    darkTip: "Sombre, quoi que dise le système",
+    cycle: (next) => `Appuyez pour passer à : ${next}`,
   },
   ttl: {
-    label: "TTL",
-    hint: "TTL d’écriture en cache. Une écriture est facturée 2× l’entrée avec un TTL de 1h et 1,25× avec 5m ; là où la transcription a noté lequel s’appliquait, c’est repris tel quel, donc ceci ne retarife que le reste.",
-    tip1h: "Supposer 1h : écritures non notées à 2× l’entrée",
-    tip5m: "Supposer 5m : écritures non notées à 1,25× l’entrée",
+    name: "TTL d’écriture en cache",
+    tip1h:
+      "Les écritures en cache que la transcription n’a pas notées sont tarifées comme un TTL de 1h, à 2× l’entrée. Appuyez pour supposer 5m, à 1,25×.",
+    tip5m:
+      "Les écritures en cache que la transcription n’a pas notées sont tarifées comme un TTL de 5m, à 1,25× l’entrée. Appuyez pour supposer 1h, à 2×.",
   },
   mask: {
     name: "Masquer les montants",
@@ -1653,15 +1648,14 @@ const DE: Dict = {
     light: "Helles Design",
     system: "System-Design",
     dark: "Dunkles Design",
-    lightTip: "Hell, was das System auch sagt",
-    systemTip: "Der Hell-/Dunkel-Einstellung des Systems folgen",
-    darkTip: "Dunkel, was das System auch sagt",
+    cycle: (next) => `Drücken, um zu wechseln zu: ${next}`,
   },
   ttl: {
-    label: "TTL",
-    hint: "TTL für Cache-Schreibvorgänge. Ein Schreibvorgang kostet bei 1h TTL das 2-fache der Eingabe, bei 5m das 1,25-fache; wo das Transkript festgehalten hat, was galt, wird das wörtlich übernommen — dieser Schalter bepreist nur den Rest neu.",
-    tip1h: "1h annehmen: nicht festgehaltene Cache-Schreibvorgänge zum 2-fachen der Eingabe",
-    tip5m: "5m annehmen: nicht festgehaltene Cache-Schreibvorgänge zum 1,25-fachen der Eingabe",
+    name: "TTL für Cache-Schreibvorgänge",
+    tip1h:
+      "Cache-Schreibvorgänge ohne TTL-Angabe im Transkript werden als 1h bepreist, zum 2-fachen der Eingabe. Drücken, um stattdessen 5m anzunehmen, zum 1,25-fachen.",
+    tip5m:
+      "Cache-Schreibvorgänge ohne TTL-Angabe im Transkript werden als 5m bepreist, zum 1,25-fachen der Eingabe. Drücken, um stattdessen 1h anzunehmen, zum 2-fachen.",
   },
   mask: {
     name: "Beträge ausblenden",

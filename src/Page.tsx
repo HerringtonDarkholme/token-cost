@@ -129,7 +129,15 @@ export function Page({
           for something, and this reads the pointer and the focus against those marks. See
           `hoverClear`. */}
       <div className="shell" data-dir={dir} {...hoverClear}>
-        <Toolbar report={!!ctx} leaving={leaving} onReset={onReset} />
+        {/* The TTL lens is offered only where the transcripts left it something to do: the
+            walk counts the write tokens whose TTL went unrecorded, and where that is zero the
+            two lenses are the same number and the switch is a control that does nothing. */}
+        <Toolbar
+          report={!!ctx}
+          ttl={!!data && data.ttlTokens.unknown > 0}
+          leaving={leaving}
+          onReset={onReset}
+        />
         {/* The frame, and the only element on the page that is never replaced. `data-chart`
             gives the empty card the shape the report will have, so a file drop changes what is
             inside the box without changing the box; `data-face` is what makes its border a

@@ -198,30 +198,36 @@ button {
   align-items: center;
   padding: 5px 10px;
 }
-/* A label that names what the buttons beside it choose, so "TTL" is said once instead of
-   twice. Not a button, and ruled off from them, so it never reads as a third option. It is
-   the hover target for the control's own hint, where there is one -- hence the cursor that
-   asks rather than points, conditioned on the hint actually following it. */
-.seglbl:has(+ .t-tt) {
-  cursor: help;
+/* A control that shows the option it is on and walks to the next when pressed -- the theme,
+   and the TTL lens where there is one. One box where three stood, for a preference rather than
+   a lens: the other two options were drawn full-time to say a thing the reader settles once.
+   No pressed state to draw, because there is no unpressed sibling for it to mean anything
+   against -- what carries the state is the face, and what carries the rest is the hint. */
+.cycbtn {
+  color: var(--ink2);
+  transition: color var(--duration-fast) var(--ease-smooth-out);
 }
-.seglbl {
+.cycbtn:hover,
+.cycbtn:focus-visible {
+  color: var(--ink);
+}
+/* The swap wrapper is `inline-block` by default, which would leave a glyph sitting on the
+   text baseline inside a button laid out as a row. */
+.cycbtn .t-text-swap,
+.cycface {
   display: flex;
   align-items: center;
-  padding: 5px 10px;
-  font-size: 11px;
-  font-family: var(--mono);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--ink3);
-  border-right: 1px solid var(--rule);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cycbtn {
+    transition: none;
+  }
 }
 /* The language picker: a `.seg` box like its neighbours, holding a globe and a native
    `<select>` rather than a row of buttons. Six options is where the travelling pill stops
-   working -- six words in six scripts is the widest thing on the page for a control pressed
-   once a session -- and the platform's own list already knows how to draw 简体中文 beside
-   Français, and how to be operated by a thumb.
+   working, and where cycling stops working too -- nobody should press through four languages
+   to reach their own -- and the platform's own list already knows how to draw 中文 beside FR,
+   and how to be operated by a thumb.
 
    Which means the one thing to undo is the platform's *chrome*: `appearance: none` strips the
    bevel and the arrow so the box is the same box as the theme switch beside it. The glyph is

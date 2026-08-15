@@ -13,7 +13,7 @@ import { LANGS } from "../src/i18n.ts"
 import { Page, type Dir } from "../src/Page.tsx"
 import { originOf, type Origin } from "../src/Upload.tsx"
 import { getHover, getState, resetState, setHover, setState, type ViewState } from "../src/store.ts"
-import { corpus } from "./fixture.ts"
+import { corpus, synthetic } from "./fixture.ts"
 
 const data = analyze(corpus(process.env.TRANSCRIPT_DIR))
 const d = data.datasets["1h"]
@@ -377,13 +377,51 @@ describe("interaction", () => {
     expect(container.querySelector(".total")?.textContent).toBe(real)
   })
 
-  it("the TTL switch recomputes the page", () => {
-    const before = container.querySelector(".total")?.textContent
-    click(byLabel("button", "5m"))
-    expect(getState().ttl).toBe("5m")
-    expect(container.querySelector(".billed")?.textContent).toContain("5m")
-    // The two lenses can legitimately agree to the cent; the label must still move.
-    expect(typeof before).toBe("string")
+  /* The corpus records the TTL of every cache write, which is what a transcript written by any
+     recent Claude Code does -- so there is nothing left for the assumption to assume, and the
+     switch that reprices it is not offered at all. A control that visibly changes nothing is
+     worse than a missing one: the reader presses it, watches the bill hold still, and comes
+     away trusting the page less. The claim it would have made is still made, in the footnotes,
+     where it costs no width. See the legacy suite below for the other half of this. */
+  it("the TTL switch is absent when the transcripts left it nothing to reprice", () => {
+    expect(data.ttlTokens.unknown).toBe(0)
+    expect(byLabel("button", "5m")).toBeNull()
+    expect(container.querySelector('[aria-label*="TTL"]')).toBeNull()
+    expect(container.querySelector(".foot")?.textContent).toContain("100.0%")
+  })
+
+  /* One button where three stood, so what has to hold is that pressing walks the whole ring and
+     comes back -- a cycle that stops on the last option is a control with a corner. The name
+     carries the state, since there is no sibling for `aria-pressed` to mean anything against,
+     and the hint has to move with it or it is describing the option that just left. */
+  it("the theme walks to the next option and round again", () => {
+    const btn = (): HTMLButtonElement => container.querySelector<HTMLButtonElement>(".cycbtn")!
+    /* The hint is the trigger's own next sibling -- that adjacency is the whole of what makes
+       the CSS show it -- and the id link is what makes a screen reader read it. Both, since
+       either one alone can come undone without a symptom on screen. */
+    const tipOf = (b: HTMLButtonElement): string => {
+      const tip = b.nextElementSibling
+      expect(tip?.id).toBe(b.getAttribute("aria-describedby"))
+      return tip?.textContent ?? ""
+    }
+
+    /* The theme survives a reset the way the language does, so it is put back by hand: an
+       earlier test that walked it would otherwise decide where this one starts. */
+    show({ theme: "system" })
+    expect(btn().getAttribute("aria-label")).toBe("System theme")
+    expect(tipOf(btn())).toContain("Dark theme")
+
+    click(btn())
+    expect(getState().theme).toBe("dark")
+    expect(btn().getAttribute("aria-label")).toBe("Dark theme")
+    expect(tipOf(btn())).toContain("Light theme")
+
+    click(btn())
+    expect(getState().theme).toBe("light")
+    click(btn())
+    expect(getState().theme).toBe("system")
+    // And only ever one of them on screen.
+    expect(container.querySelectorAll(".cycbtn")).toHaveLength(1)
   })
 
   /* The pressed state of a segmented control is a pill that travels, so the thing to assert
@@ -396,22 +434,22 @@ describe("interaction", () => {
       expect(seg.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1)
     }
     expect(byLabel(".t-tab", "Sunburst")).not.toBeNull()
-    expect(byLabel(".t-tab", "5m")).not.toBeNull()
+    expect(byLabel(".t-tab", "Table")).not.toBeNull()
   })
 
-  /* The controls whose face is a symbol -- the eye over the dollars, "1h", the three theme
-     glyphs -- say what they do in a hint, and the hint has to be the words a screen reader
-     gets as well as the ones a pointer gets. So: a glyph button carries a name, its hint is
-     what describes it, and the hint is the trigger's own next sibling, since that adjacency
-     is the whole of what makes the CSS show it. The ids come from `useId`, which is exactly
-     the kind of link that comes undone in a refactor with no symptom on screen. */
+  /* The controls whose face is a symbol -- the eye over the dollars, the one theme glyph --
+     say what they do in a hint, and the hint has to be the words a screen reader gets as well
+     as the ones a pointer gets. So: a glyph button carries a name, its hint is what describes
+     it, and the hint is the trigger's own next sibling, since that adjacency is the whole of
+     what makes the CSS show it. The ids come from `useId`, which is exactly the kind of link
+     that comes undone in a refactor with no symptom on screen. */
   it("a control drawn as a symbol is named, and its hint describes it", () => {
     const tips = new Map(
       [...container.querySelectorAll('[role="tooltip"]')].map((t) => [t.id, t] as const),
     )
     const described = [...container.querySelectorAll("[aria-describedby]")]
-    // The reset, the eye, the two TTL options, the three themes.
-    expect(described).toHaveLength(7)
+    // The reset, the eye, the theme.
+    expect(described).toHaveLength(3)
     for (const el of described) {
       const tip = tips.get(el.getAttribute("aria-describedby") || "")
       expect(tip, `hint for ${el.getAttribute("aria-label") || el.textContent}`).toBeDefined()
@@ -420,7 +458,7 @@ describe("interaction", () => {
     }
 
     const glyphs = [...container.querySelectorAll("button[data-icon]")]
-    expect(glyphs).toHaveLength(3)
+    expect(glyphs).toHaveLength(1)
     for (const b of glyphs) {
       // A picture instead of the word, so the word has to be the name.
       expect(b.textContent).toBe("")
@@ -727,7 +765,13 @@ describe("the card's two faces", () => {
     expect(box.querySelector(".total")?.textContent).toMatch(/^\$[\d,.]+$/)
     // And the controls that only mean something now that there is a bill have arrived.
     expect(box.querySelector('button[aria-label="New analysis"]')).not.toBeNull()
-    expect(box.querySelectorAll(".toolbar .t-grow")).toHaveLength(5)
+    /* Four, not five: the corpus records every cache write's TTL, so the switch that reprices
+       the unrecorded ones has nothing to offer and is not drawn. */
+    expect(box.querySelectorAll(".toolbar .t-grow")).toHaveLength(4)
+    // And the stagger still counts outward from the anchor without a gap in it.
+    expect(
+      [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")),
+    ).toEqual(["3", "2", "1", "0"])
     expect([...box.querySelectorAll(".toolbar > *")].at(-1)?.classList.contains("seg")).toBe(true)
   })
 
@@ -806,5 +850,98 @@ describe("where a pick came from", () => {
     expect(at("a.jsonl", "b.jsonl")).toEqual({ root: null, claude: false })
     expect(at("-Users-me-x/a.jsonl", "-Users-me-y/b.jsonl")).toEqual({ root: null, claude: true })
     expect(at()).toEqual({ root: null, claude: false })
+  })
+})
+
+/* The other half of the TTL switch's rule.
+
+   Everything above runs against a corpus that records which TTL applied to every cache write,
+   because that is what a transcript written by any recent Claude Code looks like -- and there
+   the switch is absent, having nothing to reprice. This is the corpus from before that field
+   existed, where the assumption is doing real work: the whole cache-write bill moves by the
+   ratio between 2× input and 1.25×, and the reader has to be able to say which one to read it
+   under. So the control comes back, and it comes back as one button that walks between the two
+   rather than as a row that spends its width saying there are exactly two. */
+describe("the TTL lens, where there is one to offer", () => {
+  const legacy = analyze(synthetic({ recordTtl: false }))
+  let box: HTMLElement
+  let r: Root
+
+  beforeAll(() => {
+    box = document.createElement("div")
+    document.body.appendChild(box)
+    r = createRoot(box)
+    act(() => {
+      r.render(<Page data={legacy} leaving={false} dir="fwd" onData={noop} onReset={noop} />)
+    })
+  })
+
+  afterAll(() => {
+    act(() => {
+      r.unmount()
+    })
+    box.remove()
+  })
+
+  beforeEach(() => {
+    act(() => {
+      resetState()
+      setState({ lang: "en" })
+    })
+  })
+
+  const ttlBtn = (): HTMLButtonElement =>
+    [...box.querySelectorAll<HTMLButtonElement>(".cycbtn")].find((b) =>
+      b.getAttribute("aria-label")?.includes("TTL"),
+    )!
+
+  it("nothing was recorded, so the switch is there", () => {
+    expect(legacy.ttlTokens.unknown).toBeGreaterThan(0)
+    expect(legacy.ttlMeasuredShare).toBe(0)
+    const btn = ttlBtn()
+    expect(btn).toBeDefined()
+    /* The abbreviation is the face, and the name is what it stands for -- "1h" on its own is
+       the kind of label that means something only to whoever wrote it. */
+    expect(btn.textContent?.trim()).toBe("1h")
+    expect(btn.getAttribute("aria-label")).toBe("Cache-write TTL: 1h")
+    // No pressed state: there is no sibling for it to be pressed instead of.
+    expect(btn.hasAttribute("aria-pressed")).toBe(false)
+    // Five controls now, and the stagger still runs unbroken outward from the anchor.
+    expect(
+      [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")),
+    ).toEqual(["4", "3", "2", "1", "0"])
+  })
+
+  it("pressing it reprices the bill, and walks back", () => {
+    const total = (): string => box.querySelector(".total")?.textContent ?? ""
+    const at1h = total()
+
+    act(() => {
+      ttlBtn().dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    })
+    expect(getState().ttl).toBe("5m")
+    /* The *name*, not the face. The face is inside a swap, which holds the option that is
+       leaving for the length of its exit -- that is the animation, and a test that asserted
+       against it would be asserting the page has no animation. What cannot be held back is
+       what a screen reader is told, so that is what commits on the tick. */
+    expect(ttlBtn().getAttribute("aria-label")).toBe("Cache-write TTL: 5m")
+    expect(box.querySelector(".billed")?.textContent).toContain("5m")
+    /* The point of the whole control: with nothing recorded, every cache write in the corpus
+       is repriced, so the two lenses cannot agree. */
+    expect(total()).not.toBe(at1h)
+    expect(legacy.datasets["5m"].total).toBeLessThan(legacy.datasets["1h"].total)
+
+    act(() => {
+      ttlBtn().dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    })
+    expect(getState().ttl).toBe("1h")
+    expect(total()).toBe(at1h)
+  })
+
+  it("the hint says what pressing does, not what is already showing", () => {
+    const tip = ttlBtn().nextElementSibling
+    expect(tip?.id).toBe(ttlBtn().getAttribute("aria-describedby"))
+    expect(tip?.textContent).toContain("5m")
+    expect(tip?.textContent).toContain("1.25")
   })
 })

@@ -1,20 +1,23 @@
-/* The instrument's controls. Every one of them is a real button with `aria-pressed`, so
-   the current lens is announced rather than only coloured. */
+/* The instrument's controls. Every one of them is a real button that says its own state, so
+   the current lens is announced rather than only coloured -- `aria-pressed` where there is a
+   sibling to be pressed instead of, and the accessible name itself where there is not. See
+   `Cycle`. */
 
 import { useId } from "react"
 import { LANGS, useT, type Dict } from "./copy.tsx"
 import type { TtlAssumption } from "./engine.ts"
 import type { Lang } from "./i18n.ts"
-import { Seg, type SegOption } from "./Seg.tsx"
+import { Cycle, type SegOption } from "./Seg.tsx"
 import { CopyChartButton, ShareButton } from "./Share.tsx"
 import { setState, useViewState, type ThemeChoice } from "./store.ts"
 import { Tip } from "./Tip.tsx"
 
 /** The sun, a display, the moon. Three glyphs where three words -- LIGHT SYSTEM DARK -- were
  *  the widest thing in the toolbar, for the control a reader touches once a session and
- *  recognises by shape. Stroked in `currentColor`, so the pressed one inverts with the pill
- *  rather than needing a second colour, and the word survives as the accessible name and as
- *  the hint. */
+ *  recognises by shape. One of the three is on screen at a time now, which is the rest of that
+ *  same argument: the reader is not choosing between them, they are saying where they already
+ *  are. Stroked in `currentColor`, so it takes the bar's ink, and the word survives as the
+ *  accessible name. */
 function Sun(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -46,18 +49,23 @@ function Moon(): React.JSX.Element {
 
 /* The options are built per render rather than written once at module scope, because a word in
    them changes when the language does and a constant cannot. The glyphs do not change, so they
-   are still the same three elements every time. */
-const themes = (t: Dict): ReadonlyArray<SegOption<ThemeChoice>> => [
-  { value: "light", label: t.theme.light, icon: <Sun />, tip: t.theme.lightTip },
-  { value: "system", label: t.theme.system, icon: <Display />, tip: t.theme.systemTip },
-  { value: "dark", label: t.theme.dark, icon: <Moon />, tip: t.theme.darkTip },
+   are still the same three elements every time.
+
+   Each hint names the *next* option rather than its own, because only one of these is ever on
+   screen: by the time a hint can be read, its option is the one already showing, and the only
+   thing left to say about it is where pressing goes. Which is also why the order is written
+   here and nowhere else -- light, system, dark, and round -- since the hints spell it out. */
+const themes = (t: Dict): ReadonlyArray<SegOption<ThemeChoice> & { tip: string }> => [
+  { value: "light", label: t.theme.light, icon: <Sun />, tip: t.theme.cycle(t.theme.system) },
+  { value: "system", label: t.theme.system, icon: <Display />, tip: t.theme.cycle(t.theme.dark) },
+  { value: "dark", label: t.theme.dark, icon: <Moon />, tip: t.theme.cycle(t.theme.light) },
 ]
 
 /* A cache write costs 2× input on a 1h TTL and 1.25× on 5m, so a bill read under the wrong
    assumption is wrong by that much on every write the transcript left unlabelled. That is
    what the switch is for, and what the hints say -- the abbreviation on its own says none of
    it. The abbreviations themselves are not translated: they are what the API calls them. */
-const ttls = (t: Dict): ReadonlyArray<SegOption<TtlAssumption>> => [
+const ttls = (t: Dict): ReadonlyArray<SegOption<TtlAssumption> & { tip: string }> => [
   { value: "1h", label: "1h", tip: t.ttl.tip1h },
   { value: "5m", label: "5m", tip: t.ttl.tip5m },
 ]
@@ -80,15 +88,25 @@ function Globe(): React.JSX.Element {
   )
 }
 
-/** The language, as a select rather than as the segmented control every other lens here uses.
- *  Six options is where that stops working: the pill measures its buttons, and six words in
- *  six scripts is the widest thing on the page for a control pressed once a session -- and
- *  pressed by someone who is, by definition, not reading the language it is currently in.
+/** The language, as a select rather than as the segmented control every other lens here uses,
+ *  and not as the cycle its neighbours use either. Six options is where a row of buttons stops
+ *  working, and six is also where cycling stops working: a reader who wants German should not
+ *  have to press through four other languages to reach it, and a control that walks somewhere
+ *  new on every press is the one control here where a wrong press is expensive -- the way back
+ *  is now labelled in a script you may not read.
  *
- *  A native `<select>` also gets one thing no row of buttons does: the platform's own list,
- *  which already knows how to render 简体中文 beside Français and how to be operated by a
- *  keyboard, a screen reader and a thumb. The glyph beside it is what makes it findable
- *  without a word, since the word would be in the language you are trying to leave. */
+ *  A native `<select>` gets one thing neither of those does: the platform's own list, which
+ *  already knows how to render 中文 beside Français and how to be operated by a keyboard, a
+ *  screen reader and a thumb. The glyph beside it is what makes it findable without a word,
+ *  since the word would be in the language you are trying to leave.
+ *
+ *  What the options say is a code where the script is Latin and the language's own name where
+ *  it is not -- "EN", "中文". A picker naming each language in itself is right in principle,
+ *  and in practice five of the six names were being set in a font this toolbar does not use,
+ *  in a box sized for the longest of them, to tell a reader something they can already see
+ *  from the page behind it. The two that stay written out are the two a code would fail:
+ *  "ZH" and "JA" are how English refers to those languages, which makes them the one form no
+ *  reader looking for them is scanning for. */
 function LangPicker(): React.JSX.Element {
   const { lang } = useViewState()
   const t = useT()
@@ -207,9 +225,10 @@ function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
  *  left the pair marooned between frames, reading as a row that had failed to line up. Order is
  *  what fixes that, not sizes: text, text, then every box in one run ending on the anchor.
  *
- *  Nothing here reads the analysis: every one of these is a lens on the view state, which
- *  exists before the data does. That is what lets one toolbar serve both faces of the card
- *  instead of a stripped-down copy for the empty one.
+ *  Every one of these is a lens on the view state, which exists before the data does -- which
+ *  is what lets one toolbar serve both faces of the card instead of a stripped-down copy for
+ *  the empty one. The one thing it asks the analysis is whether a lens has anything to act on:
+ *  see `ttl`.
  *
  *  The two things worth taking out of the page are the picture and the post. A link is not
  *  one of them: the hash carries the view -- lens, drill, chart -- and none of the data,
@@ -217,11 +236,19 @@ function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
  *  for whoever receives it. */
 export function Toolbar({
   report,
+  ttl,
   leaving,
   onReset,
 }: {
   /** Whether there is a bill to act on. */
   report: boolean
+  /** Whether the TTL assumption is load-bearing -- that is, whether the transcripts left any
+   *  cache write unlabelled for it to reprice. Modern ones label every one, which makes the
+   *  switch a control that visibly changes nothing: the reader presses it, watches the bill
+   *  hold still, and learns to distrust the page rather than to trust the transcript. So it is
+   *  absent unless there is something for it to move. What it would have said is said anyway,
+   *  once, in the footnotes -- see `ttlShareCaveat`. */
+  ttl: boolean
   /** The report is on its way out: play the exits, and stay mounted until it is gone. */
   leaving: boolean
   onReset: () => void
@@ -229,41 +256,43 @@ export function Toolbar({
   const state = useViewState()
   const t = useT()
 
+  /* Where the stagger starts counting. It runs *outward* from the anchor, so the beats belong
+     to the positions rather than to the controls: the one nearest the anchor arrives first
+     whether it is the TTL switch or the mask. Which means the numbers cannot be written in --
+     with the switch away, a hand-numbered row would open on a beat where nothing arrives. */
+  const first = ttl ? 4 : 3
+
   return (
     <div className="toolbar" data-leaving={leaving ? "1" : undefined}>
       <span className="tick" />
       {report ? (
         <>
-          <span className="t-grow" data-i="4">
+          <span className="t-grow" data-i={first}>
             <CopyChartButton />
           </span>
-          <span className="t-grow" data-i="3">
+          <span className="t-grow" data-i={first - 1}>
             <ShareButton />
           </span>
-          <span className="t-grow" data-i="2">
+          <span className="t-grow" data-i={first - 2}>
             <ResetButton onReset={onReset} />
           </span>
-          <span className="t-grow" data-i="1">
+          <span className="t-grow" data-i={first - 3}>
             <span className="seg t-tt-host">
               <MaskToggle on={state.pctOnly} />
             </span>
           </span>
-          <span className="t-grow" data-i="0">
-            <Seg
-              label={t.ttl.label}
-              hint={t.ttl.hint}
-              options={ttls(t)}
-              value={state.ttl}
-              onPick={pickTtl}
-            />
-          </span>
+          {ttl ? (
+            <span className="t-grow" data-i="0">
+              <Cycle name={t.ttl.name} options={ttls(t)} value={state.ttl} onPick={pickTtl} />
+            </span>
+          ) : null}
         </>
       ) : null}
       {/* Inside the anchor rather than beside it: language and theme are the two controls that
           exist before there is a bill and outlive any one of them, so they hold the same
           ground on both faces of the card and everything else grows leftward past them. */}
       <LangPicker />
-      <Seg options={themes(t)} value={state.theme} onPick={pickTheme} />
+      <Cycle options={themes(t)} value={state.theme} onPick={pickTheme} />
     </div>
   )
 }

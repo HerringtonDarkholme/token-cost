@@ -21,9 +21,17 @@ export function readDir(dir: string): RawFile[] {
  *  `acme-deploy` and the `acmeinternal` MCP server are here to stand for the names a caption
  *  must never say out loud -- an in-house CLI and a server named after somebody's employer.
  *  They are also the most expensive things in the corpus, so a caption that names leaves by
- *  cost alone reaches for one of them first, and the suite catches it. */
-export function synthetic(): RawFile[] {
+ *  cost alone reaches for one of them first, and the suite catches it.
+ *
+ *  `recordTtl` is the one thing about a transcript that changes what the page *offers* rather
+ *  than what it says: a request records which cache-write TTL applied, and one written before
+ *  the field existed does not. Both shapes are real, so both are here -- the default is the
+ *  modern one, and the switch that reprices what was not recorded is only reachable from the
+ *  other. See `Toolbar`. */
+export function synthetic({ recordTtl = true }: { recordTtl?: boolean } = {}): RawFile[] {
   const L: string[] = []
+  const written = (n: number): Record<string, number> | undefined =>
+    recordTtl ? { ephemeral_1h_input_tokens: n, ephemeral_5m_input_tokens: 0 } : undefined
   const progs: Array<[string, string[]]> = [
     ["git", ["diff", "log", "status", "commit"]],
     ["docker", ["build", "run", "ps"]],
@@ -43,7 +51,7 @@ export function synthetic(): RawFile[] {
             cache_read_input_tokens: 9000 + k * 800,
             cache_creation_input_tokens: 300,
             output_tokens: 260,
-            cache_creation: { ephemeral_1h_input_tokens: 300, ephemeral_5m_input_tokens: 0 },
+            cache_creation: written(300),
           },
           content: [
             { type: "text", text: "considering the change ".repeat(12) },
@@ -84,7 +92,7 @@ export function synthetic(): RawFile[] {
             cache_read_input_tokens: 12000 + k * 800,
             cache_creation_input_tokens: 300,
             output_tokens: 200,
-            cache_creation: { ephemeral_1h_input_tokens: 300, ephemeral_5m_input_tokens: 0 },
+            cache_creation: written(300),
           },
           content: [
             {
@@ -118,7 +126,7 @@ export function synthetic(): RawFile[] {
             cache_read_input_tokens: 15000 + k * 800,
             cache_creation_input_tokens: 300,
             output_tokens: 120,
-            cache_creation: { ephemeral_1h_input_tokens: 300, ephemeral_5m_input_tokens: 0 },
+            cache_creation: written(300),
           },
           content: [
             {
