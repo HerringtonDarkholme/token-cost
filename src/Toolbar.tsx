@@ -1,7 +1,4 @@
-/* The instrument's controls. Every one of them is a real button that says its own state, so
-   the current lens is announced rather than only coloured -- `aria-pressed` where there is a
-   sibling to be pressed instead of, and the accessible name itself where there is not. See
-   `Cycle`. */
+/* The instrument's controls. */
 
 import { useId } from "react"
 import { LANGS, useT, type Dict } from "./copy.tsx"
@@ -13,12 +10,7 @@ import { CopyChartButton, ShareButton } from "./Share.tsx"
 import { setState, useViewState, type ThemeChoice } from "./store.ts"
 import { Tip } from "./Tip.tsx"
 
-/** The sun, a display, the moon. Three glyphs where three words -- LIGHT SYSTEM DARK -- were
- *  the widest thing in the toolbar, for the control a reader touches once a session and
- *  recognises by shape. One of the three is on screen at a time now, which is the rest of that
- *  same argument: the reader is not choosing between them, they are saying where they already
- *  are. Stroked in `currentColor`, so it takes the bar's ink, and the word survives as the
- *  accessible name. */
+/** The sun, a display, the moon. */
 function Sun(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -28,9 +20,7 @@ function Sun(): React.JSX.Element {
   )
 }
 
-/** Whatever the machine is set to. A display rather than the half-filled disc some apps use:
- *  the disc reads as a third brightness, and this is not one -- it is the setting living
- *  somewhere else. */
+/** Whatever the machine is set to. */
 function Display(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -49,13 +39,7 @@ function Moon(): React.JSX.Element {
 }
 
 /* The options are built per render rather than written once at module scope, because a word in
-   them changes when the language does and a constant cannot. The glyphs do not change, so they
-   are still the same three elements every time.
-
-   Each hint names the *next* option rather than its own, because only one of these is ever on
-   screen: by the time a hint can be read, its option is the one already showing, and the only
-   thing left to say about it is where pressing goes. Which is also why the order is written
-   here and nowhere else -- light, system, dark, and round -- since the hints spell it out. */
+   them changes when the language does and a constant cannot. */
 const themes = (t: Dict): ReadonlyArray<SegOption<ThemeChoice> & { tip: string }> => [
   { value: "light", label: t.theme.light, icon: <Sun />, tip: t.theme.cycle(t.theme.system) },
   { value: "system", label: t.theme.system, icon: <Display />, tip: t.theme.cycle(t.theme.dark) },
@@ -63,23 +47,18 @@ const themes = (t: Dict): ReadonlyArray<SegOption<ThemeChoice> & { tip: string }
 ]
 
 /* A cache write costs 2× input on a 1h TTL and 1.25× on 5m, so a bill read under the wrong
-   assumption is wrong by that much on every write the transcript left unlabelled. That is
-   what the switch is for, and what the hints say -- the abbreviation on its own says none of
-   it. The abbreviations themselves are not translated: they are what the API calls them. */
+   assumption is wrong by that much on every write the transcript left unlabelled. */
 const ttls = (t: Dict): ReadonlyArray<SegOption<TtlAssumption> & { tip: string }> => [
   { value: "1h", label: "1h", tip: t.ttl.tip1h },
   { value: "5m", label: "5m", tip: t.ttl.tip5m },
 ]
 
-/* The switches hand these down rather than closing over a fresh arrow each render. Nothing
-   here needs a component's scope -- a pick is a write to the store, which is a module away --
-   so they are written once, and the two theme switches are the same function. */
+/* The switches hand these down rather than closing over a fresh arrow each render. */
 const pickTtl = (ttl: TtlAssumption): void => setState({ ttl })
 const pickTheme = (theme: ThemeChoice): void => setState({ theme })
 
-/** A globe, for the one control whose options are words in scripts the rest of the toolbar
- *  does not draw. Same recipe as its neighbours: one 16-unit box, stroked in `currentColor`,
- *  so it takes the bar's ink without needing a colour of its own. */
+/** A globe, for the one control whose options are words in scripts the rest of the toolbar does
+ *  not draw. */
 function Globe(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -90,24 +69,7 @@ function Globe(): React.JSX.Element {
 }
 
 /** The language, as a select rather than as the segmented control every other lens here uses,
- *  and not as the cycle its neighbours use either. Six options is where a row of buttons stops
- *  working, and six is also where cycling stops working: a reader who wants German should not
- *  have to press through four other languages to reach it, and a control that walks somewhere
- *  new on every press is the one control here where a wrong press is expensive -- the way back
- *  is now labelled in a script you may not read.
- *
- *  A native `<select>` gets one thing neither of those does: the platform's own list, which
- *  already knows how to render 中文 beside Français and how to be operated by a keyboard, a
- *  screen reader and a thumb. The glyph beside it is what makes it findable without a word,
- *  since the word would be in the language you are trying to leave.
- *
- *  What the options say is a code where the script is Latin and the language's own name where
- *  it is not -- "EN", "中文". A picker naming each language in itself is right in principle,
- *  and in practice five of the six names were being set in a font this toolbar does not use,
- *  in a box sized for the longest of them, to tell a reader something they can already see
- *  from the page behind it. The two that stay written out are the two a code would fail:
- *  "ZH" and "JA" are how English refers to those languages, which makes them the one form no
- *  reader looking for them is scanning for. */
+ *  and not as the cycle its neighbours use either. */
 function LangPicker(): React.JSX.Element {
   const { lang } = useViewState()
   const t = useT()
@@ -130,8 +92,7 @@ function LangPicker(): React.JSX.Element {
   )
 }
 
-/** The eye every brokerage app puts over its balance. Stroked in `currentColor` so it
- *  inverts with the button rather than needing a second colour for the pressed state. */
+/** The eye every brokerage app puts over its balance. */
 function Eye({ off }: { off: boolean }): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -142,25 +103,7 @@ function Eye({ off }: { off: boolean }): React.JSX.Element {
   )
 }
 
-/** Cover the dollars. One button rather than a `$`/`%` pair, because this is not a choice
- *  between two units -- it is one thing being covered up, and the reader wants the state at
- *  a glance while sharing a screen. Pressed is the covered state: the mask is the departure
- *  from the default, so it is the one that earns the filled treatment.
- *
- *  The accessible name stays put while `aria-pressed` carries the state, which is the toggle
- *  contract -- a label that flipped to "Show" would leave a screen reader hearing
- *  "Show, pressed" and no way to tell what that means. The hint is where the flip belongs:
- *  it is a description rather than a name, so it can say what pressing does next, and
- *  `aria-describedby` means it is read out as well as drawn.
- *
- *  Pressing it is a view transition, because what it changes is spread over the whole page:
- *  the bill in the header, the four figures in the strip, a number in every panel and every
- *  row of the table, and the eye in this button. Set between two frames, that is a page that
- *  flickers and leaves the reader checking what else moved. The page's third transition and
- *  the plainest of the three: it names nothing and takes the header's standing names away, so
- *  nothing travels and nothing is stretched -- what is unchanged crosses into itself and is not
- *  seen to change, and the figures dissolve where they stand. See `data-mask` in the
- *  stylesheet. */
+/** Cover the dollars. */
 function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
   const tip = useId()
   const t = useT()
@@ -184,9 +127,7 @@ function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
   )
 }
 
-/** A page with a plus, for the one control here that throws something away. A picture rather
- *  than the words "New file" partly because it is the same size as its neighbours that way,
- *  and partly because the words were the widest thing in the bar for a button pressed once. */
+/** A page with a plus, for the one control here that throws something away. */
 function Fresh(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -196,11 +137,7 @@ function Fresh(): React.JSX.Element {
   )
 }
 
-/** Back to the empty card. The one control with a consequence, so the hint carries it: the
- *  numbers live in this page and nowhere else, and there is no undo -- the transcripts have to
- *  be picked again. The name stays "New analysis", which is what the button is for; what
- *  pressing it costs is a description, and `aria-describedby` means it is read out as well as
- *  drawn. No confirm step on top of that, because re-picking is two clicks. */
+/** Back to the empty card. */
 function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
   const tip = useId()
   const t = useT()
@@ -220,30 +157,7 @@ function ResetButton({ onReset }: { onReset: () => void }): React.JSX.Element {
   )
 }
 
-/** The controls, and the order is the point.
- *
- *  The theme switch is last in the row and the row is packed to the right, so it sits in the
- *  same place whether the page is holding a report or waiting for one: everything else grows
- *  leftward into the tick and leaves it where it was. The controls that only mean something
- *  once there is a bill are absent until there is one -- a disabled control on first load
- *  advertises something that cannot be done -- and they arrive on a stagger that runs outward
- *  from that anchor. They leave together and faster, because a dismissal does not need
- *  choreography.
- *
- *  Within that, the boxed controls are contiguous and the two bare-text ones lead. Reset began
- *  life at the head of the row, which put a box to the left of "Copy chart" and "Share to X" and
- *  left the pair marooned between frames, reading as a row that had failed to line up. Order is
- *  what fixes that, not sizes: text, text, then every box in one run ending on the anchor.
- *
- *  Every one of these is a lens on the view state, which exists before the data does -- which
- *  is what lets one toolbar serve both faces of the card instead of a stripped-down copy for
- *  the empty one. The one thing it asks the analysis is whether a lens has anything to act on:
- *  see `ttl`.
- *
- *  The two things worth taking out of the page are the picture and the post. A link is not
- *  one of them: the hash carries the view -- lens, drill, chart -- and none of the data,
- *  which lives only in the reader's own browser, so a shared link opens on an empty card
- *  for whoever receives it. */
+/** The controls, and the order is the point. */
 export function Toolbar({
   report,
   ttl,
@@ -253,11 +167,7 @@ export function Toolbar({
   /** Whether there is a bill to act on. */
   report: boolean
   /** Whether the TTL assumption is load-bearing -- that is, whether the transcripts left any
-   *  cache write unlabelled for it to reprice. Modern ones label every one, which makes the
-   *  switch a control that visibly changes nothing: the reader presses it, watches the bill
-   *  hold still, and learns to distrust the page rather than to trust the transcript. So it is
-   *  absent unless there is something for it to move. What it would have said is said anyway,
-   *  once, in the footnotes -- see `ttlShareCaveat`. */
+   *  cache write unlabelled for it to reprice. */
   ttl: boolean
   /** The report is on its way out: play the exits, and stay mounted until it is gone. */
   leaving: boolean
@@ -266,10 +176,7 @@ export function Toolbar({
   const state = useViewState()
   const t = useT()
 
-  /* Where the stagger starts counting. It runs *outward* from the anchor, so the beats belong
-     to the positions rather than to the controls: the one nearest the anchor arrives first
-     whether it is the TTL switch or the mask. Which means the numbers cannot be written in --
-     with the switch away, a hand-numbered row would open on a beat where nothing arrives. */
+  /* Where the stagger starts counting. */
   const first = ttl ? 4 : 3
 
   return (

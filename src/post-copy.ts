@@ -1,27 +1,10 @@
-/* The captions that travel with the shared image, in every language the page speaks.
-
-   Apart from `copy.tsx` — which holds the other nine tenths of the words — for one mechanical
-   reason: `model.ts` builds these, and `node test/model.test.ts` runs `model.ts` with nothing
-   between the assertion and the code. Node strips types; it does not strip JSX. So the file
-   the model imports has to be one with no angle brackets in it, and this is that file.
-
-   What lives here is only the sentences. Whether a variant is viable at all -- whether there
-   are two shell programs to escalate between, whether the carry ratio is worth a reframe --
-   is a question about the data rather than about the language, so it stays in `model.ts` and
-   is asked once instead of six times. Each entry below is handed the pieces it needs, already
-   formatted, and returns the lines. */
+/* The captions that travel with the shared image, in every language the page speaks. */
 
 import type { GroupId } from "./engine.ts"
 import type { Draft } from "./model.ts"
 import type { Lang } from "./i18n.ts"
 
-/** One language's captions. Everything is a function of pieces the caller has already
- *  formatted, because how a number is written is a question this file must not answer twice.
- *
- *  `masked` is the reader having covered the dollars to share a screen. Every variant that
- *  takes it has two sentences rather than one with a blank in it: the covered form is not the
- *  open one with the figure removed, it is a different claim, and a language where that reads
- *  badly needs to be able to say so. */
+/** One language's captions. */
 export interface PostCopy {
   /** The span a caption is about: days where the transcripts carry dates, sessions otherwise. */
   scopeDays: (n: number) => string
@@ -29,8 +12,7 @@ export interface PostCopy {
   /** "$12.30 of $98.00", and the covered form that names no total. */
   outOf: (amt: string, total: string) => string
   outOfMasked: (share: string) => string
-  /** How a group is said out loud. The chart's names are column headings -- a heading dropped
-   *  into a sentence reads as a spreadsheet -- so each group gets a phrase instead. */
+  /** How a group is said out loud. */
   said: Partial<Record<GroupId, string>>
 
   a: (p: {

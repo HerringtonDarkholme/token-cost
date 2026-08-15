@@ -1,8 +1,4 @@
-/* The corpus the view suites run against.
-
-   Synthetic by default, so the views are covered without touching anyone's transcripts and
-   without a directory being discovered automatically. Pass a real one when you want to see
-   the views survive real data -- `TRANSCRIPT_DIR=~/.claude/projects/<project>`. */
+/* The corpus the view suites run against. */
 
 import fs from "node:fs"
 import path from "node:path"
@@ -15,19 +11,8 @@ export function readDir(dir: string): RawFile[] {
     .map((f) => ({ name: f, text: fs.readFileSync(path.join(dir, f), "utf8") }))
 }
 
-/** A corpus with enough shape to reach every view: several groups, shell programs that
- *  take subcommands, files of more than one extension, a harness tag, and typed text.
- *
- *  `acme-deploy` and the `acmeinternal` MCP server are here to stand for the names a caption
- *  must never say out loud -- an in-house CLI and a server named after somebody's employer.
- *  They are also the most expensive things in the corpus, so a caption that names leaves by
- *  cost alone reaches for one of them first, and the suite catches it.
- *
- *  `recordTtl` is the one thing about a transcript that changes what the page *offers* rather
- *  than what it says: a request records which cache-write TTL applied, and one written before
- *  the field existed does not. Both shapes are real, so both are here -- the default is the
- *  modern one, and the switch that reprices what was not recorded is only reachable from the
- *  other. See `Toolbar`. */
+/** A corpus with enough shape to reach every view: several groups, shell programs that take
+ *  subcommands, files of more than one extension, a harness tag, and typed text. */
 export function synthetic({ recordTtl = true }: { recordTtl?: boolean } = {}): RawFile[] {
   const L: string[] = []
   const written = (n: number): Record<string, number> | undefined =>

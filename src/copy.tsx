@@ -1,61 +1,24 @@
-/* Every word on the page, six times over.
-
-   English is not one dictionary among six here -- it is the shape of the thing. `Dict` is
-   `typeof EN`, so a key added to the source is a type error in the other five until it is
-   answered, and a key answered with the wrong number of arguments is a type error at the
-   site that would otherwise have printed `undefined` into the report. There is no runtime
-   fallback to English and no lookup by string, because neither is needed: a missing key
-   cannot reach a build.
-
-   What is a *function* here rather than a string is anything with a number in it. A template
-   assembled at the call site -- `t.x + " of " + t.y` -- is an English sentence with holes cut
-   in it, and word order is exactly what the other five do not share. So the call site hands
-   over the pieces already formatted and the dictionary decides where they go.
-
-   The same rule covers the markup: a caveat with a `<strong>` in it is one entry returning a
-   fragment, not a sentence split into three keys around the emphasis. Which words are stressed
-   is a decision about the language.
-
-   What is *not* here is the share captions -- they are in `post-copy.ts`, apart because
-   `model.ts` builds them and `node test/model.test.ts` runs `model.ts` directly. Node strips
-   types; it does not strip JSX.
-
-   The `labels` block at the bottom is the other half of the job: the names the engine puts in
-   the tree. Those stay English inside the analysis -- they are identifiers, they key the
-   palette, and they travel in the shared link -- and are translated on the way to the screen.
-   See `labelOf`. */
+/* Every word on the page, six times over. */
 
 import { GROUPS } from "./engine.ts"
 import { LANGS, type Lang } from "./i18n.ts"
 import type { CostNode } from "./model.ts"
 import { useViewState } from "./store.ts"
 
-/** Which dialog the reader is about to meet. Here rather than in `Upload.tsx` because the
- *  per-platform instructions live in the dictionary and the dictionary may not import the
- *  component that draws them. */
+/** Which dialog the reader is about to meet. */
 export type Os = "mac" | "win" | "linux"
 
-/** One word of the card's heading, and the slot it occupies.
- *
- *  The two faces of the heading are the same sentence in two tenses, and the stylesheet gives
- *  each slot a `view-transition-name` so a word present on both sides *moves* while a word on
- *  one side only fades where it stands -- see the `[data-w]` rules. Which words a language
- *  shares between its question and its answer is a fact about that language, so each supplies
- *  its own tokens: `zh` shares two slots and uses no `where` at all, `de` shares three. A slot
- *  named on one side only is not an omission, it is the change of tense being paid for. */
+/** One word of the card's heading, and the slot it occupies. */
 export interface Word {
   w: string
   text: string
   em?: boolean
-  /** No gap before this one. For the punctuation that has to be its own slot because it is
-   *  present on one face and not the other -- Spanish closes a question with a `?` that the
-   *  answer has no use for -- and that must not be pushed off the word it closes. French wants
-   *  the space and so does not set this; Spanish does. */
+  /** No gap before this one. */
   tight?: boolean
 }
 
 const EN = {
-  /* ---------- the toolbar ---------- */
+  /* the toolbar */
   language: "Language",
   theme: {
     light: "Light theme",
@@ -95,15 +58,14 @@ const EN = {
     failed: "Could not render the image",
   },
 
-  /* ---------- the card's header ---------- */
+  /* the card's header */
   card: {
     eyebrow: "Cost attribution · Claude Code",
-    /** The browser tab, which the shell ships in English because the markup is written
-     *  before anyone has guessed anything. This is the guess arriving -- see `useLangAttr`. */
+    /** The browser tab, which the shell ships in English because the markup is written before
+     *  anyone has guessed anything. */
     title: "Where the money went — Claude Code cost attribution",
     nothingYet: "Nothing dropped yet",
-    /** What goes between the heading's words: a space, or nothing in the scripts that set
-     *  none. See `Heading`. */
+    /** What goes between the heading's words: a space, or nothing in the scripts that set none. */
     gap: " ",
     billed: (ttl: string, masked: boolean): string =>
       `Billed · ${masked ? "amount hidden · " : ""}${ttl} cache TTL`,
@@ -128,7 +90,7 @@ const EN = {
         .join(" · "),
   },
 
-  /* ---------- the four figures that carry the thesis ---------- */
+  /* the four figures that carry the thesis */
   strip: {
     thesis: (
       <>
@@ -143,7 +105,7 @@ const EN = {
     fixedOpen: (amount: string): string => `Fixed, every request · ${amount}`,
   },
 
-  /* ---------- the picture, and the controls that pick it ---------- */
+  /* the picture, and the controls that pick it */
   chart: {
     panels: "Panels",
     table: "Table",
@@ -160,7 +122,7 @@ const EN = {
       `${name}   ${amount}   ${share} of ${under}`,
   },
 
-  /* ---------- the sunburst's own furniture ---------- */
+  /* the sunburst's own furniture */
   sun: {
     back: "Back one level",
     goBack: "click to go back",
@@ -179,7 +141,7 @@ const EN = {
     ),
   },
 
-  /* ---------- panels ---------- */
+  /* panels */
   panels: {
     leaf: "single line item · no further breakdown",
     shown: (shown: string, whole: string): string => `shown: ${shown} of ${whole}`,
@@ -187,7 +149,7 @@ const EN = {
     perReq: (amount: string): string => `${amount}/req`,
   },
 
-  /* ---------- the breakdown, and the table inside it ---------- */
+  /* the breakdown, and the table inside it */
   breakdown: {
     title: "Breakdown",
     find: "Find",
@@ -215,7 +177,7 @@ const EN = {
     noMatch: (query: string): string => `No line item matches “${query}”.`,
   },
 
-  /* ---------- the footnotes ---------- */
+  /* the footnotes */
   foot: {
     monday: "What to change on Monday",
     caveats: "Caveats",
@@ -268,7 +230,7 @@ const EN = {
     unknownShare: "an unknown share",
   },
 
-  /* ---------- the empty card ---------- */
+  /* the empty card */
   intake: {
     heading: (folder: React.ReactNode): React.ReactNode => <>Drop your {folder} folder here</>,
     lede: "Chart your bill: every tool, every subcommand, every dollar.",
@@ -279,15 +241,7 @@ const EN = {
     reading: "Reading",
     privacy: "Parsed in this page · nothing is uploaded",
     /** One line per platform, and it is the keystrokes rather than prose about them: this is
-     *  read with a file dialog already open on top of it.
-     *
-     *  macOS gets both routes because they answer different questions. ⇧⌘. unhides every
-     *  dotfile in the dialog, which is the one to reach for when you want to see where you are
-     *  going; ⇧⌘G takes a typed path and skips the looking entirely. The other two have only
-     *  the typed route -- their dialogs have a location box, so unhiding is not a separate
-     *  trick. The path and the key caps are not translated; the words around them are, and so
-     *  is the name of the box the path goes in, because that is what the dialog on the reader's
-     *  own machine will be calling it. */
+     *  read with a file dialog already open on top of it. */
     how: {
       mac: (
         <>
@@ -340,7 +294,7 @@ const EN = {
     ),
   },
 
-  /* ---------- the help under the empty card ---------- */
+  /* the help under the empty card */
   where: {
     handingOver: "What you are handing over",
     handingOverBody: (
@@ -375,8 +329,8 @@ const EN = {
       "Whoever opens it gets an empty card and drops their own transcripts in.",
   },
 
-  /* ---------- the names the engine puts in the tree ----------
-     Keyed by the English name, which stays in the data. See `labelOf`. */
+  /* the names the engine puts in the tree ---------- Keyed by the English name, which stays in
+     the data. */
   labels: {
     all: "all",
     other: "other",
@@ -410,7 +364,7 @@ const EN = {
     "(no path parsed)": "(no path parsed)",
   } as Record<string, string>,
   /** The two suffixes the engine hangs off a tool's own name when both directions cost real
-   *  money. Translated separately, because the half in front is the reader's tool. */
+   *  money. */
   suffix: { results: "results", callArgs: "call args" },
   /** The folded tail, which is a count as much as a word. */
   folded: (n: number): string => `other (${n} items)`,
@@ -774,11 +728,7 @@ const JA: Dict = {
         .join(" · "),
   },
   strip: {
-    /* Kept to two lines in the strip's first cell. The literal translation ran to three, and
-       no amount of better wrapping would have fixed it -- Japanese offers no spaces to break at,
-       so in a 337px cell the sentence has to be shorter rather than set differently. What went
-       was the repeated 請求 and the spelled-out リクエストごとに: 毎回 says the same thing here,
-       and the cell immediately beside this one is already headed 毎リクエスト. */
+    /* Kept to two lines in the strip's first cell. */
     thesis: (
       <>
         使用量ではなく<em>持ち越し</em>の請求 — 毎回コンテキスト全体が再課金される。
@@ -1390,8 +1340,8 @@ const FR: Dict = {
     billed: (ttl, masked) => `Facturé · ${masked ? "montant masqué · " : ""}TTL de cache ${ttl}`,
     ask: [
       { w: "where", text: "Où" },
-      /* The same two words the answer ends on, so they carry the same slot and travel across
-         the line rather than fading out here and fading in there. */
+      /* The same two words the answer ends on, so they carry the same slot and travel across the
+         line rather than fading out here and fading in there. */
       { w: "went", text: "est passé" },
       { w: "your", text: "votre" },
       { w: "money", text: "argent", em: true },
@@ -1987,29 +1937,19 @@ export function dict(l: Lang): Dict {
   return DICTS[l]
 }
 
-/** The words for the language the page is currently in. One subscription to the same store
- *  every other lens is read from, so switching language re-renders exactly what switching the
- *  TTL lens does. */
+/** The words for the language the page is currently in. */
 export function useT(): Dict {
   return DICTS[useViewState().lang]
 }
 
-/** The languages, for the switcher. Re-exported so a component drawing the picker imports one
- *  module rather than two. */
+/** The languages, for the switcher. */
 export { LANGS }
 
-/* ---------- the names in the tree ----------
-   The engine's labels stay English inside the analysis: they key the palette, they are what
-   `state.path` carries into the shared link, and one of them is what the mosaic and the
-   sunburst test to find the block this page argues about. Translating them at the source would
-   put a language into the data and make a link opened in another one land nowhere.
+/* the names in the tree ---------- The engine's labels stay English inside the analysis: they
+   key the palette, they are what `state.path` carries into the shared link, and one of them is
+   what the mosaic and the sunburst test to find the block this page argues about. */
 
-   So they are translated here, on the way to the screen, and anything unrecognised passes
-   through -- which is most of what these functions see. A tool name, a shell program and a
-   file path are the reader's own, and nothing in six dictionaries should be guessing at them. */
-
-/** The two suffixes the engine hangs off a tool's own name when both directions cost real
- *  money. Split rather than looked up whole, because the half in front is not ours. */
+/** The two suffixes the engine hangs off a tool's own name when both directions cost real money. */
 const SUFFIXES: ReadonlyArray<[string, (t: Dict) => string]> = [
   [" · results", (t) => t.suffix.results],
   [" · call args", (t) => t.suffix.callArgs],
@@ -2023,8 +1963,7 @@ export function labelOf(t: Dict, name: string): string {
   return name
 }
 
-/** A node as the reader should see it named. The folded tail is the one row whose label is a
- *  count as well as a word, and the count is the node's rather than the dictionary's. */
+/** A node as the reader should see it named. */
 export function nodeName(t: Dict, n: CostNode): string {
   return n.folded ? t.folded(n.foldCount ?? 0) : labelOf(t, n.name)
 }
@@ -2032,17 +1971,8 @@ export function nodeName(t: Dict, n: CostNode): string {
 /** The group whose rows are programs rather than tools. */
 const SHELL = GROUPS.find((g) => g.id === "shell")?.name
 
-/** Whether a name is text off the reader's own machine -- `git status`, `*.ts`, a path -- and
- *  so is set as code rather than as prose.
- *
- *  Structural, not guessed from the string. `under` is whatever this row hangs beneath, which
- *  every view already tracks for the hover; where that is the group itself the row is a line
- *  item -- a tool, or a program -- and only the shell group's are the reader's own. Anything
- *  below a line item is theirs whatever the group: the command under `git`, the path under
- *  `Read`. A row hanging under its own name is neither -- it is a leaf drawn as its own only
- *  child, which the mosaic does to every column that does not branch -- so it answers with
- *  whatever its parent would. The dictionary keeps the last word, because `(no path parsed)`
- *  and the folded tail are sentences of ours sitting at that same depth. */
+/** Whether a name is text off the reader's own machine -- `git status`, `*.ts`, a path -- and so
+ *  is set as code rather than as prose. */
 export function isCode(t: Dict, name: string, under: string | null, group: string): boolean {
   if (t.labels[name] !== undefined) return false
   if (under !== null && under !== group && under !== name) return true

@@ -1,5 +1,5 @@
-/* Palette, type and layout from "Cost Report.dc.html" (claude.ai/design d41a68ba):
-   warm grey-green paper, brick accent, 8 categorical hues + neutral for the 9th. */
+/* Palette, type and layout from "Cost Report.dc.html" (claude.ai/design d41a68ba): warm
+   grey-green paper, brick accent, 8 categorical hues + neutral for the 9th. */
 :root {
   --paper: #ebede8;
   --panel: #f4f5f2;
@@ -24,12 +24,7 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  /* Told, rather than left to be inferred from the background. Two things on this page are
-     drawn by the browser rather than by the stylesheet -- the language picker's popup list and
-     the search box's clear button -- and they take their ink from this property alone. Without
-     it a dark page opens a white list, which is the one flash of the wrong theme a reader gets
-     from a control they only touch when they cannot read the page yet. It travels with the
-     palette below for the same reason the palette does. */
+  /* Told, rather than left to be inferred from the background. */
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -116,15 +111,11 @@ button {
   display: none !important;
 }
 /* A name that came off the reader's machine rather than out of the dictionary -- `git status`,
-   `*.ts`, a path. Which names those are is `isCode` in `copy.tsx`; every view marks them the
-   same way, so the answer looks the same in the table as it does in the sunburst's hole. */
+   `*.ts`, a path. */
 [data-code="1"] {
   font-family: var(--mono);
 }
-/* Positioned, and above what follows it. Its hints hang below the bar, which is where the card
-   starts -- and the card is a positioned element further down the document, so with both at the
-   same level the later one wins and the hint is painted underneath it. A stacking context here
-   settles that for the whole bar at once. */
+/* Positioned, and above what follows it. */
 .toolbar {
   position: relative;
   z-index: 1;
@@ -141,14 +132,8 @@ button {
   height: 9px;
   background: repeating-linear-gradient(to right, var(--rule) 0 1px, transparent 1px 9px);
 }
-/* An action rather than a lens, so it is words on the paper with a rule under them rather than
-   a button in a box.
-
-   The padding is symmetric about the text on purpose, and that is the whole of why the row
-   lines up: the rule and its 2px of clearance sit *below* the words, so a box with nothing
-   above them centres 1.5px high -- and the boxed controls beside it, whose own padding is even,
-   centre their words exactly on the row's middle. Two boxes that are symmetric about their text
-   put their text in the same place; one that is not cannot. */
+/* An action rather than a lens, so it is words on the paper with a rule under them rather than a
+   button in a box. */
 .linkish {
   background: none;
   border: 0;
@@ -197,18 +182,14 @@ button {
   background: var(--ink);
   color: var(--paper);
 }
-/* An option drawn as a picture rather than a word. The box keeps the control's height and
-   the glyph centres in it, so the pill still travels between boxes of one row. */
+/* An option drawn as a picture rather than a word. */
 .seg button[data-icon] {
   display: flex;
   align-items: center;
   padding: 5px 10px;
 }
-/* A control that shows the option it is on and walks to the next when pressed -- the theme,
-   and the TTL lens where there is one. One box where three stood, for a preference rather than
-   a lens: the other two options were drawn full-time to say a thing the reader settles once.
-   No pressed state to draw, because there is no unpressed sibling for it to mean anything
-   against -- what carries the state is the face, and what carries the rest is the hint. */
+/* A control that shows the option it is on and walks to the next when pressed -- the theme, and
+   the TTL lens where there is one. */
 .cycbtn {
   color: var(--ink2);
   transition: color var(--duration-fast) var(--ease-smooth-out);
@@ -217,8 +198,8 @@ button {
 .cycbtn:focus-visible {
   color: var(--ink);
 }
-/* The swap wrapper is `inline-block` by default, which would leave a glyph sitting on the
-   text baseline inside a button laid out as a row. */
+/* The swap wrapper is `inline-block` by default, which would leave a glyph sitting on the text
+   baseline inside a button laid out as a row. */
 .cycbtn .t-text-swap,
 .cycface {
   display: flex;
@@ -229,20 +210,8 @@ button {
     transition: none;
   }
 }
-/* The language picker: a `.seg` box like its neighbours, holding a globe and a native
-   `<select>` rather than a row of buttons. Six options is where the travelling pill stops
-   working, and where cycling stops working too -- nobody should press through four languages
-   to reach their own -- and the platform's own list already knows how to draw 中文 beside FR,
-   and how to be operated by a thumb.
-
-   Which means the one thing to undo is the platform's *chrome*: `appearance: none` strips the
-   bevel and the arrow so the box is the same box as the theme switch beside it. The glyph is
-   the arrow's replacement and the label at once -- the word would be in the language you are
-   trying to leave.
-
-   `font-family` is inherited by the popup on some platforms and not on others, so the options
-   are left to the system's own UI font: a mono stack asked to set kana or hanzi falls back
-   per-glyph, and a list where three rows are one face and three are another reads as broken. */
+/* The language picker: a `.seg` box like its neighbours, holding a globe and a native `<select>`
+   rather than a row of buttons. */
 .langseg {
   align-items: center;
   padding-left: 9px;
@@ -259,11 +228,7 @@ button {
   letter-spacing: 0.06em;
   color: var(--ink2);
 }
-/* Focus goes on the box the reader sees, not on the `<select>` inside it. The page's ring is
-   drawn 2px clear of what it surrounds, which here would be a rectangle a hair inside the
-   border that is already there -- two frames where the reader is looking at one. It is the
-   same problem the search field has, and it gets the same answer: the control states its own
-   focus on the edge it already has, and the element inside stops drawing anything. */
+/* Focus goes on the box the reader sees, not on the `<select>` inside it. */
 .langseg:has(.langsel:focus-visible) {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
@@ -280,8 +245,8 @@ button {
 .eyeamt {
   font-size: 12px;
 }
-/* Every stroked mark in a control -- the eye, the sun, the display, the moon -- at one
-   weight and one size, in `currentColor` so it inverts under the pill. */
+/* Every stroked mark in a control -- the eye, the sun, the display, the moon -- at one weight
+   and one size, in `currentColor` so it inverts under the pill. */
 .glyph {
   width: 14px;
   height: 14px;
@@ -291,15 +256,11 @@ button {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* Fixed ratios because the card is the thing people screenshot: 16/9 suits the mosaic,
-   which is a wide band, and a disc in a wide band comes out small, so the sunburst gets
-   4/3 instead. Either way the frame is a shape that posts well rather than whatever height
-   the content happened to want. */
+/* Fixed ratios because the card is the thing people screenshot: 16/9 suits the mosaic, which is
+   a wide band, and a disc in a wide band comes out small, so the sunburst gets 4/3 instead. */
 /* `width` is pinned rather than left to `auto`, and that is load-bearing: a ratio plus a floor
    resolves in either direction, so a card whose height is being held at 600px by `min-height`
-   will happily work *back* to a width of 600 × 16/9 = 1067px and hang out of a narrower column.
-   Between the 820px breakpoint and about 1090px, that is every window. A definite width leaves
-   the ratio only one thing left to compute. */
+   will happily work *back* to a width of 600 × 16/9 = 1067px and hang out of a narrower column. */
 .card {
   position: relative;
   width: 100%;
@@ -314,20 +275,12 @@ button {
 .card[data-chart="sun"] {
   aspect-ratio: 4/3;
 }
-/* The empty face. The frame is the drop target itself, so the invitation is this border going
-   dashed rather than a second box drawn inside the first -- and the shape is the report's own
-   shape, so dropping a file changes what is in the box without changing the box at all.
-   A letterbox was tried here, on the theory that a frame sized for a chart is too tall to hold
-   two sentences and two buttons; the answer is to use the height (see `.dropzone`) rather than
-   to take it away, because the frame not moving is the strongest thing the turn has.
-   A border *style* does not interpolate, but that swap lands in the beat when the card is
-   empty, with the outgoing contents gone and the incoming ones not yet arrived. */
+/* The empty face. */
 .card[data-face="empty"] {
   border-style: dashed;
 }
 /* Lit from the zone inside it, because the frame the reader is aiming at is the frame that
-   should answer. Deliberately not transitioned: a drop target that takes 150ms to acknowledge
-   the pointer reads as one that has not noticed. */
+   should answer. */
 .card:has([data-over="1"]) {
   border-color: var(--accent);
 }
@@ -381,8 +334,8 @@ button {
   font-weight: 700;
   text-wrap: balance;
 }
-/* The one word both tenses of the heading share, so it is the one that keeps its colour
-   across the change. */
+/* The one word both tenses of the heading share, so it is the one that keeps its colour across
+   the change. */
 .chead h1 em {
   font-style: normal;
   color: var(--accent);
@@ -397,13 +350,7 @@ button {
   text-transform: uppercase;
   color: var(--ink3);
 }
-/* The figure's box is the type's, and the rolling digits are let out of it.
-   NumberFlow pads its own box top and bottom by half the vertical mask, so the fade has
-   somewhere to paint. That padding is decoration rather than type, and left in the flow it
-   makes the bill some 19px taller than the dash standing in for it -- which `.chead`, being
-   bottom-aligned, pays for by dropping the eyebrow and the heading by that much the moment a
-   report arrives. So the height is stated here, in the figure's own line box, and both faces
-   set their heading against the same one. The digits overflow it and nothing clips them. */
+/* The figure's box is the type's, and the rolling digits are let out of it. */
 .total {
   font-family: var(--mono);
   font-size: 33px;
@@ -419,11 +366,8 @@ button {
 .total[data-empty="1"] {
   color: var(--ink3);
 }
-/* An asterisk hangs at the top of its line box, so four of them left where the figure was
-   read as a footnote marker floating above an empty space rather than as the figure covered
-   up. Dropped onto the digits' own band and given back the tracking `.total` takes away --
-   asterisks set that tight fuse into one blot instead of four covered digits. The shift is
-   a transform, so the header's baseline grid is untouched. */
+/* An asterisk hangs at the top of its line box, so four of them left where the figure was read
+   as a footnote marker floating above an empty space rather than as the figure covered up. */
 .mask {
   display: inline-block;
   transform: translateY(0.26em);
@@ -628,8 +572,8 @@ button {
 .colhead .cum80 {
   color: var(--accent);
 }
-/* Footnote and chart switch share one row on the closing rule, so the switch reads as
-   belonging to the card rather than to the mosaic's header. */
+/* Footnote and chart switch share one row on the closing rule, so the switch reads as belonging
+   to the card rather than to the mosaic's header. */
 .cardfoot {
   display: flex;
   align-items: center;
@@ -705,11 +649,9 @@ button {
   padding: 5px 9px;
   width: 230px;
 }
-/* The page's `:focus-visible` ring is drawn for things that have no focused state of their
-   own -- a button, a segment, a link -- and it is drawn 2px thick and 2px clear of the box so
-   it reads against them. A text field does have a focused state of its own, and the ring on
-   top of it made two rectangles where the reader is looking at one. So the field states its
-   own focus, in the same accent, on the edge it already has. */
+/* The page's `:focus-visible` ring is drawn for things that have no focused state of their own
+   -- a button, a segment, a link -- and it is drawn 2px thick and 2px clear of the box so it
+   reads against them. */
 .bctl input:focus-visible {
   outline: none;
   border-color: var(--accent);
@@ -733,26 +675,7 @@ button {
   align-items: baseline;
   gap: 10px;
 }
-/* The name, with the group's colour upright beside it. The hue comes down from the component
-   as `--hue`, because the hue is the only part of this the data decides.
-
-   The border and the padding add up to the panel's own 15px of left padding, and the margin
-   pulls that back out into it, so the first letter of the name stays exactly where it was and
-   stays flush with the track below it and the line items under that. A bar that pushed the
-   title right instead would have cost the panel the one vertical edge every other line in it
-   is set against. Widen the bar and the padding gives up the same pixel: 4 + 11, as 3 + 12
-   was.
-
-   Pulled the whole 15px rather than part of it, so the bar sits against the panel's edge with
-   nothing between them. Short of it, the sliver of paper left over read as a misalignment --
-   two vertical lines a few pixels apart, one of them the grid's divider, neither explaining
-   the other.
-
-   `line-height` is stated because the bar's height is the button's line box: left to the font's
-   own default it would be whatever the sans happens to say, and it would say something
-   different in a language set in a different face. 1.25 is a bar that clears the ascenders and
-   stops just under the baseline -- long enough to read as upright, short enough not to reach
-   the figure across from it. */
+/* The name, with the group's colour upright beside it. */
 .pantop button {
   background: none;
   border: 0;
@@ -851,9 +774,9 @@ button {
   font-size: 10.5px;
   color: var(--ink3);
 }
-/* The sunburst stands where the mosaic does, so it takes the same slot: fill what the card
-   has left, and let the disc take its size from the height rather than the width -- a
-   circle that overflows its row is worse than one that leaves margin beside the legend. */
+/* The sunburst stands where the mosaic does, so it takes the same slot: fill what the card has
+   left, and let the disc take its size from the height rather than the width -- a circle that
+   overflows its row is worse than one that leaves margin beside the legend. */
 .sun {
   flex: 1;
   min-height: 0;
@@ -924,10 +847,10 @@ button {
   color: var(--accent);
 }
 /* The hole's type is sized off the chart, not the viewport: the disc takes its size from
-   whatever the card has left, so a readout fixed in px is either lost in it or spilling out
-   of it. Each rule keeps a px fallback first for anything without container queries. */
-/* The eyebrow is ours -- a tool, a group -- so it is set in the page's own face, and the mono
-   is spent on the line below it, which is usually a path or a command. */
+   whatever the card has left, so a readout fixed in px is either lost in it or spilling out of
+   it. */
+/* The eyebrow is ours -- a tool, a group -- so it is set in the page's own face, and the mono is
+   spent on the line below it, which is usually a path or a command. */
 .suncore .k {
   max-width: 92%;
   font-size: 9.5px;
@@ -1254,13 +1177,7 @@ tfoot .n {
 }
 /* The empty face's contents, filling the whole interior of the card: the frame is the drop
    target, so the target has to be the frame's inside rather than a panel sitting in the middle
-   of it. `flex: 1` is the same claim the chart makes on the same space.
-
-   Two bands now, on the report's own lines: the invitation stands where the picture stands and
-   the privacy line stands on the rule where the chart switch stands. There were three, with the
-   lede up on the thesis strip's line -- which mirrored the report exactly and read, on this face,
-   as a centred sentence orphaned under a left-aligned title with a hundred pixels of nothing
-   between it and the thing it introduced. It is the ask's subtitle, so it went to the ask. */
+   of it. */
 .dropzone {
   flex: 1;
   min-height: 0;
@@ -1278,9 +1195,7 @@ tfoot .n {
 }
 /* Two classes deep on purpose: `.dropzone p` below is a class *and* a type, so it outranks a
    bare `.lede` however far down the file that is written -- which is how the old lede ended up
-   quietly taking the small size it was meant to override.
-   The measure is set just inside the heading's, so the ask reads as one block down the middle of
-   the card rather than as a stack of three different widths. */
+   quietly taking the small size it was meant to override. */
 .invite .lede {
   color: var(--ink2);
   max-width: 58ch;
@@ -1289,13 +1204,8 @@ tfoot .n {
   line-height: 1.55;
   text-wrap: balance;
 }
-/* The middle band takes the slack, so the invitation sits on the card's centre line whatever
-   the window has done to the two bands around it.
-
-   The gap is the ask's own rhythm -- heading to button -- and nothing else uses it: everything
-   here sat one flat 16px apart, which put the heading, the button and the help in a single clump
-   with a hundred pixels of empty card around it. Air between the *groups* is what separates
-   them; air inside a group is what holds it together, and the two cannot be the same number. */
+/* The middle band takes the slack, so the invitation sits on the card's centre line whatever the
+   window has done to the two bands around it. */
 .invite {
   flex: 1;
   min-height: 0;
@@ -1307,9 +1217,7 @@ tfoot .n {
   width: 100%;
   /* The status line below the group is empty until a folder is picked, and an empty line still
      takes its 22px and the gap above it -- so centring on the flow box sat the whole visible
-     group half of that above the middle of the card, which is the lopsided look. The padding
-     hands that space back to the top. It goes the other way while a status *is* showing, which
-     is the right trade: one is the state every reader sees, the other lasts a few seconds. */
+     group half of that above the middle of the card, which is the lopsided look. */
   padding-top: 40px;
 }
 .dropzone h2 {
@@ -1331,45 +1239,25 @@ tfoot .n {
   flex-wrap: wrap;
   /* On top of the band's own 18, because the button is not one of the lines around it: the
      heading and the lede are a sentence in two parts and belong together at 18, and the help
-     below already stands off by 34. At the band's flat gap the button read as the third line of
-     the ask rather than as the thing the ask is asking for -- and it is the one control on the
-     page that has to be pressed, so it gets the room a target wants around it. */
+     below already stands off by 34. */
   margin: 12px 0 0;
 }
 /* The box under the button, and the two faces it takes: the way into the hidden folder before a
-   pick, the transcripts that came back after one. They are stacked in one grid cell, which is
-   what lets them cross -- the note leaving upward as the list arrives from below -- instead of
-   taking turns in the flow and shoving each other on the way past.
-
-   The height is the one thing that travels. `min-height` rather than `height`, twice: a floor
-   under the note, a taller floor under the list, and either way a note that wraps to three lines
-   on a narrow window is still allowed to be three lines tall. Transitioned, so the box grows into
-   the taller job rather than jumping into it -- and it grows against the empty card the invite is
-   centred in, which is slack this face has plenty of.
-
-   Both faces are always as wide as the box, so the row of the grid is sized by whichever is
-   taller. That is only ever the floor or the note, because the list's own scroller has no
-   intrinsic height to contribute -- see `.foundbox`. */
+   pick, the transcripts that came back after one. */
 .swap {
   /* The panel's grid, in the units the list is written in: a row's height, the air above and
-     below the rows, and the label's line with its own air. The panel is an exact number of rows
-     tall because the column inside it travels by whole rows -- half a line showing at the bottom
-     edge would be half a line of a name nobody asked to see. `--file-rows` comes in from the
-     markup, which is the one place the count can live: see `SHOWN`. */
+     below the rows, and the label's line with its own air. */
   --file-row: 20px;
   --file-pad: 6px;
   --found-head: 21px;
   display: grid;
   width: 100%;
-  /* A shade under the heading's own measure, so the block below it lines up with the block
-     above rather than introducing a third width down the middle of the card. */
+  /* A shade under the heading's own measure, so the block below it lines up with the block above
+     rather than introducing a third width down the middle of the card. */
   max-width: 58ch;
   min-height: 74px;
   /* The step from the ask to the help: on top of the band's own 18, so the button and the note
-     under it are two things rather than one stack of four evenly spaced rows.
-     It was 32 for a while, to hold the platform hint when that opened upward -- 50px of empty
-     card between a button and the note under it, spent entirely on a chip that is only there
-     while a pointer rests on the switch. Moving the hint below the block bought that back. */
+     under it are two things rather than one stack of four evenly spaced rows. */
   margin: 16px 0 0;
   transition: min-height var(--intake-swap-dur) var(--intake-swap-ease);
 }
@@ -1381,16 +1269,13 @@ tfoot .n {
   );
 }
 /* The stack, and the state both faces rest in when they are not the one on show: away from the
-   middle, blurred out, and gone from the tab order. Which direction "away" is belongs to each
-   face below -- the note goes back the way it came, the list goes down where it came from. */
+   middle, blurred out, and gone from the tab order. */
 .swap > * {
   grid-area: 1 / 1;
   opacity: 0;
   filter: blur(var(--blur-small));
   /* Held visible for the length of the exit and dropped on its last frame: a face that turned
-     invisible on the first would have nothing left to fade. It is `visibility` rather than
-     `pointer-events` because the thing that has to stop being reachable is a button, and a
-     button you cannot see must not still be a tab stop. */
+     invisible on the first would have nothing left to fade. */
   visibility: hidden;
   transition:
     opacity var(--intake-swap-dur) var(--intake-swap-ease),
@@ -1409,14 +1294,7 @@ tfoot .n {
     filter var(--intake-swap-dur) var(--intake-swap-ease),
     visibility 0s linear 0s;
 }
-/* The way into the hidden folder. No panel, no border, no rule between the rows: it was a sunk
-   grey box with a hairline, inside a card that is already a frame, which made two lines of help
-   read as a second thing to decide about. Space separates it now -- the only thing here that is
-   drawn is the switch, because the switch is the only thing you can press.
-
-   Centred in the box rather than stretched to it, so it keeps its own height whatever the box is
-   doing: `100%` of a stretched note is the bottom of the box, and that is what the platform hint
-   hangs off on a narrow window. */
+/* The way into the hidden folder. */
 .howto {
   /* The hint's containing block, which is the whole point: see `.howto .t-tt`. */
   position: relative;
@@ -1434,8 +1312,7 @@ tfoot .n {
   margin-bottom: 7px;
 }
 /* The same line, held to an exact height instead of a line box plus a margin: what is left of
-   the box after it is the panel, and the panel has to come out at a whole number of rows. The
-   label sits at the top of it, which is where the note's label sits in the face this replaces. */
+   the box after it is the panel, and the panel has to come out at a whole number of rows. */
 .foundhead {
   display: flex;
   align-items: flex-start;
@@ -1444,8 +1321,7 @@ tfoot .n {
   height: var(--found-head);
 }
 /* Files finished over files found, in the same mono caps as the verb beside it and a step up the
-   ink, because it is the part that moves. `pre` keeps the padding the markup puts in front of a
-   short count -- without it the line shifts under itself every time a digit is added. */
+   ink, because it is the part that moves. */
 .foundnum {
   font-family: var(--mono);
   font-size: 10.5px;
@@ -1467,9 +1343,7 @@ tfoot .n {
 .foundlbl b {
   color: var(--ink2);
 }
-/* The transcripts that came back. A column, because the head sits on the note's line and the
-   panel under it takes whatever the box has left -- which is what makes the list grow with the
-   box rather than the box grow with the list. */
+/* The transcripts that came back. */
 .found {
   display: flex;
   flex-direction: column;
@@ -1487,19 +1361,10 @@ tfoot .n {
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--rule);
-  /* Sunk, where the note it replaced is drawn on the card's own paper. The note is prose and had
-     to stop looking like a second decision; this is a readout of what the machine found, and a
-     readout is the one thing on this face that earns a well to sit in. */
+  /* Sunk, where the note it replaced is drawn on the card's own paper. */
   background: var(--sunk);
 }
-/* Out of flow, which is the whole reason the panel is the height it was asked for. In flow, sixty
-   rows are sixty rows of content: the box would report them as the height it wants, the grid would
-   hand it over, and the panel would grow until the card ran out of room -- which is what put a
-   fixed number of names on screen and clipped the rest. Taken out, the rows have no say in it.
-   Inset rather than padded, and that is the difference between seven rows and seven rows plus a
-   sliver of the eighth: `overflow` clips at the padding box, so the air under the last row is air
-   the row below is free to show through. Held off the edges from outside, the window is exactly
-   the rows it was sized for. */
+/* Out of flow, which is the whole reason the panel is the height it was asked for. */
 .filelist {
   position: absolute;
   inset: var(--file-pad) 10px;
@@ -1510,18 +1375,15 @@ tfoot .n {
   color: var(--ink3);
 }
 /* The column, and the thing that keeps the writing in the window: it is translated up a row for
-   every line past the panel's last, and it transitions between the two, so a name arriving at the
-   bottom carries the ones above it up out of the way. How far is the markup's to say -- it is the
-   one that knows how many lines have gone up -- and how long is the beat the last line was written
-   in, so the scroll and the writing keep the same pace. A transform, because the pass behind it
-   holds the main thread in bursts and a composited property is one that does not care. */
+   every line past the panel's last, and it transitions between the two, so a name arriving at
+   the bottom carries the ones above it up out of the way. */
 .fileroll {
   transition-property: transform;
   transition-timing-function: var(--ease-smooth-out);
   transition-duration: var(--duration-quick);
 }
 /* A line does not travel in: what happens when it arrives is the name writing itself, and a row
-   that slides as well is two arrivals for one event. All it does is stop being nothing. */
+   that slides as well is two arrivals for one event. */
 @keyframes t-file-in {
   from {
     opacity: 0;
@@ -1540,8 +1402,7 @@ tfoot .n {
   animation: t-file-in var(--duration-micro) var(--ease-out) both;
 }
 /* The name, and the ground the cover is measured against: the box is the text's own width, so
-   one step of the cover is exactly one character of a monospaced name. `min-width` is what lets
-   a name too long for the panel shrink and take the ellipsis instead of pushing the row wide. */
+   one step of the cover is exactly one character of a monospaced name. */
 .filenm {
   position: relative;
   min-width: 0;
@@ -1549,28 +1410,14 @@ tfoot .n {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The typing. A panel-coloured cover lying over the name, sliding off it to the right in as many
-   steps as the name has characters -- so the name is written a character at a time, and it is a
-   transform doing it. That is the point rather than a detail: the parse this is drawn over holds
-   the main thread for seconds, and a composited animation keeps stepping through that while
-   anything paint-driven -- a width, a background position, a caret drawn by a timer -- would
-   freeze on the frame the parse started.
-   The border is the caret, and it needs no second animation to put itself away: the cover's own
-   left edge is where the next character is about to land, and on the last step the whole cover
-   has passed the end of the name, which is past the end of the box that clips it. */
+/* The typing. */
 @keyframes t-type {
   from {
     transform: translateX(0);
   }
   to {
     /* Two characters past the end of the name rather than exactly on it, which is what makes the
-       *second to last* step the one that finishes the name. The last step cannot be relied on: a
-       composited step animation that ends between two frames is left holding the last value it
-       was sampled at, so a name whose final character only arrives on the final step spends the
-       rest of its life one character short with a caret sitting where the character should be.
-       Overshoot by a character and the step before the end has already cleared the name; overshoot
-       by two and the caret is outside the box that clips it as well. `ch` because the panel is
-       monospaced, so a character is a unit here. */
+     * second to last* step the one that finishes the name. */
     transform: translateX(calc(100% + 2ch));
   }
 }
@@ -1580,24 +1427,18 @@ tfoot .n {
   background: var(--sunk);
   border-left: 1px solid var(--accent);
   /* The duration, the delay and the step count are the row's own -- one beat per character, from
-     this row's turn onward -- so they are set on the element. See `Intake`. */
+     this row's turn onward -- so they are set on the element. */
   animation-name: t-type;
   animation-fill-mode: both;
 }
-/* Taken away entirely rather than left still. Motion the reader asked not to see is turned off
-   at the top of this file with a blanket `animation: none`, and an animation that is the only
-   thing which ever moves the cover off the name would leave the name under it for good. The
-   column still follows the writing: with no transition it arrives at each new offset in one
-   step, which is the honest reading of "no motion" -- the panel still shows the newest line. */
+/* Taken away entirely rather than left still. */
 @media (prefers-reduced-motion: reduce) {
   .filecover {
     display: none;
   }
 }
 /* The prompt on the empty line under the names: the folder has been read, the parse has not
-   finished, and this is the page saying so in the one vocabulary the panel has. It blinks on a
-   step rather than a fade, because that is what a cursor does, and on `opacity`, because the
-   parse it is drawn over is holding the main thread. */
+   finished, and this is the page saying so in the one vocabulary the panel has. */
 @keyframes t-blink {
   0%,
   49% {
@@ -1614,11 +1455,7 @@ tfoot .n {
   background: var(--accent);
   animation: t-blink 900ms var(--ease-linear) infinite;
 }
-/* One square per transcript, on the grid every other mark on this page is drawn on. It arrives
-   with its row and does nothing after that: the row beside it is being written a character at a
-   time, and a mark that blinks next to text that is already moving is one signal too many. The
-   accent is what it says while there is work on -- the same ink the caret writing the name is
-   drawn in. */
+/* One square per transcript, on the grid every other mark on this page is drawn on. */
 .filedot {
   flex: none;
   width: 4px;
@@ -1633,11 +1470,7 @@ tfoot .n {
   background: var(--accent);
   opacity: 1;
 }
-/* The platform, and the way to the next one. A chip rather than a bare word: a word set in the
-   same ink as the label beside it is not obviously pressable, and this is the control a reader
-   only reaches for when the guess about their machine was wrong -- so it has to look pressable
-   before they know they need it. Sized off the longest name so walking the three does not shunt
-   the row about. */
+/* The platform, and the way to the next one. */
 .osbtn {
   display: inline-flex;
   align-items: center;
@@ -1660,15 +1493,7 @@ tfoot .n {
   color: var(--ink);
   border-color: var(--rule);
 }
-/* This one hint goes beside its control rather than under it. Everywhere else a tip drops
-   straight out of the control it describes, which is right in the toolbar; here the thing
-   immediately below is the instruction the switch chooses, and a hint that covers it answers a
-   question by hiding the answer. Upward is the gap to the button -- holding 16px of layout open
-   permanently so a hover chip clears a black button is a cost every reader pays for something
-   almost none of them see. Sideways is the card's own slack, which is doing nothing at all.
-   It was under the whole block for a version, anchored to `.howto`: that covered nothing, but a
-   hint 50px from the chip and lined up with the instruction reads as a note about the
-   instruction. A hint has to look like it belongs to the thing under the pointer. */
+/* This one hint goes beside its control rather than under it. */
 .howto .t-tt {
   top: 50%;
   right: auto;
@@ -1681,8 +1506,7 @@ tfoot .n {
   transform: translateY(-50%) scale(1);
 }
 /* Below about 900px there is no longer 280px of card to the right of the chip, so the hint goes
-   back under the block, where the only thing it can cover is empty card. The switch's own span
-   stops being the containing block for it; `.howto` takes over. */
+   back under the block, where the only thing it can cover is empty card. */
 @media (max-width: 900px) {
   .howto .t-tt-host {
     position: static;
@@ -1699,12 +1523,7 @@ tfoot .n {
     transform: scale(1);
   }
 }
-/* Sized off the longest name, so walking the three does not shunt the row about.
-   Flex the whole way down, including the swap span in the middle, rather than letting any part of
-   this sit in a line box: an inline-flex inside an inline-block is aligned on its baseline, and
-   the baseline of a row whose tallest thing is a 13px drawing is not its middle. That is what sat
-   the mark and the word 3px from the top of the chip and 5px from the bottom while the chevron
-   beside them -- a plain flex item -- was dead centre. */
+/* Sized off the longest name, so walking the three does not shunt the row about. */
 .osname,
 .osname .t-text-swap {
   display: flex;
@@ -1739,8 +1558,8 @@ tfoot .n {
     transition: none;
   }
 }
-/* Overriding `.dropzone p`, which is a class and a type and so outranks a bare class however
-   far below it this is written. */
+/* Overriding `.dropzone p`, which is a class and a type and so outranks a bare class however far
+   below it this is written. */
 /* `balance` rather than `pretty`: this is a two-line centred block, which is the case the two
    algorithms disagree on -- `pretty` only protects the last line from being a runt, and a
    centred pair of lines wants both the same length. */
@@ -1777,8 +1596,7 @@ tfoot .n {
 }
 /* The one button on this face, and the only thing on the page a first-time reader has to press,
    so it is sized for that rather than to the toolbar's scale: 13px on a 16/34 pad against the
-   11px on 9/16 it started at. It sat under a 27px heading looking like a secondary control in a
-   dialog, which is the wrong reading of the only control there is. */
+   11px on 9/16 it started at. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1811,9 +1629,7 @@ tfoot .n {
   border-color: var(--ink);
 }
 /* The primary had no hover at all: `.btn.primary` and `.btn:hover` are the same specificity, so
-   the one written later won and the button did not answer the pointer. It answers in the accent
-   now -- the same colour the card's frame takes when a folder is dragged over it, so hovering
-   the button previews what dropping on the card will do. */
+   the one written later won and the button did not answer the pointer. */
 .btn.primary:hover {
   background: var(--accent);
   border-color: var(--accent);
@@ -1838,8 +1654,7 @@ tfoot .n {
   padding: 10px 0;
 }
 /* What went wrong, and only that: the progress a pick makes is narrated by the head of its own
-   list now, so this line no longer has two jobs and two colours. It holds its ground while there
-   is nothing to say, which is what keeps the group above it still when there is. */
+   list now, so this line no longer has two jobs and two colours. */
 .status {
   font-size: 13px;
   color: var(--accent);
@@ -1852,8 +1667,7 @@ tfoot .n {
 }
 /* Two columns on the same rule the report's footnotes sit on, and the full width of the shell:
    this is what stands under the empty card, so it holds the same ground the breakdown and the
-   footnotes hold under a full one. A single measure-wide column left the page half empty and
-   read as something that had failed to lay out. */
+   footnotes hold under a full one. */
 .where {
   margin-top: 34px;
   padding-top: 16px;
@@ -1863,7 +1677,7 @@ tfoot .n {
   display: grid;
   /* Two columns that fold to one on their own, rather than at the narrow-window breakpoint:
      every rule for the empty face is written below that block, so an override in it would be
-     overridden right back. `min()` is what keeps the fold from overflowing a phone. */
+     overridden right back. */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 60ch), 1fr));
   gap: 8px 24px;
 }
@@ -1891,10 +1705,7 @@ tfoot .n {
 .where .whead:first-child {
   margin-top: 0;
 }
-/* Set at the size of the sentence around it rather than a point under it. A key cap is mostly
-   box, and the two that matter most here are ⇧ and ⌘ -- symbols the font draws well inside their
-   em, so a smaller size leaves a glyph rattling around in a chip. Centred and floored at a
-   near-square width, so a single character is a key rather than a sliver. */
+/* Set at the size of the sentence around it rather than a point under it. */
 kbd {
   font-family: var(--mono);
   font-size: 13px;
@@ -1936,18 +1747,8 @@ kbd {
   cursor: default;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Motion — transitions.dev
-
-   Six transitions from the skill, each still reading from its own semantic
-   variables so it can be retuned here rather than in the rule. The variables
-   are pointed at the shared motion scale above wherever the scale has a token
-   for that usage, so the page has one motion vocabulary instead of six sets
-   of literals; the three values with no matching usage -- the digits' bouncy
-   curve, their 70ms stagger and the hint's 50ms disappear -- stay literal, and
-   the panel's travel is the one value tuned for this page, since the
-   reference's 100px is the height of its own demo panel.
-   ───────────────────────────────────────────────────────────────────────────── */
+/* Motion — transitions.dev Six transitions from the skill, each still reading from its own
+   semantic variables so it can be retuned here rather than in the rule. */
 :root {
   /* Motion tokens — the shared scale every transition below reads from. */
   --duration-stagger: 40ms; /* per-item stagger offset */
@@ -1982,38 +1783,20 @@ kbd {
   --tabs-text-muted: var(--ink2);
   --tabs-text-active: var(--ink);
   --tabs-pill-bg: var(--ink);
-  /* Rolling figure. The digits are NumberFlow's, and so is their timing -- it is passed to the
-     Web Animations API rather than declared, so there is nothing there for the scale to hold.
-     What it does read off the cascade is two masks, and both are in `em` so they hold at any
-     size the figure is set at.
-
-     The vertical one fades a digit out at the top and bottom of the strip it spins through, and
-     is left near its default. The horizontal one fades the ends of the figure while it changes
-     width, and is halved: at the 33px this is set at, the default eats most of the dollar
-     sign -- and the dollar sign is the one character in the figure that never moves. */
+  /* Rolling figure. */
   --number-flow-mask-height: 0.28em;
   --number-flow-mask-width: 0.25em;
-  /* And how often the figure is given a new number to roll to, while a folder is being read.
-     Not a duration on screen -- nothing lasts this long -- but it is the same kind of decision
-     as the ones around it, and it is a decision about the roll rather than about the reading:
-     the digits take a few hundred milliseconds to travel, so a number handed over faster than
-     this lands on a roll that is still going, restarts it, and the figure spends the whole read
-     blurred without ever arriving anywhere. Read in `Motion.tsx`, beside the figure it paces. */
+  /* And how often the figure is given a new number to roll to, while a folder is being read. */
   --figure-beat: 160ms;
   /* Text states swap */
   --text-swap-dur: var(--duration-quick);
   --text-swap-translate-y: var(--distance-micro);
   --text-swap-blur: var(--blur-small);
   --text-swap-ease: var(--ease-in-out);
-  /* Card resize. The scale documents `--ease-smooth-out` for a resize, so the ease
-     comes from it; no duration's documented usage is a container resize, so 300ms
-     stays the snippet's own literal. */
+  /* Card resize. */
   --resize-dur: 300ms;
   --resize-ease: var(--ease-smooth-out);
-  /* Panel reveal. A panel travels in from `--panel-translate-y` and out to `--panel-exit-y`,
-     which is the opposite side: content arrives from where it came and leaves toward where it
-     is going. Flipping the one value flips both, which is what `[data-dir]` does below --
-     without it, going back would be going forward with the labels changed. */
+  /* Panel reveal. */
   --panel-open-dur: var(--duration-slow);
   --panel-close-dur: var(--duration-medium);
   --panel-translate-y: 24px;
@@ -2021,144 +1804,56 @@ kbd {
   --panel-blur: var(--blur-small);
   --panel-ease: var(--ease-smooth-out);
 
-  /* How long the page under the card waits before it follows the card. The card is the
-     answer; the breakdown is the working behind it, and the working arriving in the same
-     instant is what made the report read as one flash rather than as a page assembling
-     itself. `--duration-quick` because it has to be long enough to be a sequence and short
-     enough not to be a wait -- the card is still opening when the breakdown starts. */
+  /* How long the page under the card waits before it follows the card. */
   --face-stagger: var(--duration-quick);
 
-  /* The breakdown filtering itself. `--find-settle` is not a duration on screen: it is how
-     long the query box waits after the last keystroke before it hands the store a value to
-     filter by. A view transition needs two settled states to travel between, and a string
-     halfway through being typed is not one of them. `--duration-quick` is the shortest wait
-     that reliably has a whole word in it and the longest that still reads as the list
-     following the keys. */
+  /* The breakdown filtering itself. */
   --filter-dur: var(--duration-fast);
   --filter-ease: var(--ease-smooth-out);
   --find-settle: var(--duration-quick);
 
-  /* Covering the dollars. Nothing travels here -- every figure is replaced where it stands by
-     another of a different width -- so this is a cross-fade the length of the filter's move,
-     eased in and out like the text swap it is a page-wide version of rather than out of a
-     position it never leaves. */
+  /* Covering the dollars. */
   --mask-dur: var(--duration-fast);
   --mask-ease: var(--ease-in-out);
 
-  /* Bars drawing themselves. `both` on the animation is what holds them at zero through the
-     delay, so a bar's first appearance is its own left edge rather than a full-width bar
-     waiting to be noticed.
-
-     The two staggers are indices rather than durations: `--bar-stagger` counts across the
-     panels in reading order, `--row-stagger` counts down the rows inside one. Down is faster
-     than across, because a panel's rows are one gesture and the grid of panels is nine.
-
-     `--duration-fast` rather than the panel's own `--duration-slow`: a bar is not a panel
-     opening, it is a length being stated, and the sweep across nine panels is already 360ms
-     of stagger on top of whatever each one costs. The switch from table to panels is the
-     mount that happens most, and it has no card arriving over it to hide a long draw. */
+  /* Bars drawing themselves. */
   --bar-dur: var(--duration-fast);
   --bar-ease: var(--ease-smooth-out);
   --bar-stagger: var(--duration-stagger);
   --row-stagger: 18ms;
 
-  /* The disc unfurling, which is two movements and one arrival: every sector opening across
-     its own width, and the rings growing out of the hole while they do.
-
-     `--sun-ring-dur` is one ring's leg and `--sun-ring-stagger` is how long the ring outside
-     it waits, and the second is deliberately a third of the first: the rings overlap, each one
-     setting off while the one inside it is still travelling.
-
-     They were tried strictly in turn -- ring 1 starting where ring 0 stopped -- on the theory
-     that a drill-down should be stated a level at a time. It is worse, at every beat length
-     tried. Four legs end to end is four animations queueing however short each one is, and the
-     picture arrives in instalments; overlapped, the same three delays read as one movement
-     that happens to deepen outward, which is what the chart is. The sequence was never the
-     thing carrying the depth -- the *order* is, and an order survives being overlapped.
-
-     A third of the leg is where the three read as three. Much less and they arrive as one
-     swell with no order in it at all; much more and the outer ring is visibly waiting its
-     turn, which is the queue coming back by degrees. The stagger is the one value here with no
-     usage on the scale to point at, because the scale's staggers are for lists where the
-     sequence is texture -- 40ms across nine panels, 18ms down their rows -- and these three
-     beats are most of what the movement says.
-
-     Every sector opens across its own width alongside ring 0, the ring whose width it is, so
-     `--sun-fan-dur` is a leg like the rings' rather than a length of its own -- a touch longer
-     because an angular sweep across a wide sector has further to go than a ring has outward.
-     Every sector opens at once and they all finish together, so what differs between them is
-     the rate rather than the moment: a line item worth a third of the bill crosses 120 degrees
-     in the time a thin one crosses four, which is the same fact the chart states in the
-     picture, said in the arrival. A hand crossing the whole dial instead would have made the
-     ranking a queue, and the tail of the bill something the reader waits through. */
+  /* The disc unfurling, which is two movements and one arrival: every sector opening across its
+     own width, and the rings growing out of the hole while they do. */
   --sun-ring-dur: var(--duration-medium);
   --sun-ring-ease: var(--ease-smooth-out);
   --sun-ring-stagger: 120ms;
   --sun-fan-dur: var(--duration-slow);
   --sun-fan-ease: var(--ease-smooth-out);
-  /* A scale about the centre, so what it sets is how far each ring is from where it belongs:
-     at 0.88 the outer edge travels about eleven units of a 96-unit radius and the innermost
-     ring starts just under the readout, which is where it comes out from. Further would put
-     the first ring across the words in the hole. */
+  /* A scale about the centre, so what it sets is how far each ring is from where it belongs: at
+     0.88 the outer edge travels about eleven units of a 96-unit radius and the innermost ring
+     starts just under the readout, which is where it comes out from. */
   --sun-ring-from: 0.88;
 
   /* The mosaic being laid down, which is the two claims its own header makes -- column width is
-     a share of the bill, block height is a share of the column -- said in that order.
-
-     `--mos-wipe-dur` is a column uncovering across its own width. Every column starts at once
-     and they all finish together, so what differs between them is the rate: a line item worth a
-     third of the bill crosses a third of the chart in the time a sliver crosses sixty pixels.
-     That is the sunburst's fan made straight, and it is the same argument -- see the block
-     beside `t-sun-fan`, where the case against one hand crossing the whole picture is written
-     out. `--duration-slow` because it is the same leg the fan takes; a width stated sideways is
-     the same size of movement whether the picture is round or square.
-
-     `--mos-block-dur` is one block growing into its slot, and the stagger is what separates it
-     from the block below it. It is `--duration-stagger`, the scale's own per-item offset, because
-     that is what this is -- a list inside one column, the same ladder the panels' rows take -- and
-     deliberately not the sunburst's 120ms. Three rings can afford a beat that carries the
-     sequence on its own; a column holds up to fifteen blocks, and fifteen beats of anything is a
-     column the reader watches fill. At 40ms the ladder runs out roughly where the wipe does, so
-     the width and the depth land as one arrival rather than two. */
+     a share of the bill, block height is a share of the column -- said in that order. */
   --mos-wipe-dur: var(--duration-slow);
   --mos-wipe-ease: var(--ease-smooth-out);
   --mos-block-dur: var(--duration-fast);
   --mos-block-ease: var(--ease-smooth-out);
   --mos-block-stagger: var(--duration-stagger);
 
-  /* The intake's two faces. One duration for the crossfade and for the height the box grows
-     through, so the note leaving, the list arriving and the box resizing are one movement rather
-     than three that end at three different moments. It is read back in `Upload.tsx`, which waits
-     it out before handing the main thread to the parse.
-
-     The two beats the list is written in are the values here with no usage on the scale, because
-     nothing else on the page types: one per character, and one pause between names. They run one
-     after another rather than overlapping -- a folder is read by one machine, and two carets in
-     the panel at once says it is being read by two.
-     What is *not* here any more is the beat the names are written in. It cannot be: a line is
-     written in the time the file it names took to read, which is a measurement rather than a
-     choice -- see `MIN_WRITE` and `NAMES` in `Upload.tsx`. The stylesheet keeps the timings
-     that are decisions; this one belongs to the disk. */
+  /* The intake's two faces. */
   --intake-swap-dur: var(--duration-fast);
   --intake-swap-ease: var(--ease-smooth-out);
 
-  /* Controls growing into the toolbar. Sideways rather than up, because they emerge from
-     beside the theme switch, which does not move; and out faster than in, because arriving is
-     the moment worth watching and leaving is not. */
+  /* Controls growing into the toolbar. */
   --grow-in-dur: var(--duration-fast);
   --grow-out-dur: var(--duration-quick);
   --grow-distance: var(--distance-base);
   --grow-blur: var(--blur-small);
   --grow-ease: var(--ease-smooth-out);
 
-  /* Tooltip open / close. The 150ms appear comes off the scale; the 50ms disappear has no usage
-     on the scale and stays literal, which is the point of it -- a hint that waits before
-     arriving must not wait before leaving. The chip is ink on paper inverted, the same
-     treatment the pressed pill gets.
-     The wait is the one departure from the scale, which names 80ms for this. 80ms is not a
-     wait, it is a frame and a half: every control the pointer crossed on its way somewhere else
-     put a black chip on the page, and a row of small controls is a thing pointers cross
-     constantly. 320ms is long enough that only pointers which *stopped* are answered. */
+  /* Tooltip open / close. */
   --tt-in-dur: var(--duration-quick);
   --tt-out-dur: 50ms;
   --tt-delay: 320ms;
@@ -2169,11 +1864,8 @@ kbd {
   --tt-fg: var(--paper);
 }
 
-/* Tabs sliding — the pressed state of every segmented control, as one pill that
-   travels rather than four backgrounds switching on. The bar is the page's own
-   `.seg`, which already draws the border and the sunk ground, so only the
-   positioning context is added here. `aria-pressed` stands in for the
-   reference's `aria-selected`: these are buttons, not tabs. */
+/* Tabs sliding — the pressed state of every segmented control, as one pill that travels rather
+   than four backgrounds switching on. */
 .seg.t-tabs {
   position: relative;
 }
@@ -2213,15 +1905,7 @@ kbd {
   }
 }
 
-/* Tooltip open/close — the hint on the controls whose label is a symbol or an abbreviation.
-   Two departures from the reference, both because of where this toolbar sits. It opens
-   downward: the bar is the first thing on the page, so a hint above it would open off the
-   top of the window. And it hangs from its control's right edge rather than centred on it,
-   because the bar is flush right, and a centred hint on the rightmost control would run off
-   that edge instead.
-
-   The trigger's own container is the positioning context -- `.seg.t-tabs` already is one for
-   the pill, and a control without one says so with `.t-tt-host`. */
+/* Tooltip open/close — the hint on the controls whose label is a symbol or an abbreviation. */
 .t-tt-host {
   position: relative;
 }
@@ -2245,14 +1929,13 @@ kbd {
   transform-origin: 100% 0;
   opacity: 0;
   pointer-events: none;
-  /* Default rule controls the LEAVE state. transition-delay
-     stays unset so leaving plays without delay. */
+  /* Default rule controls the LEAVE state. */
   transition:
     opacity var(--tt-out-dur) var(--tt-out-ease),
     transform var(--tt-out-dur) var(--tt-out-ease);
 }
-/* The delay belongs ONLY to the hover rule so leaving the trigger snaps the delay back to 0
-   and the disappear plays immediately. */
+/* The delay belongs ONLY to the hover rule so leaving the trigger snaps the delay back to 0 and
+   the disappear plays immediately. */
 .t-tt-trigger:hover + .t-tt,
 .t-tt-trigger:focus-visible + .t-tt {
   opacity: 1;
@@ -2267,8 +1950,8 @@ kbd {
   }
 }
 
-/* Text states swap — the copy and share buttons, whose label is a running
-   account of what just happened. */
+/* Text states swap — the copy and share buttons, whose label is a running account of what just
+   happened. */
 .t-text-swap {
   display: inline-block;
   transform: translateY(0);
@@ -2297,21 +1980,14 @@ kbd {
   }
 }
 
-/* Text states crossfade — the sunburst's readout, whose copy changes under the pointer
-   rather than because something happened. Both legs run at once, so the slot is never
-   empty; the one on its way out leaves the flow, so the box is sized by the line arriving. */
+/* Text states crossfade — the sunburst's readout, whose copy changes under the pointer rather
+   than because something happened. */
 .t-text-cross {
   display: block;
   position: relative;
 }
-/* The variant that sits inside a sentence: `inline-block`, so the box has a width to
-   interpolate and the words after it are carried along by it.
-
-   The clip goes on the ghost rather than on the box around it, which is the whole reason the
-   figure sits on the same baseline as the sentence: an inline-block that hides its overflow
-   is baselined off its bottom edge instead of off the text inside it, and `2.7%` would ride
-   a descender high. The ghost keeps the width it was written at, so left unclipped a figure
-   shrinking would reach across the words it is handing over to. */
+/* The variant that sits inside a sentence: `inline-block`, so the box has a width to interpolate
+   and the words after it are carried along by it. */
 .t-text-cross[data-inline] {
   display: inline-block;
 }
@@ -2350,7 +2026,7 @@ kbd {
     filter: blur(var(--text-swap-blur));
   }
 }
-/* Nothing fades, so the two would stack. The one leaving is dropped outright. */
+/* Nothing fades, so the two would stack. */
 @media (prefers-reduced-motion: reduce) {
   .t-text-cross > .leg {
     animation: none !important;
@@ -2360,10 +2036,7 @@ kbd {
   }
 }
 
-/* Card resize — the frame, which is a different shape for each chart. Its size is
-   set by `aspect-ratio` rather than by a length, so that property is enumerated
-   alongside the snippet's own two: a browser that interpolates ratios tweens the
-   frame, and one that does not lands on the jump it makes today. */
+/* Card resize — the frame, which is a different shape for each chart. */
 .t-resize {
   transition:
     width var(--resize-dur) var(--resize-ease),
@@ -2377,12 +2050,8 @@ kbd {
   }
 }
 
-/* Panel reveal — the breakdown's two lists and the card's two charts, each sliding
-   into the region the other left.
-
-   The chart's panel stands where `.mosaicwrap` and `.sun` used to stand, as the
-   flex child that takes the rest of the card, so it has to hand that on: the
-   column is what the chart inside it measures its own height against. */
+/* Panel reveal — the breakdown's two lists and the card's two charts, each sliding into the
+   region the other left. */
 .chartslot {
   flex: 1;
   min-height: 0;
@@ -2397,8 +2066,7 @@ kbd {
   display: flex;
   flex-direction: column;
 }
-/* Everything under the card, which is most of the page's height. Translate and opacity are
-   composited; a blur across a subtree this tall is not, so this one travels without one. */
+/* Everything under the card, which is most of the page's height. */
 .below {
   --panel-blur: 0px;
 }
@@ -2414,7 +2082,7 @@ kbd {
   will-change: transform, opacity, filter;
 }
 /* A panel being *shown the door* rather than one that has not arrived yet: same closed state,
-   opposite side. It can sit before the open rule because a leaving panel is never open. */
+   opposite side. */
 .t-panel-slide[data-leaving="1"] {
   transform: translateY(var(--panel-exit-y));
 }
@@ -2428,10 +2096,7 @@ kbd {
     opacity var(--panel-open-dur) var(--panel-ease),
     filter var(--panel-open-dur) var(--panel-ease);
 }
-/* The working, after the answer. The other half of `--face-stagger`, for the browsers that
-   take the two-step path: the card moves, and the page under it follows. Both directions,
-   because a breakdown that left first would empty the page bottom-up on the way out and
-   top-down on the way in. */
+/* The working, after the answer. */
 .below.t-panel-slide[data-open="true"],
 .below.t-panel-slide[data-leaving="1"] {
   transition-delay: var(--face-stagger);
@@ -2442,62 +2107,22 @@ kbd {
   }
 }
 
-/* Which way the page is going. The turn back to the empty card is not the turn away from it
-   played in reverse: the report leaves downward and the drop zone comes back from above, the
-   way a stack of pages behaves. One value, because the exit is derived from it. */
+/* Which way the page is going. */
 .shell[data-dir="back"] {
   --panel-translate-y: -24px;
 }
 
-/* The screen change, as a view transition — the drop zone becoming the report, and the
-   report becoming the drop zone again.
-
-   Everything below runs against snapshots rather than against the page. `App.tsx` hands the
-   browser one state change; the browser photographs the old screen, lets the change land, and
-   builds a pseudo-element tree beside the real one: a `group` per named element, holding an
-   `old` picture and a `new` live rendering. Those are what these rules animate. The real DOM
-   is already in its new state the whole time.
-
-   What is named is the whole argument of this block, and the rule is that a name is a claim of
-   identity: these two things, on the two screens, are the same thing.
-
-   The heading is the clearest of them, and it is claimed a word at a time rather than a line
-   at a time -- "Where did your money go?" and "Where your money went" are one sentence in two
-   tenses, and three of its words are the same word in both. So the words themselves are what
-   travel; see the block below them. The eyebrow is claimed whole, gaining the scope it is now
-   able to state; the caption under the figure the same; the figure itself the same, a dash
-   standing in the place the bill will occupy and then being replaced by it. And the card,
-   which is the page's one frame: it does
-   not go anywhere, it stops being a dashed invitation and becomes a solid border around a
-   chart -- a change no CSS transition can make, since `border-style` does not interpolate.
-
-   What is deliberately *not* named is everything that is genuinely being replaced rather than
-   changed. The drop zone is not an earlier draft of the mosaic and the note about finding the
-   transcripts is not an earlier draft of the breakdown, so pairing them off would be a claim
-   that is not true, and it would look like one: two unrelated pictures stretching into each
-   other. Those ride in the root snapshot and cross-fade, and the arriving ones still slide up
-   under their own `.t-panel-slide` -- which runs live inside the new snapshot, and which is
-   where the breakdown's wait behind the card continues to come from. */
+/* The screen change, as a view transition — the drop zone becoming the report, and the report
+   becoming the drop zone again. */
 .card {
   view-transition-name: vt-card;
 }
 .chead .eyebrow {
   view-transition-name: vt-eyebrow;
 }
-/* The heading is named a word at a time rather than as a line, because between the two faces
-   it is not one line becoming another -- it is the same three words with two taken out from
-   under them. "Where", "your" and "money" are on both sides, so each carries its own name and
-   the browser pairs them off and moves them: dropping "did" pulls everything after it left,
-   and `money` -- the one word set in the accent, and so the one the eye is already on -- has
-   the furthest to go.
-
-   "did", "go?" and "went" are named too, and have no counterpart on the other side. That is
-   the whole of what makes them fade where they stand: the browser pairs by name, and a name
-   present on one side only is an arrival or a departure rather than a move. Which is the true
-   account of them -- they are what the change of tense costs.
-
-   The `h1` itself is deliberately unnamed. A line that both moves as a whole and has moving
-   parts is two claims about the same pixels. */
+/* The heading is named a word at a time rather than as a line, because between the two faces it
+   is not one line becoming another -- it is the same three words with two taken out from under
+   them. */
 .chead h1 [data-w="where"] {
   view-transition-name: vt-w-where;
 }
@@ -2523,14 +2148,7 @@ kbd {
   view-transition-name: vt-total;
 }
 
-/* The morph, at the page's own tempo rather than the browser's 250ms. One duration for the
-   boxes and for the pictures crossing inside them, because a frame that arrives before its
-   contents is a frame that arrives twice.
-
-   A wildcard under the turn's own mark rather than the names written out: the heading alone
-   is six of them now, and a name added above should not also have to be remembered here. The
-   mark is what stops it reaching the breakdown's transition, which runs faster -- see the
-   `data-filter` block below, which is scoped for the same reason in the other direction. */
+/* The morph, at the page's own tempo rather than the browser's 250ms. */
 :root[data-turn]::view-transition-group(*),
 :root[data-turn]::view-transition-old(*),
 :root[data-turn]::view-transition-new(*) {
@@ -2538,15 +2156,7 @@ kbd {
   animation-timing-function: var(--panel-ease);
 }
 
-/* Text does not stretch. A snapshot is a replaced element, and the browser's default is to
-   fill the group box with it -- which is right for the card, whose two sides are the same
-   size, and wrong for every line of copy here, whose two sides are not: a question and its
-   answer are different lengths, and a dash is not as wide as a bill. `object-fit: none` draws
-   each picture at the size it was taken and lets the box travel underneath it, so what the
-   reader sees is one line of words becoming another rather than two being squeezed.
-
-   Anchored where the copy is set: the heading and the eyebrow grow rightward from a left
-   margin, the figure and its caption grow leftward from a right one. */
+/* Text does not stretch. */
 ::view-transition-old(vt-eyebrow),
 ::view-transition-new(vt-eyebrow),
 ::view-transition-old(vt-w-where),
@@ -2577,10 +2187,7 @@ kbd {
 }
 
 /* The copy has a swap of its own for the browsers with no view transition to run -- see
-   `TextSwap` in `Motion.tsx`, which is what changes these same words on the fallback path.
-   Where there is one, it would be a second animation playing inside the first: the new words
-   sliding up through a box that is already travelling. So while `data-turn` is on the root the
-   swap holds still, and the attribute coming off at the end leaves the words where they are. */
+   `TextSwap` in `Motion.tsx`, which is what changes these same words on the fallback path. */
 :root[data-turn] .t-text-swap {
   transform: none;
   filter: none;
@@ -2588,9 +2195,9 @@ kbd {
   transition: none;
 }
 
-/* The transition is not started at all when motion is reduced -- see `reduced()` in
-   `App.tsx` -- so this is the belt to that braces: `*` does not match a pseudo-element, which
-   means the blanket rule at the top of this file cannot reach any of the above. */
+/* The transition is not started at all when motion is reduced -- see `reduced()` in `App.tsx` --
+   so this is the belt to that braces: `*` does not match a pseudo-element, which means the
+   blanket rule at the top of this file cannot reach any of the above. */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-old(*),
@@ -2599,36 +2206,14 @@ kbd {
   }
 }
 
-/* The breakdown filtering itself, as the page's second view transition.
-   ─────────────────────────────────────────────────────────────────────────────
-   Typing in the query box used to change the list between two frames: panels vanished, the
-   ones after them slid up into the gap with no travel, and the rows left over were suddenly
-   somewhere else. Nothing about that told the reader whether a line item had been filtered out
-   or had simply moved -- which is the only question a filter has to answer.
-
-   Same machinery as the turn above, opposite claim about what is named. Up there the two
-   screens are different content and only a handful of things are the same thing twice; here
-   almost everything is the same thing twice, and what changes is which of them are present
-   and where they sit. So every panel and every row is named, by identity rather than by
-   position -- `vtName` in `Motion.tsx` hashes the key the row is already keyed by -- and the
-   browser is left to work out which of them survived. A row in both states travels between
-   its two positions; a row in one state fades, and the fact that it fades rather than travels
-   is the answer to the question.
-
-   The names are switched on by `data-filter` and are absent otherwise, for the same reason
-   they are by identity: a name is a claim that this element is worth photographing on its
-   own, and it is not one the table's forty rows should be making during the turn, when the
-   whole page is what is changing. */
+/* The breakdown filtering itself, as the page's second view transition. */
 :root[data-filter] .pan,
 :root[data-filter] .pi,
 :root[data-filter] tbody > tr {
   view-transition-name: var(--vt, none);
 }
 
-/* The query box is exempt from its own transition. It is the one element the reader may still
-   be typing into while this runs, and a photograph of it laid over the live one is a caret in
-   two places and a letter that arrives faint. Naming it lifts it clear of the root snapshot;
-   dropping its `old` leaves the real control on screen, unphotographed, all the way through. */
+/* The query box is exempt from its own transition. */
 :root[data-filter] .bctl {
   view-transition-name: vt-find;
 }
@@ -2640,8 +2225,7 @@ kbd {
 }
 
 /* Faster than the turn, and for the same reason the bars are: a filter is an adjustment to
-   something the reader is already looking at, not an arrival. Scoped to `data-filter` so the
-   turn's own five morphs keep their slower tempo -- `*` here would otherwise reach them too. */
+   something the reader is already looking at, not an arrival. */
 :root[data-filter]::view-transition-group(*),
 :root[data-filter]::view-transition-old(*),
 :root[data-filter]::view-transition-new(*) {
@@ -2649,31 +2233,7 @@ kbd {
   animation-timing-function: var(--filter-ease);
 }
 
-/* Covering the dollars, as the page's third view transition and the one that adds no names.
-   ─────────────────────────────────────────────────────────────────────────────
-   The eye in the toolbar rewrites a number in almost every box on the page at once -- the bill
-   becomes four asterisks, the strip's dollars become shares, and every panel and every row of
-   the table trades a per-request figure for a percentage. Landing all of that in one frame is
-   the whole page appearing to flinch, and a reader who has just covered their screen for
-   someone else to see cannot tell from a flinch what was covered.
-
-   So this one is left almost entirely to the root snapshot: what the page holds still is
-   photographed twice, and two identical pictures crossing take nothing across. Only the boxes
-   whose contents actually changed have anything to dissolve, which makes the dissolve itself
-   the answer to where the money went out of the page.
-
-   Nothing new is named, and the header's standing names are taken away for the length of it,
-   which is the whole difference between this and the turn above. A name is a box the browser
-   will travel between two positions, and the header's boxes do move: the caption gains "amount
-   hidden" and gets wider, which widens the column it shares with the figure, which moves that
-   column's left edge. Named, the bill slid sideways on its way to becoming four asterisks --
-   motion the reader has to read and discard, since the figure it is standing in front of never
-   went anywhere. Unnamed, the caption and the figure ride inside the card's own snapshot, which
-   is the same size in both states, and the change happens where it happened.
-
-   The card keeps its name, because that is what makes the header's part of this a cross-fade
-   rather than a repaint: it is one picture the width of the page, dissolving into another that
-   differs only where the numbers are. */
+/* Covering the dollars, as the page's third view transition and the one that adds no names. */
 :root[data-mask] .chead .eyebrow,
 :root[data-mask] .chead h1 [data-w],
 :root[data-mask] .chead .billed,
@@ -2687,11 +2247,7 @@ kbd {
   animation-timing-function: var(--mask-ease);
 }
 
-/* Controls growing into the toolbar — the five that only mean something once there is a bill.
-   They mount at their final width and animate nothing that affects layout, which is what keeps
-   the theme switch beside them still and the travelling pills inside them measured against a
-   bar that is not moving. `data-i` counts outward from the anchor, so the TTL lens beside the
-   theme switch appears first. */
+/* Controls growing into the toolbar — the five that only mean something once there is a bill. */
 @keyframes t-grow-in {
   from {
     opacity: 0;
@@ -2745,35 +2301,15 @@ kbd {
   }
 }
 
-/* Bars drawing themselves — every bar in the breakdown, wiped out from its left edge
-   rather than already at length when the panel arrives.
-
-   A bar is a length, and a length that appears is a length nobody watched being measured.
-   Drawn, the same panel says which line items are big before any of the labels are read,
-   because the long ones are still moving when the short ones have stopped.
-
-   `scaleX` rather than `width`, because the width is React's -- it is a percentage in a
-   style attribute that changes on every drill, lens and query. Scaling a bar that is
-   already the right width leaves that untouched, and stays on the compositor.
-
-   It plays once, when the bars mount: the panels re-render constantly (a pointer crossing
-   one re-renders it) and a CSS animation does not restart on a re-render, only on a
-   remount. Which is exactly the set of moments worth drawing -- the report arriving, the
-   view switching back to panels, a drill changing what the panels are. */
+/* Bars drawing themselves — every bar in the breakdown, wiped out from its left edge rather than
+   already at length when the panel arrives. */
 @keyframes t-bar-draw {
   from {
     transform: scaleX(0);
   }
 }
 
-/* Where in the sequence a given bar falls, as two indices the delay below multiplies out.
-   Enumerated rather than counted, because CSS has no arithmetic on `nth-child`: the ladder
-   stops at the tenth panel and the twelfth row and holds every later one at that value, so a
-   long tail arrives with the tail rather than trailing off the end of the animation.
-
-   The row half is shared with the ledger's rows, because it is the same count of the same
-   thing: the table is the other way of drawing this list, and its magnitude column was the
-   one set of bars on the page that appeared already drawn. */
+/* Where in the sequence a given bar falls, as two indices the delay below multiplies out. */
 .pan {
   --pan-i: 0;
 }
@@ -2853,20 +2389,8 @@ tbody > tr:nth-child(n + 12) {
   --row-i: 12;
 }
 
-/* The panel's own bar leads its rows: `--row-i` starts at 1 for the first row, so the
-   headline bar at 0 is always a beat ahead of the list underneath it.
-
-   No `--face-stagger` in the base offset. It was there for the one mount that arrives under a
-   card -- the report itself -- and it charged every other mount for it: switching from the
-   table back to the panels put 150ms of nothing between the click and the first bar, which is
-   long enough to read as the page thinking. The bars now start with the panel they are in,
-   and on the turn they spend their first frames under a `.below` that is still travelling,
-   which is a bar drawing behind an arriving panel rather than a bar waiting for one.
-
-   No `will-change` either. It was a hint for a hundred-odd panel bars, and the table's rows
-   would have made it three hundred elements asking to be held on their own compositor layer
-   for as long as the page is open, for one 250ms animation each -- which is the cost the hint
-   is supposed to avoid. A transform animation is promoted for its own duration anyway. */
+/* The panel's own bar leads its rows: `--row-i` starts at 1 for the first row, so the headline
+   bar at 0 is always a beat ahead of the list underneath it. */
 .pan .track > span,
 .pan .tk > span,
 .magbar {
@@ -2880,8 +2404,8 @@ tbody > tr:nth-child(n + 12) {
 .pan .pi .tk > span {
   animation-delay: calc(var(--pan-i) * var(--bar-stagger) + var(--row-i) * var(--row-stagger));
 }
-/* The table is one panel's worth of rows rather than a grid of them, so it takes the row
-   ladder alone -- there is no across for `--bar-stagger` to count. */
+/* The table is one panel's worth of rows rather than a grid of them, so it takes the row ladder
+   alone -- there is no across for `--bar-stagger` to count. */
 .magbar {
   animation-delay: calc(var(--row-i) * var(--row-stagger));
 }
@@ -2893,51 +2417,8 @@ tbody > tr:nth-child(n + 12) {
   }
 }
 
-/* The disc unfurling — every sector opening across its own width at once, with the rings
-   growing out of the hole while they do.
-
-   Two movements, because the chart makes two claims and neither one says the other.
-
-   The fans are the claim that these are shares of one turn. Each sector opens from its own
-   start angle, all of them together and all of them finishing together, so the width of a
-   line item is stated as the speed it opens at: the largest crosses a third of the circle in
-   the time the smallest crosses four degrees. Nine sectors, one gesture.
-
-   Which is why they are nine fans rather than one hand going round the dial. A hand makes the
-   ranking a queue -- the biggest line item is drawn while the reader is still looking for the
-   chart, and the tail of the bill is something they wait through -- and it reads as a clock
-   or a progress bar, neither of which this is. The whole point of the picture is that these
-   things are concurrent shares of one bill.
-
-   The growth is the claim about depth. It is the same argument as the bars drawing
-   themselves, made about how far in rather than how far along: this chart answers "how deep
-   does the money go", and the answer is a drill-down -- the line item, then what is inside it,
-   then what is inside that. Ring by ring out of the hole, the picture says which ring is a
-   subdivision of which before a single label is read.
-
-   The rings overlap, and that is a decision that was made twice. Strictly in turn -- ring 1
-   setting off where ring 0 landed -- is the truer diagram of a drill-down and the worse thing
-   to watch: four legs end to end is four animations queueing however short each one is, and a
-   chart that arrives in instalments reads as a page that is slow rather than as a tree with
-   levels. Overlapped, the delays say the same thing in the same order while the disc arrives
-   as one movement. The order is what carries the depth here; the pauses were carrying nothing.
-
-   The two movements compose because they are perpendicular, and they set off together where
-   they meet. The fan is the sector's width, uncovered sideways; the growth is its depth,
-   arriving outward -- so the fan starts with ring 0, the ring whose width it is, and a sector
-   opening and stating its first level is one thing happening.
-
-   The readout leads by a step: the rings are a decomposition of the figure in the middle, so
-   the figure is what they come out of. A total that appeared after its own breakdown would be
-   the sentence backwards.
-
-   The wrapper `<g>` per arc is what moves, not the arc -- see `Sunburst.tsx`. The arc's own
-   `opacity` is already carrying the dimming (hover, query miss) and its ring's fade would be
-   fighting it; on the wrapper the two multiply, which is what they mean.
-
-   Scaled about the centre of the viewBox, which is the centre of the circle: the box is
-   `-100 -100 200 200`, so `transform-box: view-box` and a 50% origin land on the origin --
-   the one point every arc in the chart is measured from. */
+/* The disc unfurling — every sector opening across its own width at once, with the rings growing
+   out of the hole while they do. */
 @keyframes t-sun-fan {
   from {
     stroke-dasharray: 0 360;
@@ -2949,21 +2430,15 @@ tbody > tr:nth-child(n + 12) {
     opacity: 0;
   }
 }
-/* The dash is in degrees, because the circle in the mask declares `pathLength="360"`: a dash
-   as long as this sector's sweep, then a gap as long as the whole turn, so the pattern cannot
-   come round and paint a second wedge somewhere it does not mean. What grows is the dash
-   itself rather than an offset walking it into view -- an offset reveals the *end* of a dash
-   first, which would open every sector against the ranking.
-
-   It rests at the sector's full width, which is the state the mask is in when nothing is
-   animating it: the whole sector, uncovered. That is what the PNG gets, and what a reader who
-   has asked for stillness gets. */
+/* The dash is in degrees, because the circle in the mask declares `pathLength="360"`: a dash as
+   long as this sector's sweep, then a gap as long as the whole turn, so the pattern cannot come
+   round and paint a second wedge somewhere it does not mean. */
 .sunfan {
   stroke-dasharray: var(--span) 360;
   animation: t-sun-fan var(--sun-fan-dur) var(--sun-fan-ease) both;
-  /* One beat in, alongside ring 0: the sector's width and its first ring are one arrival, and
-     a fan that opened before the readout's own beat would be uncovering a wedge with nothing
-     in it yet. */
+  /* One beat in, alongside ring 0: the sector's width and its first ring are one arrival, and a
+     fan that opened before the readout's own beat would be uncovering a wedge with nothing in it
+     yet. */
   animation-delay: var(--sun-ring-stagger);
 }
 /* Which ring this is, enumerated rather than read off the attribute, for the same reason the
@@ -2973,9 +2448,7 @@ tbody > tr:nth-child(n + 12) {
   transform-box: view-box;
   transform-origin: 50% 50%;
   animation: t-ring-out var(--sun-ring-dur) var(--sun-ring-ease) both;
-  /* The ladder: one step for the readout in front of every ring, and one more per ring. Steps
-     shorter than the leg, so a ring sets off while the one inside it is still moving -- see
-     the token block, where the ratio is the argument. */
+  /* The ladder: one step for the readout in front of every ring, and one more per ring. */
   animation-delay: calc((var(--ring-i) + 1) * var(--sun-ring-stagger));
 }
 .sunwedge[data-ring="1"] {
@@ -2995,40 +2468,8 @@ tbody > tr:nth-child(n + 12) {
   }
 }
 
-/* The mosaic laying itself down — every column uncovering across its own width at once, with
-   the blocks inside each one filling down the stack while it does.
-
-   The same two movements as the disc, because it is the same tree and the same two claims; what
-   changes is that here they are both straight lines. The column's width is the share of the
-   bill, so the width is what is uncovered, and it is uncovered at the rate that states it --
-   every column starting together and every column landing together, which is the fan's argument
-   without the trigonometry. The blocks are the share of the column, so they arrive down the
-   stack in the order the column ranks them, biggest first: the rings' claim about depth, made
-   downward instead of outward.
-
-   Downward, and it was tried the other way -- each block growing out of its own bottom edge,
-   the column stacking up off the baseline the way a bar rises. On paper that is the better
-   argument, since a column is a quantity standing on a baseline. On screen it is worse, and the
-   reason is the leading edge. Filling down, one edge travels the whole height of the column:
-   each block picks up where the one above it stopped, and the boundaries between them are things
-   the edge passes rather than places it restarts. Growing up, every block opens from its own
-   floor, so what the eye gets is not one edge crossing a column but seven edges sprouting in
-   seven slots -- the stack does not build, it flickers into place. Down also runs with the
-   ranking rather than against it.
-
-   A wipe rather than a scale, which is the difference between this and the bars in the panels.
-   A bar is a bare length and can be drawn by scaling it from nothing; a column is a length with
-   labels standing in it, and a column scaled from nothing is a column whose name arrives
-   stretched. What travels here is the edge of the reveal, and everything behind it is already
-   at full size and full weight.
-
-   `backwards` rather than the `both` every other mount animation on this page takes, and this
-   is the one place the difference matters. `both` would hold the end state for the life of the
-   page, and the end state is a clip: `inset(0)` is the border box, and the 2px focus ring these
-   blocks and headings draw *outside* their box would be clipped away for every keyboard reader
-   from then on, to keep a shape that has nothing left to do. So the resting state is no clip at
-   all, and both ends are named in the keyframes -- `none` is not a shape, and there is nothing
-   to interpolate between it and one. */
+/* The mosaic laying itself down — every column uncovering across its own width at once, with the
+   blocks inside each one filling down the stack while it does. */
 @keyframes t-mos-wipe {
   from {
     clip-path: inset(0 100% 0 0);
@@ -3053,8 +2494,8 @@ tbody > tr:nth-child(n + 12) {
   animation-delay: calc(var(--seg-i) * var(--mos-block-stagger));
 }
 /* Where in the stack a block falls, enumerated for the reason the panels' ladder is: CSS has no
-   arithmetic on `nth-child`. It stops at the seventh block and holds every later one there, so
-   a column that folds fourteen line items in arrives with its tail rather than trailing off the
+   arithmetic on `nth-child`. It stops at the seventh block and holds every later one there, so a
+   column that folds fourteen line items in arrives with its tail rather than trailing off the
    end of the wipe. */
 .colsegs > .segb {
   --seg-i: 0;
@@ -3085,16 +2526,11 @@ tbody > tr:nth-child(n + 12) {
 }
 
 /* And the one place none of the above may run: the PNG.
-   ─────────────────────────────────────────────────────────────────────────────
-   The snapshot hands the browser the card's own markup and this same stylesheet inside an
-   `<img>`, and that document starts its own clock -- a mount animation would be rasterised
-   at whatever frame the image happened to load on, which for anything holding its `from`
-   keyframe through a delay is a chart that is not there yet. The card is drawn as it stands,
-   so inside the clone nothing is standing still on the way to somewhere.
-
-   A blanket rule, like the reduced-motion one it is modelled on, because it is the same
-   claim: this is a still picture. `data-snapshot` is put on the clone by `snapshot()` in
-   `snapshot.ts` and exists nowhere on the live page. */
+   ───────────────────────────────────────────────────────────────────────────── The snapshot
+   hands the browser the card's own markup and this same stylesheet inside an `<img>`, and that
+   document starts its own clock -- a mount animation would be rasterised at whatever frame the
+   image happened to load on, which for anything holding its `from` keyframe through a delay is a
+   chart that is not there yet. */
 [data-snapshot],
 [data-snapshot] * {
   animation: none !important;

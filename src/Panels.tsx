@@ -1,6 +1,4 @@
-/* Panels: one card per line item, with its own children ranked inside. The alternate to
-   the mosaic rather than a peer of it -- same data, sorted and labelled instead of packed,
-   for when you want to read names rather than compare areas. */
+/* Panels: one card per line item, with its own children ranked inside. */
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
@@ -9,8 +7,8 @@ import { fold, kidsOf, maxCost, moneyFine, pctOf, type CostNode } from "./model.
 import { vtName } from "./Motion.tsx"
 import { hoverBind, useHover } from "./store.ts"
 
-/* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when
-   it lands inside this panel, null otherwise. See `Column` in Mosaic.tsx. */
+/* Memoised on the same two primitives the mosaic columns take: `hit` is the hovered key when it
+   lands inside this panel, null otherwise. */
 const Panel = memo(function Panel({
   panel,
   gname,
@@ -33,9 +31,9 @@ const Panel = memo(function Panel({
   const dim = anyHover && !hit
   const maxKid = maxCost(kids)
 
-  /* Two different footers, and the difference matters: a panel with no children is a
-     genuine leaf, while one whose children sum short of it has been filtered by the query
-     and must say so rather than appear to under-count. */
+  /* Two different footers, and the difference matters: a panel with no children is a genuine
+     leaf, while one whose children sum short of it has been filtered by the query and must say
+     so rather than appear to under-count. */
   const kidsAll = kidsOf(panel) || []
   const shown = kids.reduce((a, k) => a + k.cost, 0)
   const foot = !kidsAll.length
@@ -44,10 +42,10 @@ const Panel = memo(function Panel({
       ? ""
       : t.panels.shown(amt(shown), amt(panel.cost))
 
-  /* Named for the filter transition -- see `vtName`. The key is the panel's identity rather
-     than its place in the grid, which is the whole point: a query that removes the third
-     panel moves the fourth into its slot, and a name that counted slots would morph one line
-     item into a different one. */
+  /* Named for the filter transition -- see `vtName`. The key is the panel's identity rather than
+     its place in the grid, which is the whole point: a query that removes the third panel moves
+     the fourth into its slot, and a name that counted slots would morph one line item into a
+     different one. */
   return (
     <div className="pan" style={vtName(key)}>
       <div className="pantop">
@@ -140,8 +138,8 @@ export function Panels(): React.JSX.Element {
 
   /* Memoised for node identity, so a hover leaves the memoised panels' props untouched. */
   const { panels, maxPanel } = useMemo(() => {
-    /* At the root the nine groups are shown whole -- they are the page's spine, and folding
-       one away would hide a role rather than a long tail. Below the root, fold as usual. */
+    /* At the root the nine groups are shown whole -- they are the page's spine, and folding one
+       away would hide a role rather than a long tail. */
     const src: CostNode[] = focus.groupName
       ? fold(focus.node.items || [], rootCost)
       : d.groups.slice().sort((a, b) => b.cost - a.cost)

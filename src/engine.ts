@@ -1,43 +1,6 @@
-/* Cost attribution engine for Claude Code transcripts. Runs entirely client-side.
- *
- * METHOD -- "carry cost". Billing is per request, and each request bills the ENTIRE
- * input prefix (fresh input + cache read + cache write) plus its own output. So a piece
- * of content does not cost its face value; it costs its token share of every subsequent
- * request it survives in. For each request we take the exact billed cost from `usage`,
- * then allocate it across the content already in context, proportional to token share.
- * Totals are exact; the split across rows is an estimate.
- *
- * DESIGN RULES -- this file must work for transcripts it has never seen:
- *   1. Nothing is silently dropped. An unknown model, tool, tag or command is counted
- *      and surfaced, never skipped.
- *   2. Buckets are structured records ({role, tool, dir, sub}), never strings that get
- *      re-parsed by character offset.
- *   3. Classification is derived from the data (measured ratios, learned vocabulary,
- *      calibrated constants) or from a documented, published spec (POSIX shell
- *      builtins, the Anthropic rate card, the transcript schema). It is never a list
- *      of the things one particular author happens to use.
- *
- * ONE PASS. The walk is fed one file at a time -- open, one per file, close -- because a folder
- * of transcripts is bigger than a page should hold at once, and because a caller that gets the
- * frame back between files can say where it has got to. analyze() is the same thing in one call
- * for callers that already hold everything.
- *   openWalk/walkOne/closeWalk -- read each transcript exactly once; see `the walk`.
- *   billedSoFar()-- the running total, mid-walk, for a caller that wants to show it.
- *   price()      -- O(keys), so any TTL assumption or rate card is free to re-apply.
- *   buildTree()  -- decides direction splits and grouping from the measured costs.
- *   report()     -- arithmetic on the accumulators; walks nothing.
- *
- * ON THE TYPES. Transcript records are untrusted JSON from a schema that evolves without
- * asking us. So the record shapes below are open interfaces of optional fields, not closed
- * discriminated unions: rule 1 says an unfamiliar block type must still be counted, and a
- * union would force a cast at exactly the places that handle the unfamiliar case. The
- * strictness that pays off here is on the shapes this file OWNS -- buckets, trees,
- * datasets -- which are exact.
- */
+/* Cost attribution engine for Claude Code transcripts. */
 
-/* ------------------------------------------------------------------- data in --
- * What the caller hands us, and the transcript shapes we read out of it.
- */
+/* data in -- What the caller hands us, and the transcript shapes we read out of it. */
 
 /** One uploaded transcript: a filename and its raw JSONL text. */
 export interface RawFile {
@@ -51,7 +14,7 @@ export interface ImageSource {
   data?: string
 }
 
-/** A content block. Every field is optional on purpose -- see "ON THE TYPES" above. */
+/** A content block. */
 export interface ContentBlock {
   type?: string
   text?: string
@@ -85,7 +48,7 @@ export interface Message {
   content?: unknown
 }
 
-/** One JSONL line. `isCompactSummary`, `isMeta` and `isSidechain` are real schema fields. */
+/** One JSONL line. */
 export interface TranscriptRecord {
   message?: Message
   timestamp?: string
@@ -95,12 +58,7 @@ export interface TranscriptRecord {
   isSidechain?: boolean
 }
 
-/* ------------------------------------------------------------------ pricing --
- * A rate card, not a model whitelist. Keys are matched exactly, then by longest
- * prefix, then by tier keyword; anything still unresolved is reported as unpriced
- * rather than dropped. Rates are $ per 1M tokens, [input, output].
- * Override or extend at runtime with setRates() -- no source edit required.
- */
+/* pricing -- A rate card, not a model whitelist. */
 
 /** $ per 1M tokens, as [input, output]. */
 export type Rate = [input: number, output: number]
@@ -157,8 +115,7 @@ export function normalizeModel(id: unknown): string {
   return m.replace(/-+$/, "")
 }
 
-/** The outcome of pricing a model id. `basis` explains the match so the UI can show its
- *  work; `rate` is null when nothing matched. Never throws, never returns undefined. */
+/** The outcome of pricing a model id. */
 export interface RateResolution {
   rate: Rate | null
   basis: string
@@ -182,11 +139,8 @@ export function resolveRate(model: unknown): RateResolution {
   return { rate: null, basis: "unpriced", id }
 }
 
-/* ------------------------------------------------------- shell interpretation --
- * The sets below are the shell language, not a taste list: POSIX special builtins
- * and reserved words. Everything program-specific (which commands take subcommands,
- * which ones matter) is learned from the corpus as it is read.
- */
+/* shell interpretation -- The sets below are the shell language, not a taste list: POSIX special
+ * builtins and reserved words. */
 const KEYWORDS = new Set([
   "for",
   "while",
@@ -305,11 +259,8 @@ export function splitSegments(cmd: string): string[] {
       i++
       continue
     }
-    // `<<TAG` only *arms* a heredoc: the rest of THIS line is still part of the pipeline
-    // (`cat <<EOF | grep x`), and the body starts at the next newline. Recording it as
-    // pending keeps both halves right; consuming the line immediately loses the pipe, and
-    // resuming into the same buffer afterwards silently welds the next command onto this
-    // one (which is how `python3 - <<PY … PY` + `grep foo` became "python3 grep").
+    // `<<TAG` only *arms* a heredoc: the rest of THIS line is still part of the pipeline (`cat
+    // <<EOF | grep x`), and the body starts at the next newline.
     if (cmd.startsWith("<<", i) && cmd[i + 2] !== "<") {
       let j = i + 2
       if (cmd[j] === "-") j++
@@ -380,8 +331,8 @@ export function splitSegments(cmd: string): string[] {
   return segs.map((s) => s.trim()).filter(Boolean)
 }
 
-/** Could this word be a subcommand verb? A bare lowercase-ish token -- not a flag,
- *  path, filename, number, URL or variable. Whether it IS one is decided by the corpus. */
+/** Could this word be a subcommand verb? A bare lowercase-ish token -- not a flag, path,
+ *  filename, number, URL or variable. */
 function isVerbShaped(w: string): boolean {
   return (
     !!w &&
@@ -392,9 +343,7 @@ function isVerbShaped(w: string): boolean {
   )
 }
 
-/** One resolved pipeline segment.
- *  `rank` orders candidates for labelling a whole invocation: 0 = external command
- *  (real work), 1 = builtin that emits but does no work, 2 = state-only builtin. */
+/** One resolved pipeline segment. */
 export interface Segment {
   prog: string
   verb: string | null
@@ -418,10 +367,8 @@ export function resolveSegment(seg: string): Segment | null {
       continue
     } // sudo/env/timeout/...
     if (KEYWORDS.has(w)) return null // control flow, not a command
-    // A wrapper takes its own options before the command it execs: `timeout 5 kubectl`,
-    // `xargs -n1 grep`, `nice -n10 cargo`. Skip flags and duration/count values.
-    // (A flag whose value is a bare word -- `sudo -u alice cmd` -- still resolves to the
-    // value; that needs per-wrapper arity, so it is reported as-is rather than guessed.)
+    // A wrapper takes its own options before the command it execs: `timeout 5 kubectl`, `xargs -n1
+    // grep`, `nice -n10 cargo`. Skip flags and duration/count values.
     if (wrapped && (w.startsWith("-") || /^\d+(\.\d+)?[smhd]?$/.test(w))) {
       idx++
       continue
@@ -441,25 +388,23 @@ export function resolveSegment(seg: string): Segment | null {
   return { prog, verb, rank }
 }
 
-/** Every (program, candidate-verb) pair a Bash invocation contains -- the raw material
- *  the walk aggregates to learn which programs actually dispatch subcommands. */
+/** Every (program, candidate-verb) pair a Bash invocation contains -- the raw material the walk
+ *  aggregates to learn which programs actually dispatch subcommands. */
 export function shellCandidates(cmd: string): Segment[] {
   return splitSegments(cmd)
     .map(resolveSegment)
     .filter((s): s is Segment => s !== null)
 }
 
-/** Which segment of a command line is doing the real work. Lowest rank wins, and the first
- *  of a tie: a pipeline's payload is the thing that is not a builtin. */
+/** Which segment of a command line is doing the real work. */
 function pickSegment(cands: readonly Segment[]): Segment | null {
   let pick: Segment | null = null
   for (const c of cands) if (!pick || c.rank < pick.rank) pick = c
   return pick
 }
 
-/** Label an invocation: pick the segment doing real work, then apply the learned
- *  vocabulary to decide whether its second token is a subcommand.
- *  @param dispatchers programs the walk observed dispatching subcommands */
+/** Label an invocation: pick the segment doing real work, then apply the learned vocabulary to
+ *  decide whether its second token is a subcommand. */
 export function labelShell(
   cmd: string,
   dispatchers?: Set<string> | null,
@@ -470,28 +415,7 @@ export function labelShell(
   return { prog: pick.prog, verb }
 }
 
-/* ------------------------------------------------------------- content sizing --
- * Token counts are estimated from character length. The divisor is CALIBRATED per
- * dataset rather than assumed, using an identity that holds exactly:
- *
- *   Δ(context tokens) between consecutive requests
- *     = the previous turn's output_tokens  +  the user-side content added since
- *
- * The first term is reported exactly by `usage`, so subtracting it isolates content
- * that IS fully persisted in the transcript (tool results and typed text) from content
- * that is not (thinking text, which is replaced by a signature). Regressing against the
- * raw delta instead charges invisible thinking tokens to visible characters and lands
- * near 2.2 chars/token -- below anything real text can be.
- *
- * TWO densities, not one. Machine text (tool output, JSON arguments, source) tokenises
- * far denser than prose, so a single constant is wrong for one of them no matter which
- * value it takes. Each interval contributes one equation
- *
- *   userTokens = codeChars * a  +  textChars * b        (a = 1/density, per class)
- *
- * and the whole dataset is solved for [a, b] by least squares. Falls back to a pooled
- * single density when there is not enough of one class to identify both.
- */
+/* content sizing -- Token counts are estimated from character length. */
 const CPT_FALLBACK = 4.0,
   CPT_MIN = 1.5,
   CPT_MAX = 12.0
@@ -520,20 +444,7 @@ interface Accum {
   tok: number
 }
 
-/** Least squares for userTokens = code*a + text*b, returned as densities (chars/token).
- *
- *  Whether the two classes can be told apart is decided by the STANDARD ERROR of each
- *  fitted coefficient, not by a threshold on how much of each class happens to be
- *  present. If one class is too sparse or too collinear with the other to pin down, its
- *  error bar blows up and the fit is rejected in favour of a single pooled density --
- *  automatically, and for the actual reason. A share-of-corpus floor would instead reject
- *  perfectly identifiable fits (this was measured: a corpus with only 3% prose still
- *  yields collinearity of 0.0004, i.e. cleanly separable).
- *
- *  Note there is no assumption about which class is denser. Harness-injected "text" is
- *  often markdown and config rather than prose, and does measure denser than tool output
- *  in some corpora; encoding a prior about that would just be another hardcoded opinion.
- */
+/** Least squares for userTokens = code*a + text*b, returned as densities (chars/token). */
 const MAX_REL_SE = 0.25
 function solveDensities(S: Accum): Density | null {
   const { cc, ct, tt, cy, ty, yy, n, code, text, tok } = S
@@ -557,9 +468,7 @@ function solveDensities(S: Accum): Density | null {
   return { code: clampCpt(1 / a), text: clampCpt(1 / b), basis: "least-squares", pooled, relSE }
 }
 
-/** Characters of billable text in a content block. Images are excluded here and
- *  sized separately -- they bill by pixel dimensions, so their base64 length is
- *  meaningless (counting it once inflated a run by 40%). */
+/** Characters of billable text in a content block. */
 export function charsOf(block: unknown): number {
   if (typeof block === "string") return block.length
   if (Array.isArray(block)) return block.reduce<number>((n, b) => n + charsOf(b), 0)
@@ -594,9 +503,7 @@ function textOf(block: unknown): string {
   return ""
 }
 
-/* Image tokens from real dimensions. Anthropic bills roughly (w*h)/750 tokens and caps
- * long edges at 1568px, so a decoded header beats any flat constant. Only the first few
- * KB are decoded; unparseable or absent data falls back to a mid-size estimate. */
+/* Image tokens from real dimensions. */
 const IMAGE_FALLBACK = 1500,
   IMAGE_CAP = 1600
 function b64Bytes(data: unknown, limit: number): Uint8Array | null {
@@ -671,15 +578,12 @@ function imageTokens(b: ContentBlock): number {
   return Math.max(1, Math.min(IMAGE_CAP, Math.round((d.w * scale * d.h * scale) / 750)))
 }
 
-/* -------------------------------------------------------------------- records --
- * A bucket is a record, and its key is derived from the record. Nothing downstream
- * parses a label by character offset.
- */
+/* records -- A bucket is a record, and its key is derived from the record. */
 
 /** Where a piece of content sits in the request cycle. */
 export type Role = "preamble" | "harness" | "typed" | "assistant" | "tool" | "image"
 
-/** A cost bucket, as a record. Its key is derived from it by keyOf(). */
+/** A cost bucket, as a record. */
 export interface Bucket {
   role: Role
   tool?: string
@@ -692,9 +596,9 @@ export interface Bucket {
 const keyOf = (r: Bucket): string =>
   [r.role, r.tool || "", r.dir || "", r.sub || "", r.kind || ""].join(" ")
 
-/** Harness-injected user content, identified structurally where the schema allows and
- *  by its own wrapper tag otherwise -- so an unfamiliar tag becomes its own row instead
- *  of being misfiled as something the human typed. */
+/** Harness-injected user content, identified structurally where the schema allows and by its own
+ *  wrapper tag otherwise -- so an unfamiliar tag becomes its own row instead of being misfiled
+ *  as something the human typed. */
 const TAG_SPAN = /<([a-z][a-z0-9_-]*)>([\s\S]*?)<\/\1>/gi
 const TAG_OPEN = /^\s*<([a-z][a-z0-9_-]*)>/i
 
@@ -705,13 +609,8 @@ export interface UserSpan {
   chars: number
 }
 
-/** Split one user block into harness-injected spans and whatever is left, which is what
- *  the human actually typed.
- *
- *  Injected content is not always the whole block: a harness routinely appends reminders
- *  after a typed message, so matching only a tag at position 0 charges those characters to
- *  the human. Tag names are read out of the text rather than compared against a list, so a
- *  wrapper this build has never seen still gets its own row. */
+/** Split one user block into harness-injected spans and whatever is left, which is what the
+ *  human actually typed. */
 export function classifyUserBlock(text: string, rec?: TranscriptRecord): UserSpan[] {
   if (rec && rec.isCompactSummary === true)
     return [{ role: "harness", sub: "compaction summary", chars: text.length }]
@@ -734,18 +633,7 @@ export function classifyUserBlock(text: string, rec?: TranscriptRecord): UserSpa
   return out
 }
 
-/** What a tool call says about itself. Detected by FIELD SHAPE, not by tool name, so it works
- *  for a shell tool or file tool nobody has registered:
- *    - a `command`-ish string  -> the program it runs, and the word after it
- *    - a path-ish string       -> the file extension
- *
- *  `verb` is that word after the program, and it stays a *candidate*: whether it is a
- *  subcommand or an operand is a question about the whole corpus, and the corpus has not been
- *  read yet when this is asked. See `Slot`.
- *
- *  `cands` is the raw material for that same question -- every (program, candidate verb) pair
- *  in the command line -- handed back rather than left to be recomputed, because the walk needs
- *  both answers about the same string and splitting a command line is not free. */
+/** What a tool call says about itself. */
 const PATH_FIELDS = ["file_path", "filePath", "path", "notebook_path", "notebookPath", "file"]
 interface ToolKey {
   sub: string | null
@@ -778,74 +666,27 @@ function readTool(input: unknown): ToolKey {
   return NO_KEY
 }
 
-/** Display name for a tool. MCP's `mcp__<server>__<tool>` is a protocol convention,
- *  so it is parsed generically -- no gateway-specific prefix is stripped by name. */
+/** Display name for a tool. */
 export function toolDisplay(tool: string): string {
   if (!tool.startsWith("mcp__")) return tool
   const p = tool.split("__").filter(Boolean)
   return p.length >= 3 ? `${p[1]} · ${p.slice(2).join("__")}` : tool
 }
 
-/* ------------------------------------------------------------------- the walk --
- * One pass. Every transcript is opened once, parsed once, and let go of.
- *
- * It used to be two, and the second one existed for two constants. A first pass calibrated
- * chars-per-token and learned which programs dispatch subcommands; a second re-read every file
- * to spend them. That is the folder off the disk twice and -- far more expensive -- a few
- * hundred megabytes of JSON.parse twice, to reach numbers the first walk had already gone past.
- *
- * What actually needs the calibration is only the SPLIT. The bill itself is arithmetic on
- * `usage` and a published rate: it needs no constant this file fits, so it is added up as the
- * files go by and is exact from the first one -- which is what lets a caller show a total that
- * climbs while the folder is being read, rather than a figure that sits at nothing until the
- * end. What is deferred is the attribution, and it is deferred as measurements rather than as
- * text: each piece of content that enters a context keeps its bucket and its character count,
- * and each request keeps what it cost and how big the context it paid for was. Nothing else is
- * kept, and the transcript is dropped at the end of the file it came out of.
- *
- * That held half is smaller than what it came from by two orders of magnitude. Measured on a
- * real store: 363MB of transcript leaves about 96,000 of these records and 10MB of memory at
- * the end of the read. So reading the folder once and holding the measurements beats reading it
- * twice and holding nothing.
- */
+/* the walk -- One pass. */
 const SESSION_RE = /"sessionId"\s*:\s*"([^"]+)"/
 
-/** A copy of `s` that no longer points at whatever it was cut out of.
- *
- *  A substring is a VIEW, not a copy: V8 records it as a pointer to the original string and two
- *  offsets. So keeping a 36-character session id out of a transcript keeps the whole
- *  megabyte the id was found in, and keeping one per file keeps the folder -- which is exactly
- *  what a walk that holds one transcript at a time is written to avoid. Measured on a real
- *  store: 331 files, 363MB of text, all of it still resident at the end of the read because a
- *  `Set` of ids was holding it. Concatenating and re-slicing forces the characters to be
- *  copied, and the transcript goes when the file does. */
+/** A copy of `s` that no longer points at whatever it was cut out of. */
 const detach = (s: string): string => (" " + s).slice(1)
 
-/* Which programs dispatch subcommands is LEARNED, because any list of them is a list of
- * one author's toolchain. Three properties separate a real multiplexer from a program
- * that merely takes an argument, and all three are needed:
- *
- *   coverage  -- `git`/`docker`/`poetry` are called with a verb-shaped first operand
- *                nearly every time. `ls`, `rm`, `find`, `grep` are usually given a path,
- *                glob, quoted string or flag instead, so their coverage is low.
- *   repetition-- a verb vocabulary is closed and reused: distinct/observed is tiny for
- *                `git` (~10 verbs over hundreds of calls) and near 1.0 for `grep`, whose
- *                operand is a different search pattern almost every time.
- * State-only and no-work builtins (`cd`, `echo`) are excluded outright: their operand is
- * a path or a string, never a subcommand.
- *
- * Both thresholds are scale-free ratios on purpose. An absolute cap on vocabulary size
- * would be one more arbitrary constant, and it misfires immediately: `git` is used with 42
- * distinct subcommands in the corpus this was tested on, so a "max 40 verbs" rule would
- * reject the most obvious dispatcher there is.
- */
+/* Which programs dispatch subcommands is LEARNED, because any list of them is a list of one
+ * author's toolchain. */
 const DISPATCH_MIN_CALLS = 5,
   DISPATCH_MIN_COVERAGE = 0.6,
   DISPATCH_MAX_RATIO = 0.5
 
 /** What the corpus turned out to be: how many files were worth reading, and the constants that
- *  could not be known until all of them had been. A count rather than the files themselves,
- *  because holding them is the thing this is written to avoid -- see the walk, above. */
+ *  could not be known until all of them had been. */
 export interface Scanned {
   filesUsed: number
   duplicatesDropped: number
@@ -858,26 +699,22 @@ export interface Scanned {
 
 /** A bucket the walk has met, and the one thing about it the walk cannot settle: whether the
  *  word after a program is a subcommand or an operand, which is a question about the corpus
- *  rather than about the call. Slots are interned, so a hundred thousand context additions
- *  carry an index each rather than a record each. */
+ *  rather than about the call. */
 interface Slot {
   rec: Bucket
   /** The candidate subcommand, or `null` where there is no question to answer. */
   verb: string | null
 }
 
-/** Content that entered a context, held until there is a density to size it with: which slot
- *  it belongs to, how much of it there was, and what that measurement is in. Characters,
- *  except for images -- they bill by pixel dimensions, so they arrive already in tokens. */
+/** Content that entered a context, held until there is a density to size it with: which slot it
+ *  belongs to, how much of it there was, and what that measurement is in. */
 interface Add {
   slot: number
   amt: number
   cls: "code" | "text" | "tokens"
 }
 
-/** A request that was billed. What it cost is already exact; what it cost *for* is not, so the
- *  context it paid for is recorded as a position in the file's additions rather than as a
- *  share of anything. The output split is held as characters for the same reason the input is. */
+/** A request that was billed. */
 interface Charge {
   /** How many of the file's additions were in context when this request was made. */
   at: number
@@ -892,21 +729,13 @@ interface Charge {
   argsChars: number
 }
 
-/** One file's half of the deferral. Per file, because a context is per session: the map the
- *  additions build up is thrown away at the end of each one. */
+/** One file's half of the deferral. */
 interface Held {
   adds: Add[]
   charges: Charge[]
 }
 
-/** The walk, mid-flight.
- *
- *  It is fed one file at a time rather than handed the corpus, and that is the whole point of
- *  it being shaped this way: a few hundred megabytes of transcript is a few hundred megabytes
- *  of JavaScript string, twice that in memory, and reading the lot before starting means the
- *  page holds all of it while it works. Fed a file at a time it holds one -- and the caller
- *  gets the event loop back between them, which is what lets a progress display be something
- *  other than a lie. */
+/** The walk, mid-flight. */
 export interface Walk {
   seen: Set<string>
   /** prog -> {calls, withVerb, set:Set<verb>} */
@@ -936,13 +765,11 @@ export interface Walk {
   firstCtx: number[]
 }
 
-/** The preamble -- system prompt and tool schemas -- is slot 0. It is the one bucket that is
- *  not measured from anything in the transcript, so nothing can add to it and it needs no
- *  interning; every file's first request finds it already there. */
+/** The preamble -- system prompt and tool schemas -- is slot 0. */
 const PRE_REC: Bucket = { role: "preamble" }
 const PRE_SLOT = 0
 
-/** The three things output is split into. Fixed buckets, so their keys are worth having once. */
+/** The three things output is split into. */
 const OUT_RECS: readonly Bucket[] = [
   { role: "assistant", kind: "thinking" },
   { role: "assistant", kind: "prose" },
@@ -950,8 +777,7 @@ const OUT_RECS: readonly Bucket[] = [
 ]
 const OUT_KEYS = OUT_RECS.map(keyOf)
 
-/** A slot is a bucket plus its unanswered question, so it is keyed by both. The separator is
- *  the one character a tool name, a path or a program cannot contain. */
+/** A slot is a bucket plus its unanswered question, so it is keyed by both. */
 const slotKey = (rec: Bucket, verb: string | null): string => keyOf(rec) + "\u0000" + (verb || "")
 
 export function openWalk(): Walk {
@@ -978,9 +804,7 @@ export function openWalk(): Walk {
   }
 }
 
-/** Note content that has entered the context. Nothing is sized here -- that is the point --
- *  but nothing empty is kept either: a block of no characters costs nothing under any density,
- *  and a transcript is full of them. */
+/** Note content that has entered the context. */
 function hold(
   st: Walk,
   h: Held,
@@ -1001,11 +825,7 @@ function hold(
 }
 
 /** Read one file into `st`. `false` means it was a duplicate of one already read -- the answer
- *  goes back to the caller because the caller is the one keeping count of what it handed over.
- *
- *  Two jobs at once, on one parse of each line: what this file *costs*, which is exact, and
- *  what it *teaches* -- the calibration samples and the dispatcher vote -- which is only worth
- *  anything once every other file has voted too. */
+ *  goes back to the caller because the caller is the one keeping count of what it handed over. */
 export function walkOne(st: Walk, f: RawFile): boolean {
   const m = SESSION_RE.exec(f.text || "")
   const id = detach((m ? m[1] : f.name) + "::" + (f.text || "").length)
@@ -1067,13 +887,13 @@ export function walkOne(st: Walk, f: RawFile): boolean {
       const ctxTokens = inp + cr + cw
 
       if (ctxTokens) {
-        // Δcontext − previous output_tokens == tokens for the user-side content we
-        // can actually measure. Anything invisible is accounted for by the first term.
+        // Δcontext − previous output_tokens == tokens for the user-side content we can actually
+        // measure.
         const chars = codeChars + textChars
         if (prevTokens !== null && !dirty && chars > 400) {
           const y = ctxTokens - prevTokens - prevOut
-          // Keep only physically plausible observations; a delta outside this band
-          // means the prefix was rewritten, not appended to.
+          // Keep only physically plausible observations; a delta outside this band means the prefix
+          // was rewritten, not appended to.
           if (y > 50 && chars / y >= CPT_MIN / 2 && chars / y <= CPT_MAX * 2) {
             const c = codeChars,
               t = textChars
@@ -1113,8 +933,7 @@ export function walkOne(st: Walk, f: RawFile): boolean {
         }
         const [pIn, pOut] = rate
 
-        // The transcript records the cache-write TTL split per request. Use it, and
-        // only fall back to an assumed multiplier for the residual it omits.
+        // The transcript records the cache-write TTL split per request.
         const cc =
           u.cache_creation && typeof u.cache_creation === "object" ? u.cache_creation : null
         let w1 = 0,
@@ -1145,9 +964,7 @@ export function walkOne(st: Walk, f: RawFile): boolean {
         billed.v += varIn
         billed.out += outCost
 
-        // What the output was spent on, in characters. Thinking text is not persisted (only
-        // a signature), so it is the remainder after the prose and tool arguments we can see
-        // -- which is a subtraction in tokens, and so has to wait for the density too.
+        // What the output was spent on, in characters.
         let proseChars = 0,
           argsChars = 0
         for (const b of content) {
@@ -1187,8 +1004,7 @@ export function walkOne(st: Walk, f: RawFile): boolean {
         } else if (b.type === "tool_use") {
           const tool = b.name || "(unnamed tool)"
           const t = readTool(b.input)
-          // The dispatcher vote, from the same reading of the command line. Builtins never
-          // dispatch, so they are not asked.
+          // The dispatcher vote, from the same reading of the command line.
           for (const c of t.cands) {
             if (c.rank !== 0) continue
             let e = verbs.get(c.prog)
@@ -1217,10 +1033,9 @@ export function walkOne(st: Walk, f: RawFile): boolean {
       // Compaction rewrites the prefix, so deltas across it are not calibration data.
       if (rec.isCompactSummary === true) dirty = true
       for (const b of content) {
-        /* Two questions of the same block, and they are not the same question: what it is
-           worth is which bucket it belongs to, what it is *for* here is whether it is text
-           this file can measure against the token delta. An image is neither -- it is context
-           with no characters in it, so the interval it sits in stops being calibration data. */
+        /* Two questions of the same block, and they are not the same question: what it is worth
+           is which bucket it belongs to, what it is *for* here is whether it is text this file
+           can measure against the token delta. */
         const bt = b && typeof b === "object" ? b.type : "text"
         if (bt === "tool_result") {
           const chars = charsOf(b)
@@ -1255,14 +1070,10 @@ export function walkOne(st: Walk, f: RawFile): boolean {
   return true
 }
 
-/* ------------------------------------------------------------------ the score --
- * Spend the two constants: allocate every request's exact billed cost across the content
- * that was in its context. Two accumulators per key: `f` is TTL-invariant, `v` scales with
- * whatever multiplier is assumed for cache writes whose TTL the transcript did not record.
- * So re-pricing costs O(keys), not another walk.
- */
+/* the score -- Spend the two constants: allocate every request's exact billed cost across the
+ * content that was in its context. */
 
-/** Per-bucket cost accumulators. `f` is TTL-invariant, `v` scales with the assumption. */
+/** Per-bucket cost accumulators. */
 export interface AccEntry {
   rec: Bucket
   f: number
@@ -1315,9 +1126,7 @@ function bump(
   e.out += out
 }
 
-/** Score one file, now that the corpus has spoken. `home` sends each slot to the one that
- *  owns its final bucket, which is what puts `git` back together with `git` once the vote has
- *  said that whatever followed it was an operand rather than a subcommand. */
+/** Score one file, now that the corpus has spoken. */
 function score(
   h: Held,
   code: number,
@@ -1338,10 +1147,8 @@ function score(
       ctx.set(slot, (ctx.get(slot) || 0) + t)
     }
 
-    // Preamble (system prompt + tool schemas) is measured ONCE per session, at the
-    // first request, where almost no conversation exists yet. Holding it fixed
-    // matters: char-based sizing undercounts, and a preamble recomputed every turn
-    // would absorb the entire shortfall and grow without bound.
+    // Preamble (system prompt + tool schemas) is measured ONCE per session, at the first request,
+    // where almost no conversation exists yet.
     let mine = 0
     for (const v of ctx.values()) mine += v
     if (preamble === null) preamble = Math.max(0, ch.ctxTokens - mine)
@@ -1375,9 +1182,8 @@ function score(
   }
 }
 
-/** Close the walk: judge which programs dispatch subcommands, fit the densities, and spend
- *  both on everything that was held back. Nothing is read again -- this is arithmetic over the
- *  measurements, which is why it is a beat at the end rather than a second pass. */
+/** Close the walk: judge which programs dispatch subcommands, fit the densities, and spend both
+ *  on everything that was held back. */
 export function closeWalk(st: Walk): { scanned: Scanned; alloc: Allocation } {
   const dispatchers = new Set<string>()
   for (const [prog, e] of st.verbs) {
@@ -1402,9 +1208,7 @@ export function closeWalk(st: Walk): { scanned: Scanned; alloc: Allocation } {
     densityCalibrated: !!fit,
   }
 
-  /* A candidate verb is a subcommand only if its program was seen dispatching. Slots that
-     lose the vote collapse onto each other -- `grep foo` and `grep bar` are both `grep` -- so
-     they are pointed at whichever of them was met first before anything is scored. */
+  /* A candidate verb is a subcommand only if its program was seen dispatching. */
   const recs = st.slots.map((s) =>
     s.verb && s.rec.sub && dispatchers.has(s.rec.sub)
       ? { ...s.rec, sub: s.rec.sub + " " + s.verb }
@@ -1445,9 +1249,7 @@ export function closeWalk(st: Walk): { scanned: Scanned; alloc: Allocation } {
   }
 }
 
-/* ---------------------------------------------------------------------- price --
- * Apply a rate for the cache writes whose TTL was not recorded. O(keys).
- */
+/* price -- Apply a rate for the cache writes whose TTL was not recorded. */
 
 export interface PricedRow {
   rec: Bucket
@@ -1462,12 +1264,7 @@ export interface Priced {
   total: number
 }
 
-/** The bill as far as the walk has got, for a walk that is still going.
- *
- *  `price` below is the same arithmetic on a finished `Allocation`; this one reads the live
- *  accumulator instead, so the page can put a figure on screen between files. It is exact --
- *  the total is the one thing that never waited for the calibration -- and it is the total
- *  only: the rows are not summed, because nothing is drawing them yet. */
+/** The bill as far as the walk has got, for a walk that is still going. */
 export function billedSoFar(st: Walk, ttlAssumption: TtlAssumption = "1h"): number {
   const mult = CACHE_WRITE_MULT[ttlAssumption] ?? CACHE_WRITE_MULT["1h"]
   return st.billed.f + st.billed.v * mult + st.billed.out
@@ -1488,14 +1285,10 @@ export function price(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"): P
   }
 }
 
-/* ----------------------------------------------------------------- the report --
- * Groups are defined by ROLE IN THE REQUEST CYCLE -- a structural property every
- * transcript has. Membership is then derived from measured cost, so a tool, command,
- * harness tag or MCP server this file has never heard of still lands correctly.
- */
+/* the report -- Groups are defined by ROLE IN THE REQUEST CYCLE -- a structural property every
+ * transcript has. */
 
-/** The nine stable group identities. Views key their palette off these, so they are a
- *  contract: a group keeps its hue when the reader drills in or switches lens. */
+/** The nine stable group identities. */
 export type GroupId =
   | "shell"
   | "ingest"
@@ -1525,8 +1318,8 @@ export const GROUPS: GroupDef[] = [
   { id: "typed", name: "My typing", short: "My typing" },
 ]
 
-/** A tool is shown as one row, or split into call/result rows, depending on whether
- *  BOTH directions carry real money. Measured per tool -- no list of tool names. */
+/** A tool is shown as one row, or split into call/result rows, depending on whether BOTH
+ *  directions carry real money. */
 const SPLIT_MIN_SHARE = 0.12
 /** Above this share of a tool's cost in one direction, that direction defines its role. */
 const DOMINANT = 0.7
@@ -1534,7 +1327,7 @@ const DOMINANT = 0.7
 const round = (v: number): number => Math.round(v * 100) / 100
 const sumBy = <T>(arr: T[], f: (x: T) => number): number => arr.reduce((s, x) => s + f(x), 0)
 
-/* The tree the views render. Children always sum to their parent, at every level. */
+/* The tree the views render. */
 
 export interface TreeChild {
   name: string
@@ -1555,8 +1348,8 @@ export interface TreeGroup {
   items: TreeItem[]
 }
 
-/** Figures the views quote, measured here so no view needs a hand-written list of
- *  "commands that read" versus "commands that write". */
+/** Figures the views quote, measured here so no view needs a hand-written list of "commands that
+ *  read" versus "commands that write". */
 export interface Insights {
   fixed: number
   harness: number
@@ -1585,8 +1378,7 @@ export interface Dataset {
 export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"): Dataset {
   const priced = price(alloc, ttlAssumption)
 
-  /* A two-level accumulator: group -> item -> optional child. Every branch below feeds
-   * the same structure, so no group needs bespoke assembly code. */
+  /* A two-level accumulator: group -> item -> optional child. */
   const bucket = new Map<GroupId, Map<string, { cost: number; kids: Map<string, number> }>>()
   const put = (gid: GroupId, item: string, child: string | null, cost: number): void => {
     if (!(cost > 0)) return
@@ -1604,8 +1396,7 @@ export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"
     if (child) e.kids.set(child, (e.kids.get(child) || 0) + cost)
   }
 
-  // 1. Fold tool rows into per-tool direction and sub-key totals; place the rest by role.
-  // tool -> {call, result, shell, subs:Map(sub -> cost)}
+  // 1.
   const tools = new Map<
     string,
     { call: number; result: number; shell: boolean; subs: Map<string, number> }
@@ -1651,8 +1442,7 @@ export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"
     }
   }
 
-  // 2. Place each tool by its own measured direction balance, and give it a second level
-  //    from whatever sub-keys its inputs yielded. Both are derived, not looked up.
+  // 2.
   for (const [tool, t] of tools) {
     const total = t.call + t.result
     if (total <= 0) continue
@@ -1668,8 +1458,8 @@ export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"
     const subTotal = sumBy([...t.subs.values()], (c) => c)
 
     if (t.shell) {
-      // Shell: the sub-key is "prog" or "prog verb", so the program is the item and the
-      // full command the child. One row per program regardless of which tool ran it.
+      // Shell: the sub-key is "prog" or "prog verb", so the program is the item and the full
+      // command the child.
       for (const [sub, c] of t.subs) {
         const prog = sub.split(" ")[0]
         put(gid, prog, sub, c)
@@ -1680,8 +1470,8 @@ export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"
       for (const [sub, c] of t.subs) put(gid, disp, sub, c)
       put(gid, disp, "(no path parsed)", total - subTotal)
     } else if (Math.min(t.call, t.result) / total >= SPLIT_MIN_SHARE) {
-      // Both directions carry real money, so one merged row would hide the story --
-      // and drilling a single-child row renders a degenerate 100% block.
+      // Both directions carry real money, so one merged row would hide the story -- and drilling a
+      // single-child row renders a degenerate 100% block.
       put(gid, disp + " · results", null, t.result)
       put(gid, disp + " · call args", null, t.call)
     } else {
@@ -1689,7 +1479,7 @@ export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"
     }
   }
 
-  // 3. Emit the tree in the declared group order, largest first within each level.
+  // 3.
   const groups: TreeGroup[] = []
   for (const def of GROUPS) {
     const items = bucket.get(def.id)
@@ -1712,8 +1502,7 @@ export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"
   }
   groups.sort((a, b) => b.cost - a.cost)
 
-  // 4. Insights, measured -- so the views layer never needs a hand-written list of
-  //    "commands that read" versus "commands that write".
+  // 4.
   const gcost = (id: GroupId): number => (groups.find((g) => g.id === id) || { cost: 0 }).cost
   const outItems = (groups.find((g) => g.id === "output") || { items: [] as TreeItem[] }).items
   const oc = (n: string): number => (outItems.find((i) => i.name === n) || { cost: 0 }).cost
@@ -1756,10 +1545,8 @@ const OUT_NAMES: Record<string, string> = {
   "thinking-carried": "thinking blocks (re-billed as input)",
 }
 
-/* ------------------------------------------------------------------ top level --
- * One scan, one allocation, then a priced tree per TTL assumption -- and the
- * assumption only affects the cache writes whose TTL the transcript omitted.
- */
+/* top level -- One scan, one allocation, then a priced tree per TTL assumption -- and the
+ * assumption only affects the cache writes whose TTL the transcript omitted. */
 
 export interface ModelReport {
   id: string
@@ -1768,9 +1555,7 @@ export interface ModelReport {
   rate: Rate | null
 }
 
-/** Reserved for callers that want to parameterise a run. Rates are overridden through
- *  setRates(), so there is nothing to pass here yet; the parameter exists so adding one
- *  later is not a breaking change. */
+/** Reserved for callers that want to parameterise a run. */
 export interface AnalyzeOptions {}
 
 /** Everything the report needs: one dataset per TTL lens, plus how it was derived. */
@@ -1797,9 +1582,7 @@ export interface Analysis {
   groupDefs: GroupDef[]
 }
 
-/** The bill, out of what the walk accumulated. Nothing here walks a transcript again -- it is
- *  arithmetic on the accumulators -- so it is the same call whether the walk was fed the corpus
- *  at once or a file at a time. */
+/** The bill, out of what the walk accumulated. */
 export function report(scanned: Scanned, alloc: Allocation): Analysis {
   const datasets = {} as Record<TtlAssumption, Dataset>
   for (const t of ["1h", "5m"] as const) datasets[t] = buildTree(alloc, t)
@@ -1863,8 +1646,7 @@ export function report(scanned: Scanned, alloc: Allocation): Analysis {
 }
 
 /** The whole thing in one call, for callers that already hold every file: the tests, and any
- *  script with a directory in hand. The page does not use it -- it drives the walk itself so
- *  that it can say where it has got to. */
+ *  script with a directory in hand. */
 export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analysis {
   const w = openWalk()
   for (const f of rawFiles) walkOne(w, f)

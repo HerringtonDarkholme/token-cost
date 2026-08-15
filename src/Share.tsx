@@ -1,22 +1,4 @@
-/* Two ways to take the chart out of the page: copy it, or post it.
-
-   Both stand on the same act -- render the card to a PNG and put it where the reader can
-   use it -- and they differ only in what happens after. "Copy chart" ends there, which is
-   what a reader wants when the destination is a doc, a deck, a Slack thread, or an X post
-   they would rather write themselves. "Share chart on X" goes on to open the composer with
-   a caption already written -- one of several, drawn at random per share, so that a timeline
-   seeing this page more than once is not reading the same sentence again.
-
-   The composer at x.com/intent/post takes text and nothing else. There is no parameter that
-   attaches an image and nothing in the page can reach into it to add one, which is exactly
-   why the copy has to be a button in its own right rather than a step hidden inside the
-   share: the image is on the clipboard either way, and the reader who never wanted the
-   composer should not have to open one to get it.
-
-   Clipboard first, because pasting is a single keystroke; a download when the clipboard is
-   refused, which is the normal case on `file://`. The button says which of the two happened
-   -- anything that silently copies and then reports "shared" has lied about the one step
-   the reader still has to take. */
+/* Two ways to take the chart out of the page: copy it, or post it. */
 
 import { useEffect, useRef, useState } from "react"
 import { useReport } from "./context.ts"
@@ -30,9 +12,8 @@ const FILENAME = "where-the-money-went.png"
 /** Not a result, so it never times out: "busy" ends when the work does. */
 type Outcome = "busy" | "copied" | "saved" | "failed"
 
-/** Like the toolbar's flash, but carrying which outcome to announce, and held long enough
- *  to be read as an instruction rather than a receipt. The timer is cancelled on unmount
- *  because loading a new file unmounts the report mid-flight. */
+/** Like the toolbar's flash, but carrying which outcome to announce, and held long enough to be
+ *  read as an instruction rather than a receipt. */
 function useOutcome(ms = 6000): [Outcome | null, (o: Outcome | null) => void] {
   const [at, setAt] = useState<Outcome | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -64,9 +45,9 @@ function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
     }
     setAt("busy")
 
-    /* Started before the clipboard call and handed over unresolved: Safari only accepts a
-       write it can tie to the click, so the ClipboardItem has to be constructed with the
-       promise rather than with an image awaited first. */
+    /* Started before the clipboard call and handed over unresolved: Safari only accepts a write
+       it can tie to the click, so the ClipboardItem has to be constructed with the promise
+       rather than with an image awaited first. */
     const png = snapshot(card)
 
     let done: Outcome
@@ -74,8 +55,7 @@ function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
       await navigator.clipboard.write([new ClipboardItem({ "image/png": png })])
       done = "copied"
     } catch {
-      /* No clipboard, no permission, or no ClipboardItem at all. The render itself may also
-         have failed, in which case awaiting it here rethrows into the catch below. */
+      /* No clipboard, no permission, or no ClipboardItem at all. */
       try {
         download(await png, FILENAME)
         done = "saved"
@@ -105,9 +85,7 @@ const shareWords = (t: Dict): Record<Outcome, string> => ({
   failed: t.share.failed,
 })
 
-/** The X mark, filled with `currentColor` so it inverts with the button like the eye does.
- *  It stands in for the word at the end of the label rather than leading it as an icon --
- *  the sentence is "share to X", and X is a logo, not a letter. */
+/** The X mark, filled with `currentColor` so it inverts with the button like the eye does. */
 function XMark(): React.JSX.Element {
   return (
     <svg className="xicon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -145,25 +123,21 @@ export function ShareButton(): React.JSX.Element {
   const words = shareWords(t)
 
   const share = (): void => {
-    /* Where the invitation points: this page, if it is somewhere a reader can be sent. A
-       standalone file opened from disk has an address that means nothing to anyone else, so
-       it gets no link rather than a dead one. */
+    /* Where the invitation points: this page, if it is somewhere a reader can be sent. */
     const home =
       location.protocol === "http:" || location.protocol === "https:"
         ? location.origin + location.pathname
         : null
     const url =
       "https://x.com/intent/post?text=" + encodeURIComponent(postText(d, state.pctOnly, home))
-    /* Opened last, and only on success, so a blocked popup cannot cost the reader the image.
-       The activation from the click survives the render in every browser that allows popups
-       at all; if it does not, the caption is a click away in the composer anyway. */
+    /* Opened last, and only on success, so a blocked popup cannot cost the reader the image. */
     void run(() => {
       window.open(url, "_blank", "noopener,noreferrer")
     })
   }
 
-  /* The mark carries no text of its own, so the accessible name has to say the word it
-     stands for -- a button announced as "share to" is a button announced as nothing. */
+  /* The mark carries no text of its own, so the accessible name has to say the word it stands
+     for -- a button announced as "share to" is a button announced as nothing. */
   return (
     <button
       type="button"

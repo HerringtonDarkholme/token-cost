@@ -1,5 +1,4 @@
-/* Entry point. Everything below this line is parsed, priced and drawn in the page; there
-   is no fetch in this bundle and no server to send anything to. */
+/* Entry point. */
 
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"

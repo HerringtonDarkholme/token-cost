@@ -1,6 +1,4 @@
-/* The ledger table. Not a fallback for the charts: several palette hues fall below 3:1
-   contrast on a light ground, so identity has to be carried by text somewhere, and this is
-   where the numbers are legible to a screen reader and copyable to a spreadsheet. */
+/* The ledger table. */
 
 import { memo } from "react"
 import { useReport } from "./context.ts"
@@ -9,9 +7,7 @@ import { maxCost, moneyFine, pctOf, rowIsOpen, type LedgerRow, type Ledger } fro
 import { vtName } from "./Motion.tsx"
 import { hoverBind, setState, useHover } from "./store.ts"
 
-/** What the footer claims, in words. Two different claims: unfiltered, it asserts the
- *  reconciliation; filtered, it says plainly that the matched rows are a subset shown in
- *  their parents' context, so nobody reads the total as having shrunk. */
+/** What the footer claims, in words. */
 export function useReconNote(L: Ledger): string {
   const { d, state, amt } = useReport()
   const t = useT()
@@ -26,8 +22,8 @@ export function useReconNote(L: Ledger): string {
   return s
 }
 
-/* One row, memoised on `active` rather than on the hover target, so moving the pointer down
-   the table re-renders the row entered and the row left instead of all of them. */
+/* One row, memoised on `active` rather than on the hover target, so moving the pointer down the
+   table re-renders the row entered and the row left instead of all of them. */
 const Row = memo(function Row({
   r,
   maxRow,

@@ -1,40 +1,5 @@
-/* The card's empty face: take files from a picker or a drop, read them in the page, hand them
-   to the engine. Nothing leaves the machine -- there is no fetch here and no server to send
-   anything to.
-
-   This is the inside of the same card the report ends up in, not a screen of its own, which is
-   why there is no frame drawn here and no heading: the card supplies both, and the heading
-   merely changes tense once the bill exists. What the zone owns is the drop target -- it fills
-   the card's interior, so the frame the reader aims at is the frame that lights up. See
-   `.card:has([data-over="1"])`.
-
-   The copy about *where* the transcripts live is not decoration, and it is inside the card for
-   the same reason the ask is a folder rather than files: `.claude` is a dotfile, so the picker
-   this page is about to open hides the very folder it just asked for. A reader who cannot get
-   there never sees a report at all, and help that stands below the fold assumes they will go
-   looking for it.
-
-   Once a folder *has* been chosen, nothing here asks about it twice. The pick is the answer, and
-   the browser has already made the reader confirm it once in its own dialog; a page that comes
-   back with "are these really your transcripts?" is asking a question it can answer itself. It
-   can, because every file arrives with the path it sat at inside the chosen folder -- see
-   `originOf` -- so when a pick turns out to be empty or unbilled, what is said back names the
-   folder that was picked and whether it was the transcript store at all.
-
-   And the moment it has been chosen, the route into the hidden folder is answered rather than
-   left standing: the keystrokes are help for a dialog that is no longer open, and the thing the
-   reader now wants to see is what came back out. So the two share one box -- the note leaves and
-   the transcripts arrive in the same place, the box growing into the taller job as they cross.
-
-   The list says out loud that work is happening, because the parse behind it is seconds of
-   synchronous main thread and a page that goes still reads as a page that has died. It says it
-   by writing the names out, one character at a time, one row overlapping the last -- the machine
-   reading the folder out to you rather than a bar or a spinner drawn beside a list that is
-   already complete. What does the typing is a cover the colour of the panel sliding off the name
-   in as many steps as it has characters, which is a `transform` and therefore composited: it
-   keeps running while the parse holds the thread, where anything paint-driven would freeze on
-   the frame the parse started. The cover's leading edge is the caret, and it clips itself on the
-   last step -- see `.filecover`. */
+/* The card's empty face: take files from a picker or a drop, read them in the page, hand them to
+   the engine. */
 
 import { useId, useRef, useState, type ReactNode } from "react"
 import {
@@ -50,13 +15,7 @@ import { useT, type Dict, type Os } from "./copy.tsx"
 import { TextSwap } from "./Motion.tsx"
 import { Tip } from "./Tip.tsx"
 
-/* The three platforms, each a mark and a word. Same recipe as every other glyph on the page: one
-   16-unit box, stroked in `currentColor` at one weight, no fills -- a solid silhouette could not
-   follow the chip's ink the way these do, and at this size a filled penguin is a pear.
-   These were a row of three once, as the whole face of a segmented control, which is what made
-   them a problem: three logos where two are always wrong, carrying the entire job of saying which
-   platform you were on at 14px. One mark, beside the word that already says it, is a different
-   job -- the word carries the meaning and the mark is what the eye finds first. */
+/* The three platforms, each a mark and a word. */
 function AppleMark(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -78,9 +37,7 @@ function WindowsMark(): React.JSX.Element {
 }
 
 /** A penguin, which is the one of the three that has to be *drawn* rather than traced: body,
- *  eyes, beak, feet, and nothing else, because every further line closes up at this size. An
- *  earlier one read as a vase -- the body has to widen to the floor and the feet have to break
- *  the outline, or the silhouette is a pear with two dots in it. */
+ *  eyes, beak, feet, and nothing else, because every further line closes up at this size. */
 function TuxMark(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -92,22 +49,15 @@ function TuxMark(): React.JSX.Element {
   )
 }
 
-/* The three names are not translated, because they are not words: macOS, Windows and Linux
-   are what the platforms call themselves in every language the page speaks. */
+/* The three names are not translated, because they are not words: macOS, Windows and Linux are
+   what the platforms call themselves in every language the page speaks. */
 const PLATFORMS: ReadonlyArray<{ value: Os; label: string; mark: React.JSX.Element }> = [
   { value: "mac", label: "macOS", mark: <AppleMark /> },
   { value: "win", label: "Windows", mark: <WindowsMark /> },
   { value: "linux", label: "Linux", mark: <TuxMark /> },
 ]
 
-/** A folder, on the button that opens a folder picker. Decoration in the strict sense -- the
- *  words beside it already say what it does -- but it is what a reader's eye lands on before the
- *  words resolve, and this is the one control on the page that has to be pressed. Same recipe as
- *  every other mark here: one 16-unit box, stroked in `currentColor`, so it takes the button's
- *  paper against its ink and follows it into the accent on hover.
- *
- *  `aria-hidden`, because the button's own text is its name: a second reading of "folder" between
- *  the two words would be noise. */
+/** A folder, on the button that opens a folder picker. */
 function FolderMark(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -117,10 +67,7 @@ function FolderMark(): React.JSX.Element {
   )
 }
 
-/** The one platform, and the way to the next. Not a segmented control: two of the three options
- *  are wrong for any given reader, and a row that shows all three spends the space on the two
- *  that do not apply. The guess is right nearly always, so the odd reader it fails is served by
- *  a click rather than by a permanent row -- press it and it walks to the next platform. */
+/** The one platform, and the way to the next. */
 function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JSX.Element {
   const tip = useId()
   const t = useT()
@@ -158,10 +105,7 @@ function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JS
   )
 }
 
-/** Which dialog the reader is about to meet. A guess from the user agent rather than a question,
- *  because two of the three answers are wrong for any given reader and the switch is right there
- *  when the guess is. Linux is the fallback: its instruction is the GTK dialog's, which is also
- *  the least harmful thing to show someone whose browser reports something unrecognisable. */
+/** Which dialog the reader is about to meet. */
 function guessOs(): Os {
   const ua = typeof navigator === "undefined" ? "" : navigator.userAgent
   if (/Mac|iPhone|iPad/.test(ua)) return "mac"
@@ -169,9 +113,7 @@ function guessOs(): Os {
   return "linux"
 }
 
-/** A file, and where it sat inside the folder that was chosen. A `File` on its own cannot say:
- *  the picker's files carry `webkitRelativePath` and a dropped entry's `File` carries nothing at
- *  all, so the path travels beside the file rather than being read back off it later. */
+/** A file, and where it sat inside the folder that was chosen. */
 interface Picked {
   file: File
   /** Relative to the chosen folder, that folder's own name first. */
@@ -180,9 +122,7 @@ interface Picked {
 
 /** Claude Code names a project's folder after the directory it ran in, separators and all
  *  flattened to dashes: `-Users-me-code-thing` on a mac or a Linux box, `C--Users-me-code-thing`
- *  on Windows. It is the one name on the way down that could not be anything else, which is what
- *  makes it worth matching -- `projects` on its own is a folder half the machines in the world
- *  have in their home directory. */
+ *  on Windows. */
 const PROJECT_DIR = /^-|^[A-Za-z]--/
 
 /** Where a pick came from, as far as its paths can say. */
@@ -194,12 +134,7 @@ export interface Origin {
 }
 
 /** Judge the pick from the paths alone, so the page never has to ask the reader where they just
- *  were. Two shapes count: a `.claude/projects` anywhere on the way down, or a directory named
- *  the way Claude Code names a project's -- which is what is left when the reader picks one
- *  project rather than the whole store, and the folder above it is no longer in the path.
- *
- *  The file's own name is not asked, only the directories above it: a transcript is a session id
- *  and has no business matching anything. */
+ *  were. */
 export function originOf(paths: readonly string[]): Origin {
   const roots = new Set(paths.map((p) => (p.includes("/") ? p.slice(0, p.indexOf("/")) : "")))
   const claude = paths.some((p) => {
@@ -213,11 +148,9 @@ export function originOf(paths: readonly string[]): Origin {
 
 /** Walk a folder handed over by `showDirectoryPicker`. Depth-first, the whole tree, because a
  *  transcript sits two levels down from the store: `projects/<project>/<session>.jsonl`.
- *
  *  `getFile()` is asked for every leaf rather than only the `.jsonl` ones, and that is not
- *  waste: it hands back a lazy handle, not the bytes, and it is what lets the count of *what
- *  was in the folder* survive down to the message that has to say the folder held no
- *  transcripts. Reading happens later, and only for the files that got through the filter. */
+ *  waste: it hands back a lazy handle, not the bytes, and it is what lets the count of *what was
+ *  in the folder* survive down to the message that has to say the folder held no transcripts. */
 async function walkDir(dir: FileSystemDirectoryHandle, at: string, out: Picked[]): Promise<void> {
   for await (const kid of dir.values()) {
     const path = `${at}/${kid.name}`
@@ -226,21 +159,7 @@ async function walkDir(dir: FileSystemDirectoryHandle, at: string, out: Picked[]
   }
 }
 
-/** The folder picker that does not say "upload".
- *
- *  A `<input webkitdirectory>` pick ends in a browser confirmation — "Upload 1,234 files to this
- *  site?" — which is a fair warning about what a file input normally means and a false statement
- *  about this page: there is no server here, nothing is sent, and the reader has just answered
- *  that exact question in the dialog behind it. `showDirectoryPicker` asks for the one thing that
- *  is actually happening, which is permission to *read* the folder.
- *
- *  It is not everywhere, though, and the fallback is not an edge case: Firefox and Safari have
- *  none of this, and the API is refused outright on `file://` — which is how the saved
- *  single-file page is meant to be opened. So the input stays, and this is the better road when
- *  there is one. `null` means the reader closed the dialog: nothing to say about that.
- *
- *  `id` is what makes the second visit open where the first one ended, which matters more here
- *  than it looks -- the folder this asks for is hidden, so arriving at it is the expensive part. */
+/** The folder picker that does not say "upload". */
 async function pickFolder(): Promise<Picked[] | null> {
   const dir = await showDirectoryPicker({ id: "claude-projects", mode: "read" })
   const out: Picked[] = []
@@ -248,9 +167,7 @@ async function pickFolder(): Promise<Picked[] | null> {
   return out
 }
 
-/** Walk a dropped folder. `webkitGetAsEntry` is non-standard and the DOM types declare it
- *  as always present, but it is the entry point that makes dropping a *directory* work at
- *  all, so it stays feature-detected rather than assumed. */
+/** Walk a dropped folder. */
 function walkEntry(entry: FileSystemEntry, out: Picked[]): Promise<void> {
   return new Promise((res) => {
     if (entry.isFile) {
@@ -279,39 +196,26 @@ function walkEntry(entry: FileSystemEntry, out: Picked[]): Promise<void> {
   })
 }
 
-/** How many rows the panel shows at once. It is a number here rather than a length in the
- *  stylesheet because the roll below has to count in rows -- how far to travel, and how many
- *  jumps to get there -- and CSS cannot do arithmetic on the step count. So the markup owns it
- *  and hands it over as `--file-rows`, which is what the panel is then sized by: see `.swap`. */
+/** How many rows the panel shows at once. */
 const SHOWN = 7
 
-/** A custom property, on its way to the stylesheet. React types `style` as the properties it
- *  knows the names of, so a variable has to be cast in -- once, here, rather than at each site. */
+/** A custom property, on its way to the stylesheet. */
 function vars(v: Record<string, string | number>): React.CSSProperties {
   return v as React.CSSProperties
 }
 
 /** How long a name takes to write, in milliseconds, when the folder is being read faster or
- *  slower than a person can follow. The floor keeps the caret from being a flicker; the ceiling
- *  keeps a slow disk from spelling one name out for a second and a half. Between them the pace is
- *  the machine's own, which is the point of driving this off the work instead of a schedule. */
+ *  slower than a person can follow. */
 const MIN_WRITE = 55
 const MAX_WRITE = 260
 
-/** And how long the column may take to travel a row. It follows the line that pushed it, so that
- *  the scroll keeps the writing's pace -- but a slow line must not leave the panel sliding after
- *  the next name has started. */
+/** And how long the column may take to travel a row. */
 const MAX_SLIDE = 150
 
-/** How many names the read puts up. A share of the folder rather than a count: a name goes up
- *  every `total / NAMES` files, so the stream starts with the first file, ends with the last,
- *  and lasts exactly as long as the reading does -- whether that is a tenth of a second or a
- *  minute. Nothing is truncated, because nothing was promising to list them all. */
+/** How many names the read puts up. */
 const NAMES = 24
 
-/** How often the count is allowed to repaint. Sixty is four or five times a second, which reads
- *  as continuous, and it is the yield as much as the paint: the walk hands the frame back here,
- *  and this is the only reason the page can move while it works. */
+/** How often the count is allowed to repaint. */
 const PAINT = 60
 
 /** One line of the panel: a name, and how long it should take to write itself. */
@@ -331,17 +235,7 @@ interface Run {
   lines: Line[]
 }
 
-/** The transcripts, written out as they are read.
- *
- *  Nothing here is on a schedule. A line goes up when a file has actually been read, and it is
- *  written in the time that file took -- so the panel runs at the speed of the disk and the parse,
- *  and it is still going when they are. One line at a time and one caret, because two names being
- *  written at once is two machines reading one folder.
- *
- *  The panel follows the writing rather than holding still while it runs off the bottom: the
- *  column is translated up a row per line and transitions between the two, which is a composited
- *  transform for the same reason the typing is one. The cursor on the line under the last name is
- *  what says the machine has not stopped -- a prompt, which is what this whole panel is. */
+/** The transcripts, written out as they are read. */
 function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
   /* The prompt is a row like any other, so it counts: what the panel shows is the tail of the
      column with the cursor on the bottom line. */
@@ -386,7 +280,7 @@ function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
                     style={{
                       animationDuration: `${line.ms}ms`,
                       /* Characters rather than `length`: a name is text, and text is not code
-                         units. One step per character is what makes this typing. */
+                         units. */
                       animationTimingFunction: `steps(${[...line.name].length})`,
                     }}
                   />
@@ -408,10 +302,7 @@ export function Intake({
   sofar,
 }: {
   onData: (data: Analysis) => void
-  /** Where to leave the bill as it stands, for the figure in the header to count towards. It is
-   *  written per file and read by whoever is drawing it, on whatever beat that drawing wants --
-   *  see `useCountingUp`. The number is exact from the first file, because the total is the one
-   *  thing the walk never had to wait for a constant to know. */
+  /** Where to leave the bill as it stands, for the figure in the header to count towards. */
   sofar: React.RefObject<number>
 }): React.JSX.Element {
   const [err, setErr] = useState<ReactNode>(null)
@@ -423,21 +314,13 @@ export function Intake({
   const dirPicker = useRef<HTMLInputElement>(null)
   const picks = useRef(0)
 
-  /** Stop, with something to say. The list goes back down and the way into the folder comes back
-   *  up with it: every one of these ends with the reader picking again, and what a reader who has
-   *  to pick again needs is the route, not the names of the files that were wrong.
-   *
-   *  The list is not thrown away, only hidden -- it is mid-flight when this is called, and a face
-   *  emptied on the frame it starts leaving has nothing left to animate. */
+  /** Stop, with something to say. */
   const stop = (node: ReactNode): void => {
     setBusy(false)
     setErr(node)
   }
 
-  /** Pressing the button. The good road first, the input behind it -- and the fall back happens
-   *  on the failure rather than on a guess about which browser this is, because the thing that
-   *  decides it is not the browser at all: the same Chrome that has the picker refuses it on a
-   *  `file://` page. */
+  /** Pressing the button. */
   async function choose(): Promise<void> {
     if (typeof showDirectoryPicker === "function") {
       try {
@@ -446,8 +329,7 @@ export function Intake({
         return
       } catch (e) {
         /* Closing the dialog is not a failure and gets no message -- the same silence a
-           cancelled file input leaves. `AbortError` is also what a folder the browser judges
-           too sensitive comes back as, and it says so itself before it gets here. */
+           cancelled file input leaves. */
         if ((e as DOMException).name === "AbortError") return
       }
     }
@@ -476,7 +358,7 @@ export function Intake({
     setErr(null)
     const id = ++picks.current
     /* Empty, and up before a byte has been read: the panel is the answer to the pick, and the
-       first file is not always quick. A prompt blinking over nothing read yet is the truth. */
+       first file is not always quick. */
     setRun({ id, done: 0, total: files.length, lines: [] })
     /* Back to zero with the panel, not with the first priced file: a second pick has to start
        its count where the first one started, or the figure would appear to carry over. */
@@ -485,22 +367,13 @@ export function Intake({
 
     /* The walk is driven from here rather than handed the corpus, which is the whole shape of
        this: `walkOne` takes one file at a time, so the page holds one transcript instead of the
-       whole folder, and gets the frame back between them. That is what makes the panel able to
-       say something true -- the count is files actually finished, and a name goes up because a
-       file was actually read.
-
-       One walk, not two. The engine used to calibrate on a first pass and price on a second,
-       which meant every transcript was read off the disk and parsed twice while the figure in
-       the header had nothing to show for the first half of it. The bill needs no calibration --
-       see `billedSoFar` -- so it is exact from the first file, and what the second pass was for
-       is now a beat at the end that walks nothing. */
+       whole folder, and gets the frame back between them. */
     const lines: Line[] = []
     const every = Math.max(1, Math.ceil(files.length / NAMES))
     let wrote = performance.now()
     let painted = 0
 
-    /** One file done. Puts a name up when this is one of the files whose turn it is, repaints if
-     *  it has been long enough, and hands the frame back when it does. */
+    /** One file done. */
     const step = async (i: number, total: number, name: string): Promise<void> => {
       const now = performance.now()
       const last = i + 1 >= total
@@ -508,9 +381,7 @@ export function Intake({
         lines.push({
           key: `f${i}`,
           name,
-          /* Written in the time it took to get here, so the caret runs at the speed of the work.
-             Clamped at both ends: a folder on a fast disk would be a flicker, a slow one would
-             spell one name out for a second and a half. */
+          /* Written in the time it took to get here, so the caret runs at the speed of the work. */
           ms: Math.min(Math.max(now - wrote, MIN_WRITE), MAX_WRITE),
         })
         wrote = now
@@ -518,7 +389,7 @@ export function Intake({
       if (now - painted < PAINT && !last) return
       painted = now
       setRun({ id, done: i + 1, total, lines: [...lines] })
-      // The yield. Everything the panel does, it does in the gaps this leaves.
+      // The yield.
       await new Promise((r) => setTimeout(r, 0))
     }
 
@@ -546,9 +417,9 @@ export function Intake({
 
     let data: Analysis, scanned: Scanned
     try {
-      /* The one place the whole corpus is spoken for at once, and it walks no transcripts:
-         the densities are fitted, the dispatchers are judged, and everything the read held
-         back is scored against them. */
+      /* The one place the whole corpus is spoken for at once, and it walks no transcripts: the
+         densities are fitted, the dispatchers are judged, and everything the read held back is
+         scored against them. */
       const closed = closeWalk(w)
       scanned = closed.scanned
       data = report(scanned, closed.alloc)
@@ -558,10 +429,7 @@ export function Intake({
       return
     }
     if (!data.requests) {
-      /* Two different failures wearing the same face. Transcripts that are genuinely Claude
-         Code's and simply have nothing billed in them are a fact about the sessions; files that
-         came from somewhere else entirely are a wrong turn, and the folder's own name is the
-         quickest way to show which one happened. */
+      /* Two different failures wearing the same face. */
       const root = where.root ? <b>{where.root}</b> : null
       stop(
         where.claude
@@ -571,8 +439,8 @@ export function Intake({
       return
     }
     /* oxlint-enable no-await-in-loop */
-    /* Handed over only once the walk is done and scored, so the card's turn plays against a free main
-       thread rather than against the tail of the work. */
+    /* Handed over only once the walk is done and scored, so the card's turn plays against a free
+       main thread rather than against the tail of the work. */
     onData(data)
   }
 
@@ -667,7 +535,7 @@ export function Intake({
           className="swap"
           data-face={busy ? "files" : "how"}
           /* How tall the panel is, in rows, handed to the stylesheet as the number the markup
-             already had to count in. See `SHOWN`. */
+             already had to count in. */
           style={vars({ "--file-rows": SHOWN })}
         >
           <div className="howto" data-on={busy ? "0" : "1"}>
@@ -719,8 +587,8 @@ export function Intake({
         directory=""
         className="hidden"
         onChange={(e) => {
-          /* `webkitRelativePath` is what a folder pick adds over a file pick, and it is the whole
-             reason the page can tell `projects` from `Downloads` without asking. */
+          /* `webkitRelativePath` is what a folder pick adds over a file pick, and it is the
+             whole reason the page can tell `projects` from `Downloads` without asking. */
           void handle(
             [...(e.target.files ?? [])].map((f) => ({
               file: f,
@@ -736,13 +604,7 @@ export function Intake({
 
 /** The help that stands under the empty card, where the breakdown and the footnotes stand under
  *  a full one -- so it holds the same ground: two columns on the same rule, across the width of
- *  the shell. It is the one block with no counterpart in the report, which is why it is here
- *  rather than something the report's own footnotes grow out of.
- *
- *  What it is *not* any more is the way in. The per-platform route to the hidden folder moved
- *  into the card, next to the button that opens the dialog it describes; what is left down here
- *  is what the folder holds, the terminal way round, and the answer to the question a page that
- *  asks for a whole folder of transcripts has to answer. */
+ *  the shell. */
 export function Where(): React.JSX.Element {
   const t = useT()
   return (

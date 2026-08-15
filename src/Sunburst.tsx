@@ -1,15 +1,4 @@
-/* The sunburst: the same tree as the mosaic, wrapped into a circle.
-
-   The mosaic answers "how big is this line item" by area on a common baseline, which is the
-   honest comparison. This answers a different question — "how deep does the money go" — by
-   putting the drill-down itself on screen: ring 0 is the line item, ring 1 the command or
-   block inside it, ring 2 the level under that, each one a share of the arc it sits in. It
-   is the same numbers, the same hues and the same hover store, so nothing here can disagree
-   with the mosaic or the table about what a thing costs.
-
-   Arcs are pictures, not controls: the legend beside the chart carries the real buttons, so
-   the keyboard gets one tab stop per line item rather than three hundred, and the table view
-   remains the exhaustive keyboard path into the deeper rings. */
+/* The sunburst: the same tree as the mosaic, wrapped into a circle. */
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
@@ -18,29 +7,22 @@ import { Figure, TextCross } from "./Motion.tsx"
 import { pctOf, sunburst, type SunBranch } from "./model.ts"
 import { disarmHover, hoverBind, setState, useHover } from "./store.ts"
 
-/* Ring geometry, in the viewBox's own units: the box is 200 across and centred on the
-   origin, so 100 is the outer edge. The hole is wide enough to hold the readout, which is
-   what this chart uses instead of labelling arcs it has no room to label. */
+/* Ring geometry, in the viewBox's own units: the box is 200 across and centred on the origin, so
+   100 is the outer edge. */
 const RINGS: Array<[number, number]> = [
   [37, 59],
   [59, 79],
   [79, 96],
 ]
 
-/** Stem of the mask names, one per sector, suffixed with the sector's place in the ranking.
- *  A position rather than the branch's own name, which is a line item -- "Tools · content read
- *  in" is not an XML id. One sunburst is on screen at a time, so the stem needs no more than
- *  that to be unique, and the PNG carries the whole `<svg>` across with it, so each reference
- *  still finds its mask inside the picture. */
+/** Stem of the mask names, one per sector, suffixed with the sector's place in the ranking. */
 const FAN = "sunfan"
 
 const rad = (deg: number): number => ((deg - 90) * Math.PI) / 180
 const pt = (deg: number, r: number): string =>
   `${(Math.cos(rad(deg)) * r).toFixed(3)},${(Math.sin(rad(deg)) * r).toFixed(3)}`
 
-/** An annular wedge. A full turn has no gap to draw between its own start and end, so it is
- *  trimmed by a tenth of a degree — 1/3600 of the ring, well under a pixel at any size this
- *  renders at — rather than special-cased into a pair of half circles. */
+/** An annular wedge. */
 function arcPath(a0: number, a1: number, r0: number, r1: number): string {
   const end = a1 - a0 >= 360 ? a0 + 359.9 : a1
   const big = end - a0 > 180 ? 1 : 0
@@ -51,8 +33,7 @@ function arcPath(a0: number, a1: number, r0: number, r1: number): string {
 }
 
 /* Memoised on the same two primitives as the mosaic's columns, plus the query: `hit` is the
-   hovered key when it lands in this branch and null when it does not. A pointer crossing an
-   arc therefore redraws the branch entered and the branch left, not all nine. */
+   hovered key when it lands in this branch and null when it does not. */
 const Sector = memo(function Sector({
   branch,
   at,
@@ -69,8 +50,8 @@ const Sector = memo(function Sector({
   const { pal, amt, drill } = useReport()
   const t = useT()
   const h = pal.hue(branch.group)
-  /* The sector's own sweep, which is the first arc it laid down: `sunburst` walks a branch
-     from its root outward, so `arcs[0]` is the ring-0 wedge every other arc here sits under. */
+  /* The sector's own sweep, which is the first arc it laid down: `sunburst` walks a branch from
+     its root outward, so `arcs[0]` is the ring-0 wedge every other arc here sits under. */
   const root = branch.arcs[0]
   const fan = `${FAN}${at}`
 
@@ -104,21 +85,19 @@ const Sector = memo(function Sector({
         {branch.arcs.map((a) => {
           const [r0, r1] = RINGS[a.ring]
           /* Prose re-billed as input is the one arc the page argues about, so it keeps full
-           strength and a dashed edge — the same mark the mosaic gives the same block. */
+             strength and a dashed edge — the same mark the mosaic gives the same block. */
           const carry = a.name.includes("re-billed")
-          /* An arc lights up with its own descendants, so hovering a leaf traces the path
-           back to the centre instead of stranding it in a dimmed ring. */
+          /* An arc lights up with its own descendants, so hovering a leaf traces the path back
+             to the centre instead of stranding it in a dimmed ring. */
           const on = hit === a.key || (!!hit && hit.startsWith(a.key + "›"))
-          /* The query dims rather than filters: dropping arcs would leave a circle whose
-           sweeps no longer read as shares of anything. */
+          /* The query dims rather than filters: dropping arcs would leave a circle whose sweeps
+             no longer read as shares of anything. */
           const miss = !!q && !a.key.toLowerCase().includes(q)
           const dim = (anyHover && !on) || miss
           return (
-            /* The wedge and its dashed edge travel together on the arrival -- see `.sunwedge`
-               in the stylesheet, which grows each ring out of the hole a beat after the one
-               inside it. It is the wrapper that moves rather than the arc, so the animation's
-               opacity is a separate thing from the arc's own, which is carrying the dimming
-               below. */
+            /* The wedge and its dashed edge travel together on the arrival -- see `.sunwedge` in
+               the stylesheet, which grows each ring out of the hole a beat after the one inside
+               it. */
             <g key={a.key} className="sunwedge" data-ring={a.ring}>
               <path
                 className="sunarc"
@@ -151,12 +130,7 @@ const Sector = memo(function Sector({
   )
 })
 
-/** The hole. It is the readout — hovered line item, its amount, its share — and falls back
- *  to the focused total, which is the number the ring around it adds up to.
- *
- *  All three lines change every time the pointer crosses an arc, so all three are given the
- *  page's own primitives rather than cutting: the figure rolls between the amounts, the words
- *  around it crossfade. See `Figure` and `TextCross` in `Motion.tsx`. */
+/** The hole. */
 function Core({
   rootCost,
   label,
@@ -172,13 +146,11 @@ function Core({
   const up = state.path.length > 0
   const pct = pctOf(h?.cost ?? 0, rootCost)
 
-  /* What each line stands for, as an identifier rather than as the words -- a token built out
-     of translated copy would fade on a language change. The eyebrow names the group, so it
-     holds still across the rings inside one sector; the line below names the arc. */
+  /* What each line stands for, as an identifier rather than as the words -- a token built out of
+     translated copy would fade on a language change. */
   const kAt = h ? "h›" + (h.under ? h.under : h.group) : "r›" + focus.node.name
   const sAt = h ? "h›" + h.key : "r›" + focus.node.name
-  /* The amount twice over: a number for the rolling digits, text for the state that is not one.
-     Only one is ever rendered; see `Figure`. */
+  /* The amount twice over: a number for the rolling digits, text for the state that is not one. */
   const cost = h ? h.cost : rootCost
   const pctText = pct.toFixed(pct < 1 ? 2 : 1) + "%"
 
@@ -237,8 +209,7 @@ function Core({
   )
 }
 
-/* One row per innermost sector: the names the arcs have no room to carry. Memoised for the
-   same reason the sectors are — a hover moves the highlight, it does not rebuild the list. */
+/* One row per innermost sector: the names the arcs have no room to carry. */
 const LegRow = memo(function LegRow({
   branch,
   hue,
@@ -302,13 +273,12 @@ export function Sunburst(): React.JSX.Element {
   const q = state.query.trim().toLowerCase()
   const rootCost = focus.node.cost || 1
 
-  /* Memoised for node identity, so a hover leaves the memoised sectors' props untouched.
-     The layout walk is microseconds; what it buys is the arcs not being rebuilt. */
+  /* Memoised for node identity, so a hover leaves the memoised sectors' props untouched. */
   const branches = useMemo(() => sunburst(focus), [focus])
 
-  /* "all" is the synthetic root the drill-down starts from, and it is said as "the bill"
-     rather than by its own name -- which is the one place the tree's identifier would read as
-     a label if it were printed. */
+  /* "all" is the synthetic root the drill-down starts from, and it is said as "the bill" rather
+     than by its own name -- which is the one place the tree's identifier would read as a label
+     if it were printed. */
   const label = focus.node.name === "all" ? t.strip.theBill : labelOf(t, focus.node.name)
   if (!branches.length) return <div className="sunempty">{t.sun.empty(label)}</div>
 

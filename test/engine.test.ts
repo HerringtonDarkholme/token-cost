@@ -10,7 +10,7 @@ const ok = (c: boolean, m: string): void => {
 }
 const money = (n: number): string => "$" + n.toFixed(2)
 
-/* ================= 1. A transcript made only of things never hardcoded ============== */
+/* ================= 1. */
 console.log("\n== unknown-everything transcript ==")
 const lines: string[] = []
 let i = 0
@@ -183,9 +183,7 @@ ok(
   `PNG dimensions read from header: ${JSON.stringify(dim)}`,
 )
 
-/* ================= 2. optional: a real transcript directory passed as an argument ====
-   Deliberately NOT auto-discovered. A generic tool should not go looking through
-   someone's home directory, and the synthetic suite above is what proves the algorithms. */
+/* ================= 2. */
 const dir = process.argv[2]
 if (dir) {
   console.log(`\n== real transcripts: ${dir} ==`)

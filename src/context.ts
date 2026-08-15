@@ -1,16 +1,6 @@
-/* One context carrying everything every part of the report needs: the analysis, the
-   dataset for the current TTL lens, the view state, the palette, the focused subtree, and
-   the two formatters whose behaviour changes when amounts are hidden.
-
-   It exists so that a component deep in the mosaic does not take eight props it only
-   forwards, and so that `amt()` is impossible to bypass -- hiding amounts has to hide all
-   of them, and a component that formatted its own dollars would leak one.
-
-   The value is nullable because the page outlives the report: the card is the same element
-   before a file is dropped and after it is discarded, so the provider is always mounted and
-   `null` is what it carries while there is nothing to report on. Only the report's own parts
-   read it, and `useReport` asserts rather than widens -- a component that draws a line item
-   has no sensible behaviour without one. */
+/* One context carrying everything every part of the report needs: the analysis, the dataset for
+   the current TTL lens, the view state, the palette, the focused subtree, and the two formatters
+   whose behaviour changes when amounts are hidden. */
 
 import { createContext, useCallback, useContext, useMemo } from "react"
 import type { Analysis, Dataset } from "./engine.ts"
@@ -41,14 +31,7 @@ export function useReport(): ReportCtx {
   return ctx
 }
 
-/** Everything derived from an analysis, in one object whose identity survives a re-render.
- *
- *  The memos are not here because a ledger walk is slow -- it is microseconds -- but because
- *  stable nodes are what let the memoised columns, panels and rows skip re-rendering entirely
- *  when only a highlight moved.
- *
- *  `null` in, `null` out: the hooks still run in that case, since a page with no analysis is
- *  one file drop away from having one and the order has to hold across it. */
+/** Everything derived from an analysis, in one object whose identity survives a re-render. */
 export function useReportCtx(data: Analysis | null, state: ViewState): ReportCtx | null {
   const d = data ? data.datasets[state.ttl] : null
   const reqs = d?.requests || 1

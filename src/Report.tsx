@@ -1,15 +1,4 @@
-/* The report's own parts: thesis strip, the picture, the breakdown, the footnotes.
-
-   What holds them is the page (see `Page.tsx`), which outlives any one of them -- these mount
-   when an analysis arrives and unmount when it is discarded, inside a card that does neither.
-
-   One subscription to the view state at the top of the page, one context down. A change to the
-   view -- lens, drill, query, units -- re-renders from there, and React diffs it to the handful
-   of attributes that actually moved. Hover is the exception: it arrives dozens of times a
-   second and is read from its own store slice by the few components that draw a highlight,
-   so a pointer sweep does not re-render the header, the footnotes and the ledger. They all
-   still read the one hover key from the one place, which is what lets the mosaic, the
-   panels and the table stay a single instrument. */
+/* The report's own parts: thesis strip, the picture, the breakdown, the footnotes. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Dataset } from "./engine.ts"
@@ -24,8 +13,7 @@ import { Panels } from "./Panels.tsx"
 import { Sunburst } from "./Sunburst.tsx"
 import { LedgerTable, useReconNote } from "./Ledger.tsx"
 
-/* No hints on these four: the words are the whole explanation. Built per render, like the
-   toolbar's, because the words move when the language does. */
+/* No hints on these four: the words are the whole explanation. */
 const views = (t: Dict): ReadonlyArray<SegOption<ViewState["view"]>> => [
   { value: "panels", label: t.chart.panels },
   { value: "table", label: t.chart.table },
@@ -37,15 +25,7 @@ const charts = (t: Dict): ReadonlyArray<SegOption<ViewState["chart"]>> => [
 ]
 
 /* Written once rather than closed over per render: a pick is a write to the store, which is a
-   module away, so neither switch needs anything from the component around it.
-
-   Both drop the highlight first, and neither lets the next one arrive until the pointer has
-   moved -- see `disarmHover`. A switch replaces the whole picture under a pointer that is
-   resting whereever it was left, so a highlight standing through one describes a block that is
-   no longer there, and the arrival the browser reports when the new picture lands under the
-   cursor describes nothing the reader did. Both are equally true of the legend beside the
-   sunburst, the panels and the table's rows, which is why the rule lives in the store rather
-   than in whichever view happened to notice it first. */
+   module away, so neither switch needs anything from the component around it. */
 const pickView = (view: ViewState["view"]): void => {
   disarmHover()
   setState({ view })
@@ -91,8 +71,7 @@ function Crumbs(): React.JSX.Element {
   )
 }
 
-/** The four figures that carry the thesis. Each is a mechanism the reader can check in
- *  their own numbers, not a headline figure that belongs to one dataset. */
+/** The four figures that carry the thesis. */
 function Strip(): React.JSX.Element {
   const { d, state, amt, reqs } = useReport()
   const t = useT()
@@ -137,22 +116,7 @@ function Strip(): React.JSX.Element {
   )
 }
 
-/** The query box.
- *
- *  What the reader types and what the breakdown is filtered by are the same string a beat
- *  apart, and the beat is the point. A view transition needs two settled states to travel
- *  between, and a keystroke is not a settled state: filtering on every one of them would be a
- *  transition started and thrown away five times a second, which is the jump it was supposed
- *  to replace with extra steps. So the box owns what is typed, the store owns what is
- *  filtered, and the store catches up once the typing stops.
- *
- *  `--find-settle` is short enough that the list still reads as following the keys rather than
- *  waiting for them -- a search box is expected to think for a moment, and this one then has
- *  something to show for it.
- *
- *  The store can also change the query without the box: a shared link seeds one, and "New
- *  analysis" clears it. `committed` is how the box tells that apart from its own echo -- the
- *  value it last sent is not news coming back. */
+/** The query box. */
 function Find(): React.JSX.Element {
   const { state } = useReport()
   const t = useT()
@@ -292,10 +256,8 @@ export function Footnotes(): React.JSX.Element {
   )
 }
 
-/** What the card holds once there is a bill to show: the thesis, the picture, and the two
- *  rules that frame it. The header above it belongs to the card rather than to this, because
- *  the card has a header before there is anything to report -- the heading merely changes
- *  tense when the numbers arrive. */
+/** What the card holds once there is a bill to show: the thesis, the picture, and the two rules
+ *  that frame it. */
 export function CardBody(): React.JSX.Element {
   const { state } = useReport()
   const t = useT()

@@ -16,6 +16,14 @@ project inside it.
 Scan the diff for `/Users/` and for the account name before every commit. Getting it out
 afterwards means an amend and a force push.
 
+## Comments
+
+**One sentence.** Say why the code is the way it is — the constraint or the trap. Do not
+narrate the design or explain the domain at essay length.
+
+No file-header manifestos, no section banners, no numbered design rules. A decision that
+needs a paragraph belongs in this file or the commit message, not on top of the function.
+
 ## Git
 
 **Commit straight to `main` and push.** This project does not use branches, and does not use

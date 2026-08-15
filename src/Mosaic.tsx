@@ -1,6 +1,5 @@
-/* The primary view: one column per line item, width = share of the bill, stacked blocks
-   inside = the item's own breakdown. It is the dense, scannable thing the page leads with,
-   rather than a wide stacked bar carrying nine numbers. */
+/* The primary view: one column per line item, width = share of the bill, stacked blocks inside =
+   the item's own breakdown. */
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
@@ -8,8 +7,8 @@ import { isCode, labelOf, nodeName, useT } from "./copy.tsx"
 import { branches, fold, kidsOf, pctOf, type CostNode } from "./model.ts"
 import { hoverBind, useHover } from "./store.ts"
 
-/** A column's blocks: its children, or one block standing for the column itself when it
- *  has no breakdown. */
+/** A column's blocks: its children, or one block standing for the column itself when it has no
+ *  breakdown. */
 function segmentsOf(node: CostNode): CostNode[] {
   const kids = kidsOf(node)
   return kids
@@ -17,11 +16,8 @@ function segmentsOf(node: CostNode): CostNode[] {
     : [{ name: node.name, cost: node.cost, children: null, self: true }]
 }
 
-/* Memoised, and given the hover as two primitives rather than the target itself: `hit` is
-   the hovered key when it falls inside this column and null when it does not. Hovering one
-   block therefore changes props for only the column entered and the column left -- the rest
-   compare equal and never re-render, which is the difference between touching two columns
-   and touching every block on the page. */
+/* Memoised, and given the hover as two primitives rather than the target itself: `hit` is the
+   hovered key when it falls inside this column and null when it does not. */
 const Column = memo(function Column({
   node,
   gname,
@@ -48,12 +44,11 @@ const Column = memo(function Column({
   const segs = segmentsOf(node)
   const segTotal = segs.reduce((s, x) => s + x.cost, 0) || 1
 
-  /* The 80% mark is the one cumulative number worth calling out: it says how few columns
-     carry most of the bill. Narrow columns show nothing rather than an unreadable stub. */
+  /* The 80% mark is the one cumulative number worth calling out: it says how few columns carry
+     most of the bill. */
   const crosses80 = cumFrom < 80 && cumTo >= 80
   const cum = crosses80 ? "◂80%" : width < 0.075 ? "" : cumTo.toFixed(0) + "%"
-  /* At the root a column is a group, and a group has a short label for the narrow ones. Both
-     halves are engine names, so both are translated on the way out. */
+  /* At the root a column is a group, and a group has a short label for the narrow ones. */
   const short = focus.groupName ? undefined : pal.short(node.name)
 
   return (
@@ -69,8 +64,8 @@ const Column = memo(function Column({
             pct = share * 100
           const segKey = key + "›" + s.name
           const active = hit === segKey || hit === key
-          /* Prose re-billed as input is the one block the page argues about, so it keeps
-             full strength and a dashed edge while the rest of the column ramps down. */
+          /* Prose re-billed as input is the one block the page argues about, so it keeps full
+             strength and a dashed edge while the rest of the column ramps down. */
           const carry = s.name.includes("re-billed")
           return (
             <button
@@ -169,8 +164,7 @@ export function Mosaic(): React.JSX.Element {
   )
 }
 
-/** The readout under the mosaic. With nothing hovered it carries the thesis rather than
- *  sitting empty, because that is the sentence the page exists to teach. */
+/** The readout under the mosaic. */
 export function HoverBar(): React.JSX.Element {
   const { state, pal, focus, amt, d } = useReport()
   const t = useT()
