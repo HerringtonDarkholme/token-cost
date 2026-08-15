@@ -313,11 +313,31 @@ button {
   border-bottom: 2px solid var(--accent);
   border-right: 2px solid var(--accent);
 }
+/* Four items on a 2×2 grid rather than two stacked blocks, because the caption is the one thing
+   here that must not size a column: covering the amounts adds a clause to it in every language,
+   and as a column of its own that pushed the headline and the eyebrow left by up to 105px. Spanning
+   both columns, it grows into the empty half of the headline's line instead. */
 .chead {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 24px;
+  grid-template-rows: auto auto;
+  column-gap: 24px;
   align-items: end;
+}
+.chead > div {
+  display: contents;
+}
+.chead .eyebrow {
+  grid-area: 1 / 1;
+}
+.chead .billed {
+  grid-area: 1 / 1 / 2 / 3;
+  justify-self: end;
+  white-space: nowrap;
+}
+.chead .total {
+  grid-area: 2 / 2;
+  justify-self: end;
 }
 .eyebrow {
   font-family: var(--mono);
@@ -327,6 +347,7 @@ button {
   color: var(--ink3);
 }
 .chead h1 {
+  grid-area: 2 / 1;
   margin: 5px 0 0;
   font-size: 31px;
   line-height: 1.02;
@@ -350,7 +371,9 @@ button {
   text-transform: uppercase;
   color: var(--ink3);
 }
-/* The figure's box is the type's, and the rolling digits are let out of it. */
+/* The figure's box is the type's, and the rolling digits are let out of it. `--fig` is how many
+   characters the figure has, so the four asterisks that cover it hold the width it had -- the
+   count is never drawn, which is the point: the box stays put and the figure stays hidden. */
 .total {
   font-family: var(--mono);
   font-size: 33px;
@@ -358,6 +381,7 @@ button {
   line-height: 1.02;
   letter-spacing: -0.03em;
   height: 1.02em;
+  min-width: calc(var(--fig, 0) * 1ch - var(--fig, 0) * 0.03em);
   display: flex;
   align-items: center;
   justify-content: flex-end;

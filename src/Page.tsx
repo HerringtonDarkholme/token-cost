@@ -84,7 +84,8 @@ export function Page({
   /* The figure twice over: as a number for the rolling digits, and as text for the one state
      that is not one. */
   const total = ctx ? (state.pctOnly ? null : ctx.d.total) : counted
-  const totalText = ctx ? (state.pctOnly ? "****" : money(ctx.d.total)) : money(counted)
+  const figureText = money(ctx ? ctx.d.total : counted)
+  const totalText = ctx && state.pctOnly ? "****" : figureText
 
   return (
     <ReportContext.Provider value={ctx}>
@@ -142,6 +143,7 @@ export function Page({
                   around on its way in. */}
               <div
                 className="total"
+                style={{ "--fig": figureText.length } as React.CSSProperties}
                 data-hidden={state.pctOnly && ctx ? 1 : 0}
                 data-empty={ctx ? 0 : 1}
               >
