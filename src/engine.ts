@@ -94,6 +94,7 @@ export const CACHE_WRITE_MULT: Record<TtlAssumption, number> = { "1h": 2.0, "5m"
 
 export function setRates(partial: Record<string, Rate>): void {
   Object.assign(RATES, partial)
+  RESOLVED.clear()
 }
 
 /** Strip the decorations cloud vendors and release dates add, so one card serves all. */
@@ -122,8 +123,20 @@ export interface RateResolution {
   id: string
 }
 
+/* A corpus asks this once per request and answers it with a handful of distinct ids, so the
+   regex chain in `normalizeModel` runs once per id instead. Cleared when the rates change. */
+const RESOLVED = new Map<string, RateResolution>()
+
 export function resolveRate(model: unknown): RateResolution {
   const raw = String(model || "")
+  const memo = RESOLVED.get(raw)
+  if (memo) return memo
+  const found = resolve(raw)
+  RESOLVED.set(raw, found)
+  return found
+}
+
+function resolve(raw: string): RateResolution {
   if (!raw) return { rate: null, basis: "missing", id: raw }
   // Claude Code writes <synthetic> for records it produced locally with no API call.
   if (raw.startsWith("<")) return { rate: null, basis: "synthetic", id: raw }
@@ -234,34 +247,43 @@ const NO_WORK = new Set([
  *  parens/brackets/braces, and skipping heredoc bodies entirely. */
 export function splitSegments(cmd: string): string[] {
   const segs: string[] = []
-  let buf = "",
-    i = 0,
+  let i = 0,
     depth = 0
-  let quote: string | null = null,
+  /* A segment is a slice of `cmd` rather than a buffer built a character at a time -- the
+     commands here run to kilobytes, and the only thing that ever leaves a hole in one is the
+     `<<TAG` a heredoc is armed with. */
+  let start = 0,
+    parts: string[] | null = null
+  const take = (end: number): string => {
+    const tail = cmd.slice(start, end)
+    if (!parts) return tail
+    parts.push(tail)
+    const joined = parts.join("")
+    parts = null
+    return joined
+  }
+  let quote = 0,
     pending: string | null = null
   const n = cmd.length
   while (i < n) {
-    const c = cmd[i]
+    const c = cmd.charCodeAt(i)
     if (quote) {
-      if (c === "\\" && quote === '"') {
-        buf += cmd.slice(i, i + 2)
+      if (c === 92 /* \ */ && quote === 34 /* " */) {
         i += 2
         continue
       }
-      if (c === quote) quote = null
-      buf += c
+      if (c === quote) quote = 0
       i++
       continue
     }
-    if (c === "'" || c === '"') {
+    if (c === 39 /* ' */ || c === 34 /* " */) {
       quote = c
-      buf += c
       i++
       continue
     }
     // `<<TAG` only *arms* a heredoc: the rest of THIS line is still part of the pipeline (`cat
     // <<EOF | grep x`), and the body starts at the next newline.
-    if (cmd.startsWith("<<", i) && cmd[i + 2] !== "<") {
+    if (c === 60 /* < */ && cmd.charCodeAt(i + 1) === 60 && cmd.charCodeAt(i + 2) !== 60) {
       let j = i + 2
       if (cmd[j] === "-") j++
       while (j < n && /\s/.test(cmd[j])) j++
@@ -270,46 +292,46 @@ export function splitSegments(cmd: string): string[] {
         q = cmd[j]
         j++
       }
-      let tag = ""
-      while (j < n && (/[\w-]/.test(cmd[j]) || (q && cmd[j] !== q))) {
-        tag += cmd[j]
-        j++
-      }
+      const tagFrom = j
+      while (j < n && (/[\w-]/.test(cmd[j]) || (q && cmd[j] !== q))) j++
+      const tag = cmd.slice(tagFrom, j)
       if (q && cmd[j] === q) j++
       if (tag) {
         pending = tag
+        ;(parts ||= []).push(cmd.slice(start, i))
+        start = j
         i = j
         continue
       }
     }
-    if (c === "(" || c === "[" || c === "{") {
+    if (c === 40 /* ( */ || c === 91 /* [ */ || c === 123 /* { */) {
       depth++
-      buf += c
       i++
       continue
     }
-    if (c === ")" || c === "]" || c === "}") {
-      depth = Math.max(0, depth - 1)
-      buf += c
+    if (c === 41 /* ) */ || c === 93 /* ] */ || c === 125 /* } */) {
+      if (depth > 0) depth--
       i++
       continue
     }
     if (depth === 0) {
-      if (cmd.startsWith("&&", i) || cmd.startsWith("||", i)) {
-        segs.push(buf)
-        buf = ""
+      const two =
+        (c === 38 /* & */ && cmd.charCodeAt(i + 1) === 38) ||
+        (c === 124 /* | */ && cmd.charCodeAt(i + 1) === 124)
+      if (two) {
+        segs.push(take(i))
         i += 2
+        start = i
         continue
       }
-      if (c === "|" || c === ";") {
-        segs.push(buf)
-        buf = ""
+      if (c === 124 /* | */ || c === 59 /* ; */) {
+        segs.push(take(i))
         i++
+        start = i
         continue
       }
-      if (c === "\n") {
-        segs.push(buf)
-        buf = ""
+      if (c === 10 /* \n */) {
+        segs.push(take(i))
         i++
         if (pending !== null) {
           // skip the heredoc body, then carry on
@@ -321,14 +343,19 @@ export function splitSegments(cmd: string): string[] {
           }
           pending = null
         }
+        start = i
         continue
       }
     }
-    buf += c
     i++
   }
-  segs.push(buf)
-  return segs.map((s) => s.trim()).filter(Boolean)
+  segs.push(take(n))
+  const out: string[] = []
+  for (const s of segs) {
+    const t = s.trim()
+    if (t) out.push(t)
+  }
+  return out
 }
 
 /** Could this word be a subcommand verb? A bare lowercase-ish token -- not a flag, path,
@@ -351,38 +378,49 @@ export interface Segment {
 }
 
 export function resolveSegment(seg: string): Segment | null {
-  const words = seg.replace(/[()]/g, " ").split(/\s+/).filter(Boolean)
-  if (!words.length || words[0].startsWith("#")) return null // comment line
-  let idx = 0,
-    wrapped = false
-  while (idx < words.length) {
-    const w = words[idx]
-    if (/^[A-Za-z_]\w*=/.test(w)) {
-      idx++
-      continue
-    } // VAR=value prefix
+  /* Words are taken one at a time rather than split out in advance: a segment can be a
+     kilobyte of arguments, and nothing past the program's first operand is ever read. Parens
+     separate words the way whitespace does. */
+  let at = 0
+  const nextWord = (): string | null => {
+    const n = seg.length
+    while (at < n) {
+      const c = seg.charCodeAt(at)
+      if (c > 32 && c !== 40 && c !== 41) break
+      at++
+    }
+    if (at >= n) return null
+    const from = at
+    while (at < n) {
+      const c = seg.charCodeAt(at)
+      if (c <= 32 || c === 40 || c === 41) break
+      at++
+    }
+    return seg.slice(from, at)
+  }
+  let w = nextWord()
+  if (w === null || w.startsWith("#")) return null // comment line
+  let wrapped = false
+  for (; w !== null; w = nextWord()) {
+    if (/^[A-Za-z_]\w*=/.test(w)) continue // VAR=value prefix
     if (EXEC_WRAPPERS.has(w)) {
-      idx++
       wrapped = true
       continue
     } // sudo/env/timeout/...
     if (KEYWORDS.has(w)) return null // control flow, not a command
     // A wrapper takes its own options before the command it execs: `timeout 5 kubectl`, `xargs -n1
     // grep`, `nice -n10 cargo`. Skip flags and duration/count values.
-    if (wrapped && (w.startsWith("-") || /^\d+(\.\d+)?[smhd]?$/.test(w))) {
-      idx++
-      continue
-    }
+    if (wrapped && (w.startsWith("-") || /^\d+(\.\d+)?[smhd]?$/.test(w))) continue
     break
   }
-  if (idx >= words.length) return null
-  const prog = (words[idx].split("/").pop() || "").replace(/^[$(]+/, "").replace(/^["']|["']$/g, "")
+  if (w === null) return null
+  const prog = (w.split("/").pop() || "").replace(/^[$(]+/, "").replace(/^["']|["']$/g, "")
   if (!prog || prog.startsWith("-") || prog.startsWith("$")) return null
   const rank = STATE_ONLY.has(prog) ? 2 : NO_WORK.has(prog) ? 1 : 0
   let verb: string | null = null
-  for (const w of words.slice(idx + 1)) {
-    if (w.startsWith("-")) continue // flags are not verbs
-    if (isVerbShaped(w)) verb = w
+  for (let o = nextWord(); o !== null; o = nextWord()) {
+    if (o.startsWith("-")) continue // flags are not verbs
+    if (isVerbShaped(o)) verb = o
     break // only the first operand
   }
   return { prog, verb, rank }
@@ -508,10 +546,14 @@ const IMAGE_FALLBACK = 1500,
   IMAGE_CAP = 1600
 function b64Bytes(data: unknown, limit: number): Uint8Array | null {
   try {
+    const want = Math.ceil(limit / 3) * 4
+    // A screenshot is megabytes of base64 and the header is in the first few hundred bytes, so
+    // cut a generous prefix before scrubbing rather than scrubbing the whole payload.
     const clean = String(data)
+      .slice(0, want * 2)
       .replace(/^data:[^,]*,/, "")
       .replace(/[^A-Za-z0-9+/=]/g, "")
-    const slice = clean.slice(0, Math.ceil(limit / 3) * 4)
+    const slice = clean.slice(0, want)
     const bin =
       typeof atob === "function"
         ? atob(slice.replace(/=+$/, ""))
@@ -854,12 +896,21 @@ export function walkOne(st: Walk, f: RawFile): boolean {
     { tool: string; sub: string | null; verb: string | null; shell: boolean }
   >()
 
-  for (const line of f.text.split("\n")) {
-    const s = line.trim()
-    if (!s) continue
+  /* Walked by index rather than `split("\n")`: a store is hundreds of megabytes, and the split
+     builds an array of every line in the file before the first one is read. Leading blanks are
+     skipped by hand for the same reason -- `JSON.parse` tolerates the whitespace either side, so
+     the only thing a `trim()` would settle is whether the line is empty. */
+  const text = f.text
+  for (let i = 0, n = text.length; i < n;) {
+    let end = text.indexOf("\n", i)
+    if (end === -1) end = n
+    let from = i
+    i = end + 1
+    while (from < end && text.charCodeAt(from) <= 32) from++
+    if (from === end) continue
     let rec: TranscriptRecord
     try {
-      rec = JSON.parse(s) as TranscriptRecord
+      rec = JSON.parse(text.slice(from, end)) as TranscriptRecord
     } catch {
       st.badLines++
       continue
@@ -879,6 +930,22 @@ export function walkOne(st: Walk, f: RawFile): boolean {
     else content = []
 
     if (msg.role === "assistant") {
+      /* What the output was spent on, in characters -- measured once here because the two things
+         that want it, the charge and the context this message leaves behind, are two loops apart,
+         and serialising tool arguments twice is the most expensive thing this walk does. */
+      let proseChars = 0,
+        argsChars = 0
+      const argLens: number[] = []
+      for (const b of content) {
+        if (!b || typeof b !== "object") continue
+        if (b.type === "text") proseChars += (b.text || "").length
+        else if (b.type === "tool_use") {
+          const len = JSON.stringify(b.input || {}).length
+          argLens.push(len)
+          argsChars += len
+        }
+      }
+
       const u = msg.usage || {}
       const inp = u.input_tokens || 0
       const cr = u.cache_read_input_tokens || 0
@@ -964,14 +1031,6 @@ export function walkOne(st: Walk, f: RawFile): boolean {
         billed.v += varIn
         billed.out += outCost
 
-        // What the output was spent on, in characters.
-        let proseChars = 0,
-          argsChars = 0
-        for (const b of content) {
-          if (!b || typeof b !== "object") continue
-          if (b.type === "text") proseChars += (b.text || "").length
-          else if (b.type === "tool_use") argsChars += JSON.stringify(b.input || {}).length
-        }
         h.charges.push({
           at: h.adds.length,
           ctxTokens,
@@ -988,6 +1047,7 @@ export function walkOne(st: Walk, f: RawFile): boolean {
       }
 
       // This assistant message now becomes part of the context for later requests.
+      let argAt = 0
       for (const b of content) {
         if (!b || typeof b !== "object") continue
         if (b.type === "text") {
@@ -1024,7 +1084,8 @@ export function walkOne(st: Walk, f: RawFile): boolean {
             h,
             { role: "tool", tool, dir: "call", sub: t.sub, shell: t.shell },
             t.verb,
-            JSON.stringify(b.input || {}).length,
+            // Same blocks in the same order as the pass above, so the lengths line up.
+            argLens[argAt++],
             "code",
           )
         }
@@ -1135,10 +1196,27 @@ function score(
   recs: readonly Bucket[],
   keys: readonly string[],
   acc: Map<string, AccEntry>,
+  perSlot: Array<AccEntry | undefined>,
 ): void {
   const ctx = new Map<number, number>() // slot -> estimated tokens in context
   let preamble: number | null = null,
     at = 0
+  /* The accumulator a slot spends into is found once and then held by slot number: every request
+     in the corpus pays into the same few, and the key is a string built to be unmistakable
+     rather than quick to hash. */
+  const entry = (slot: number): AccEntry => {
+    let e = perSlot[slot]
+    if (!e) {
+      const k = keys[slot]
+      e = acc.get(k)
+      if (!e) {
+        e = { rec: recs[slot], f: 0, v: 0, out: 0 }
+        acc.set(k, e)
+      }
+      perSlot[slot] = e
+    }
+    return e
+  }
   for (const ch of h.charges) {
     for (; at < ch.at; at++) {
       const a = h.adds[at]
@@ -1153,31 +1231,38 @@ function score(
     for (const v of ctx.values()) mine += v
     if (preamble === null) preamble = Math.max(0, ch.ctxTokens - mine)
     const body = Math.max(0, ch.ctxTokens - preamble)
-    const shares: Array<[number, number]> = []
+    const k = mine > 0 ? body / mine : 0
+    const pre = Math.min(preamble, ch.ctxTokens)
+    /* The shares are walked twice rather than listed once: the same multiply repeated is free
+       next to a pair of arrays per bucket per request, and summing the parts is not the same
+       arithmetic as reusing the body they came from. */
     let denom = 0
-    if (mine > 0) {
-      const k = body / mine
-      for (const [slot, v] of ctx) {
-        const t = v * k
-        shares.push([slot, t])
-        denom += t
+    if (mine > 0) for (const v of ctx.values()) denom += v * k
+    if (pre > 0) denom += pre
+    if (denom > 0) {
+      if (mine > 0) {
+        for (const [slot, v] of ctx) {
+          const share = (v * k) / denom
+          const e = entry(slot)
+          e.f += ch.f * share
+          e.v += ch.v * share
+        }
+      }
+      if (pre > 0) {
+        const e = entry(PRE_SLOT)
+        e.f += ch.f * (pre / denom)
+        e.v += ch.v * (pre / denom)
       }
     }
-    const pre = Math.min(preamble, ch.ctxTokens)
-    if (pre > 0) {
-      shares.push([PRE_SLOT, pre])
-      denom += pre
-    }
-    for (const [slot, t] of denom > 0 ? shares : [])
-      bump(acc, keys[slot], recs[slot], ch.f * (t / denom), ch.v * (t / denom), 0)
 
     const prose = ch.proseChars / text,
       args = ch.argsChars / code
     const think = Math.max(0, ch.outTokens - prose - args)
     const d2 = prose + args + think
     if (d2 > 0) {
-      for (const [i, part] of [think, prose, args].entries())
-        bump(acc, OUT_KEYS[i], OUT_RECS[i], 0, 0, (ch.outCost * part) / d2)
+      bump(acc, OUT_KEYS[0], OUT_RECS[0], 0, 0, (ch.outCost * think) / d2)
+      bump(acc, OUT_KEYS[1], OUT_RECS[1], 0, 0, (ch.outCost * prose) / d2)
+      bump(acc, OUT_KEYS[2], OUT_RECS[2], 0, 0, (ch.outCost * args) / d2)
     }
   }
 }
@@ -1224,8 +1309,9 @@ export function closeWalk(st: Walk): { scanned: Scanned; alloc: Allocation } {
   })
 
   const acc = new Map<string, AccEntry>()
+  const perSlot: Array<AccEntry | undefined> = Array.from({ length: recs.length })
   for (const h of st.held)
-    score(h, scanned.density.code, scanned.density.text, home, recs, keys, acc)
+    score(h, scanned.density.code, scanned.density.text, home, recs, keys, acc, perSlot)
 
   const { tMin, tMax } = st
   const days =

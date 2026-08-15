@@ -401,9 +401,22 @@ export function Intake({
        memory and the frame. A block rather than a line comment, since which line the `await`
        lands on is the formatter's to decide. */
     const w = openWalk()
+    /* One read runs ahead of the walk, and only one: reading a transcript is the disk's work and
+       walking it is this thread's, and done strictly in turn each waits out the other. The empty
+       `catch` marks the read as handled so a failure mid-corpus is not also an unhandled
+       rejection -- the `await` below still throws it. */
+    const readAt = (i: number): Promise<string> | null => {
+      if (i >= files.length) return null
+      const p = files[i].file.text()
+      p.catch(() => {})
+      return p
+    }
+    let ahead = readAt(0)
     try {
       for (const [i, p] of files.entries()) {
-        walkOne(w, { name: p.file.name, text: await p.file.text() })
+        const text = await ahead!
+        ahead = readAt(i + 1)
+        walkOne(w, { name: p.file.name, text })
         /* Left where the header can find it, on every file rather than on a beat: this is two
            adds and a multiply, and deciding how often it is worth looking at is the job of
            whoever is drawing it. */
