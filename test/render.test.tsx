@@ -78,6 +78,14 @@ function expectClean(): void {
      mosaic scrolls sideways in its own box, the sunburst scales to the space it is given.
      Either way the body never scrolls sideways. */
   expect(container.querySelector(".mosaicwrap, .sun")).not.toBeNull()
+
+  /* `flatten` in `snapshot.ts` replaces every `[data-snaptext]` element with a span holding
+     that attribute's text, so anything wearing the marker is promising it has nothing else
+     worth drawing. A styling hook that reuses the name is not making that promise, and the
+     PNG comes back with its subtree deleted and an attribute value printed where the chart
+     was -- which is how a `data-flat` shared with the mosaic emptied every column. */
+  for (const el of container.querySelectorAll("[data-snaptext]"))
+    expect(el.children, `${el.className} would lose its contents to the snapshot`).toHaveLength(0)
 }
 
 describe("view states", () => {
@@ -474,12 +482,14 @@ describe("interaction", () => {
 
      Which leaves the claim that holds either way, and is the one worth having: whatever the
      header is drawn with, it is showing the whole figure, and that figure is somewhere the PNG
-     can read it. `data-flat` is that place -- see `flatten` in `snapshot.ts`, which would
+     can read it. `data-snaptext` is that place -- see `flatten` in `snapshot.ts`, which would
      otherwise serialise a stylesheet into the space where the bill goes. */
   it("the total is the whole figure, drawn either way", () => {
     const total = (): Element | null => container.querySelector(".total")
     const figure = (): string =>
-      total()?.querySelector("[data-flat]")?.getAttribute("data-flat") ?? total()?.textContent ?? ""
+      total()?.querySelector("[data-snaptext]")?.getAttribute("data-snaptext") ??
+      total()?.textContent ??
+      ""
 
     expect(figure()).toMatch(/^\$[\d,]+\.\d\d$/)
 

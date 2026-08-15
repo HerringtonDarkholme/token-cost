@@ -23,8 +23,12 @@ const SCALE = 2
 /** Elements the reader needs but the picture does not: controls that do nothing in a PNG. */
 const OMIT = "[data-nosnap]"
 
-/** Figures whose digits live in a shadow root, which does not survive the trip below. */
-const FLAT = "[data-flat]"
+/** Figures whose digits live in a shadow root, which does not survive the trip below. The
+ *  name is the snapshot's own, and paired with `data-nosnap` above rather than borrowed from
+ *  whatever a component happens to call the state it is in: this selector replaces every
+ *  element it matches with a span, so a styling hook that reused the name would have its
+ *  subtree deleted and the attribute's value printed in its place. */
+const FLAT = "[data-snaptext]"
 
 /** Replace the animated figures with their own text.
  *
@@ -40,7 +44,7 @@ function flatten(clone: HTMLElement): void {
   for (const el of Array.from(clone.querySelectorAll(FLAT))) {
     const span = document.createElement("span")
     span.className = el.className
-    span.textContent = el.getAttribute("data-flat") || ""
+    span.textContent = el.getAttribute("data-snaptext") || ""
     el.replaceWith(span)
   }
 }

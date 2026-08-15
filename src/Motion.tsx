@@ -177,7 +177,7 @@ const MONEY: Format = {
  *  reduced-motion half is this page's own question rather than the component's, because the
  *  answer has to be the one the rest of the stylesheet is giving.
  *
- *  `data-flat` carries that same text for the PNG, which is a document the digits cannot reach:
+ *  `data-snaptext` carries that same text for the PNG, a document the digits cannot reach:
  *  the snapshot serialises this markup as XML into a foreignObject, where the custom element is
  *  undefined and its shadow root did not come along. Written here rather than read back off the
  *  component, because what the component puts in the light DOM is its business. */
@@ -196,7 +196,7 @@ export function Figure({
     return <span className={className}>{text}</span>
   }
   return (
-    <span className={className} data-flat={text}>
+    <span className={className} data-snaptext={text}>
       {/* The locale as well as the format, because the two halves of the agreement with
           `money()` are both locale-dependent: where the grouping separators fall and which
           side the symbol sits on. Handed the tag rather than left to the browser's own
