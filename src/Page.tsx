@@ -5,10 +5,18 @@ import type { Analysis } from "./engine.ts"
 import { ReportContext, useReportCtx } from "./context.ts"
 import { useT, type Word } from "./copy.tsx"
 import { money } from "./model.ts"
-import { hashFor, hoverClear, readHash, setState, useViewState, type ViewState } from "./store.ts"
+import {
+  hashFor,
+  hoverClear,
+  readHash,
+  setState,
+  useNarrow,
+  useViewState,
+  type ViewState,
+} from "./store.ts"
 import { Figure, Reveal, TextSwap, useCountingUp } from "./Motion.tsx"
 import { Toolbar } from "./Toolbar.tsx"
-import { Breakdown, CardBody, Footnotes, scopeOf } from "./Report.tsx"
+import { Breakdown, CardBody, Footnotes, scopeOf, Strip } from "./Report.tsx"
 import { Intake, Where } from "./Upload.tsx"
 
 /** Which way the page is moving. */
@@ -72,6 +80,7 @@ export function Page({
   const t = useT()
   useUrlSync(state)
   const ctx = useReportCtx(data, state)
+  const narrow = useNarrow()
 
   /* One string, so the two faces cannot mount different panels by disagreeing about which one is
      on show. */
@@ -116,19 +125,15 @@ export function Page({
           <span className="br br4" />
           <header className="chead">
             <div>
-              {/* The words are identical on both faces; what the report adds is the scope,
-                  which arrives on the end rather than replacing the line. */}
-              {/* The example says so here rather than anywhere louder: it is the same report
-                  off the same engine, and what makes it an example is whose transcripts it
-                  read -- which is exactly what this line is for.
-                  The standing half is its own element because a phone drops it: what the page
-                  is called is the one thing on this line the headline underneath already says,
-                  and it costs a whole line of the first screen to repeat it. Its separator goes
-                  with it, which is why that is drawn rather than written. */}
-              <div className="eyebrow" data-scoped={ctx ? 1 : 0}>
-                <span className="ebrand">{t.card.eyebrow}</span>
+              {/* The words are identical on both faces; what the report adds is the scope, which
+                  arrives on the end rather than replacing the line -- and the example says so
+                  here rather than anywhere louder, since what makes it an example is whose
+                  transcripts it read, which is exactly what this line is for. The whole line is
+                  dropped on a narrow window: see `.chead` in the stylesheet. */}
+              <div className="eyebrow">
+                {t.card.eyebrow}
                 <TextSwap token={face}>
-                  {ctx ? (sample ? t.card.example + " · " : "") + scopeOf(t, ctx.d) : ""}
+                  {ctx ? (sample ? " · " + t.card.example : "") + " · " + scopeOf(t, ctx.d) : ""}
                 </TextSwap>
               </div>
               {/* One sentence in two tenses, set word by word so the words can be told apart.
@@ -146,10 +151,19 @@ export function Page({
               </h1>
             </div>
             <div className="cfig">
-              {/* Not swapped, unlike the two lines beside it: this is the caption on a figure
-                  that already re-enters character by character whenever it changes, and two
-                  animations saying the same thing on adjacent lines is one too many. */}
-              <div className="billed">{billed}</div>
+              {/* What qualifies the figure, gathered so a narrow window can stand both beside it
+                  in the corner the caption alone holds on a wide one. `display: contents` above
+                  that width, so the caption stays exactly where the header's grid puts it; the
+                  tag is drawn only where the eyebrow that otherwise carries it is not. The scope
+                  counts are the one thing left out -- they take two lines to themselves at this
+                  measure, and are readable off the report below. */}
+              <div className="qual">
+                {sample ? <span className="etag">{t.card.example}</span> : null}
+                {/* Not swapped, unlike the two lines beside it: this is the caption on a figure
+                    that already re-enters character by character whenever it changes, and two
+                    animations saying the same thing on adjacent lines is one too many. */}
+                <div className="billed">{billed}</div>
+              </div>
               {/* The figure's place is held by a dash before there is a figure, so the bill
                   arrives in the slot that was waiting for it rather than pushing the header
                   around on its way in. */}
@@ -180,6 +194,11 @@ export function Page({
           {ctx ? (
             <>
               <Breakdown />
+              {/* Where the card's three figures go on a narrow window: they are what the thesis
+                  argues *from*, and reading them costs a line each, so they wait until the
+                  reader has been through the picture and the line items rather than standing
+                  between the bill and the chart. */}
+              {narrow ? <Strip only="figures" /> : null}
               <Footnotes />
             </>
           ) : (

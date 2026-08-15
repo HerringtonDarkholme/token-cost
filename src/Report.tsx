@@ -5,7 +5,7 @@ import type { Dataset } from "./engine.ts"
 import { useReport } from "./context.ts"
 import { labelOf, useT, type Dict } from "./copy.tsx"
 import { count, FOLD_MIN, ledger, money, moneyFine, pctOf } from "./model.ts"
-import { disarmHover, setState, type ViewState } from "./store.ts"
+import { disarmHover, setState, useNarrow, type ViewState } from "./store.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
 import { cssMs, Reveal, transition } from "./Motion.tsx"
 import { HoverBar, Mosaic } from "./Mosaic.tsx"
@@ -71,16 +71,30 @@ function Crumbs(): React.JSX.Element {
   )
 }
 
-/** The four figures that carry the thesis. */
-function Strip(): React.JSX.Element {
+/** The thesis and the three figures that carry it -- which on a narrow window are rendered in two
+ *  places rather than one: the sentence stays under the bill it is about, and the three figures
+ *  it argues from go below the breakdown, where there is room to read them. `only` is which half
+ *  this instance is drawing; unset, it draws both, which is every window wide enough to put them
+ *  on one line. */
+export function Strip({ only }: { only?: "thesis" | "figures" }): React.JSX.Element {
   const { d, state, amt, reqs } = useReport()
   const t = useT()
   const I = d.insights
-  return (
-    <div className="strip">
-      <div>
-        <div className="thesis">{t.strip.thesis}</div>
+  if (only === "thesis")
+    return (
+      <div className="strip" data-only="thesis">
+        <div>
+          <div className="thesis">{t.strip.thesis}</div>
+        </div>
       </div>
+    )
+  return (
+    <div className="strip" data-only={only}>
+      {only ? null : (
+        <div>
+          <div className="thesis">{t.strip.thesis}</div>
+        </div>
+      )}
       <div>
         <div className="carryrow">
           <span className="from">{amt(I.proseGen)}</span>
@@ -261,9 +275,12 @@ export function Footnotes(): React.JSX.Element {
 export function CardBody(): React.JSX.Element {
   const { state } = useReport()
   const t = useT()
+  /* The three figures leave the card at this width -- see `Strip`, and `Page`, which is where
+     they land. */
+  const narrow = useNarrow()
   return (
     <>
-      <Strip />
+      <Strip only={narrow ? "thesis" : undefined} />
       <div className="mosaichead">
         <span className="lbl">{state.chart === "sun" ? t.chart.headSun : t.chart.headMosaic}</span>
         <Crumbs />

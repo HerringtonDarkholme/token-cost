@@ -40,6 +40,26 @@ export interface ViewState {
 const WIDE: boolean =
   typeof matchMedia === "function" ? !matchMedia("(max-width: 820px)").matches : true
 
+/** The narrowest band, and unlike `WIDE` this one is subscribed. The difference is what each is
+ *  for: `WIDE` seeds a default the reader may then change, so re-answering it would undo their
+ *  choice, while this decides where a block is rendered -- and a rotation has to move it. */
+const NARROW = "(max-width: 560px)"
+
+function narrow(): boolean {
+  return typeof matchMedia === "function" && matchMedia(NARROW).matches
+}
+
+function subscribeNarrow(fn: () => void): () => void {
+  if (typeof matchMedia !== "function") return () => {}
+  const list = matchMedia(NARROW)
+  list.addEventListener("change", fn)
+  return () => list.removeEventListener("change", fn)
+}
+
+export function useNarrow(): boolean {
+  return useSyncExternalStore(subscribeNarrow, narrow, narrow)
+}
+
 const INITIAL: ViewState = {
   ttl: "1h",
   path: [],

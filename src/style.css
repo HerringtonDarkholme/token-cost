@@ -359,11 +359,6 @@ button {
   text-transform: uppercase;
   color: var(--ink3);
 }
-/* Drawn rather than written into the string, so that hiding the standing half of the line takes
-   the separator with it instead of leaving the scope opening on a bullet. */
-.eyebrow[data-scoped="1"] .ebrand::after {
-  content: " · ";
-}
 .chead h1 {
   grid-area: 2 / 1;
   margin: 5px 0 0;
@@ -381,6 +376,16 @@ button {
 }
 .cfig {
   text-align: right;
+}
+/* Transparent to the header's grid, so the caption inside it stays the grid item it has always
+   been and only a narrow window makes a box of it. */
+.qual {
+  display: contents;
+}
+/* The eyebrow carries this word wherever there is an eyebrow left to carry it; this is what
+   stands in for it where there is not. Never both at once -- see the narrow-window block. */
+.etag {
+  display: none;
 }
 .billed {
   font-family: var(--mono);
@@ -1399,28 +1404,138 @@ tfoot .n {
 /* The narrowest band, where two of anything side by side is one too many. The help under the
    empty card is not here because it folds on its own measure -- see `.where`. */
 @media (max-width: 560px) {
-  /* The thesis is a sentence and takes the width; the three figures beside it are short enough
-     to pair up. Stacking all four was 90px of the first screen spent on saying the same things
-     one under the other. */
-  .strip > div:first-child,
-  .strip > div:last-child {
-    grid-column: 1 / -1;
+  /* The three figures are not on this screen at all -- `Strip` renders them below the breakdown
+     here, and leaves the sentence they argue for under the bill it is about. Measured before
+     giving up on fitting them: caption and figure want 168+120, 184+138 and 158+164 against the
+     346px there is, so two of the three cannot be made to share a line at any size worth
+     reading. What is left is one cell, so the columns go. */
+  .strip {
+    grid-template-columns: 1fr;
+    margin-top: 10px;
   }
-  /* What the page is called is already the headline, so the line above it carries only what the
-     headline does not say: which dataset, and how much of it. Only once there *is* a dataset --
-     on the empty face nothing else is competing for the line, and dropping the standing half
-     there would leave the row blank rather than shorter. */
-  .eyebrow[data-scoped="1"] .ebrand {
-    display: none;
+  /* The rule that used to close the header now opens the figure. With the eyebrow and the
+     caption gone, what this line has left to separate is the title from the number rather than
+     the number from the body -- and the standfirst under it belongs to the figure, not to the
+     chart, so nothing should be drawn between those two. */
+  /* Centred rather than on the figure's baseline: a baseline puts the *first* of the two lines on
+     it and hangs the second one below the figure, which reads as bottom-heavy and costs the row
+     that line's height. Centred, the pair sits against the figure and the row is as tall as the
+     figure alone. */
+  .card[data-face="report"] .chead > .cfig {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin-top: 9px;
+    padding-top: 9px;
+    border-top: 1px solid var(--ink);
   }
-  /* Two figures to a row is about 165px each, and 21px mono broke both of them over two lines --
-     which costs more height than the second column saved. */
+  /* Two lines, hard right, in the corner the caption alone holds on a wide window: what the
+     figure covers, and the lens it was read under -- which nothing else on this width says, and
+     which the panel can change out from under it. */
+  .card[data-face="report"] .qual {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    order: 1;
+    margin-left: auto;
+    text-align: right;
+  }
+  .card[data-face="report"] .etag {
+    display: block;
+  }
+  /* The leading is the whole gap here -- there is no margin between the two -- so it is what
+     sets how much air they sit in. */
+  .qual .etag,
+  .qual .billed {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    line-height: 1.08;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    white-space: nowrap;
+  }
+  .strip[data-only="thesis"] {
+    border-top: 0;
+    border-bottom: 0;
+  }
+  .strip[data-only="thesis"] > div {
+    padding: 8px 0 10px;
+    border-bottom: 0;
+  }
+  /* Standfirst rather than headline. It is the report's argument and worth keeping in front of
+     the reader, but it is a claim the picture below is about to make on its own -- so at this
+     width it stops competing with the figure above it for the eye and gets out of the way. The
+     one accented word carries it now, which is enough to be found again. */
+  .thesis {
+    font-size: 12.5px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: 0;
+    color: var(--ink2);
+  }
+  /* Below the breakdown, where it is a section of its own rather than a band of the card. */
+  .strip[data-only="figures"] {
+    margin-top: 26px;
+  }
+  .strip > div:not(:first-child) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .strip .cap {
+    order: -1;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-top: 0;
+    /* The tracking and the caps are what made these two lines; at this size they are what has to
+       give, not the words. */
+    text-transform: none;
+    letter-spacing: 0.01em;
+    font-size: 10.5px;
+    /* The two longest still take two lines at any size worth reading; balanced, that reads as
+       two lines rather than as one line with a word left over. */
+    text-wrap: balance;
+  }
+  .strip .big,
+  .strip .carryrow {
+    flex: 0 0 auto;
+  }
   .big,
   .carryrow .to {
     font-size: 18px;
   }
   .big .sm {
     font-size: 13px;
+  }
+  /* A line of the first screen that tells the reader nothing they cannot see: the page's own name
+     is already the headline, and the counts are readable off the report underneath. On the empty
+     face it stays -- there the eyebrow is the only thing naming the page at all. */
+  .card[data-face="report"] .eyebrow {
+    display: none;
+  }
+  /* With those gone the header is a title and a figure, and the air between them was measured
+     for a four-line block. */
+  .chead {
+    row-gap: 0;
+  }
+  .chead h1 {
+    margin-top: 0;
+  }
+  /* The caption explains how to read a picture, and the breadcrumb walks back out of one -- both
+     of which are things to do *after* seeing it. Above the chart they were four lines between
+     the reader and the only thing on the card worth scrolling to. */
+  .cardslot > .chartslot {
+    order: 1;
+  }
+  .cardslot > .mosaichead {
+    order: 2;
+  }
+  .cardslot > .cardfoot {
+    order: 3;
   }
   /* The heading and the figure stop sharing a line: below this the two-column head left the
      title about one word wide. Stacked, the caption lands directly over the figure it captions,
