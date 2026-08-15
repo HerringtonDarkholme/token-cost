@@ -345,6 +345,15 @@ const NAMES = 24
  *  and this is the only reason the page can move while it works. */
 const PAINT = 60
 
+/** And how often the figure in the header is allowed to change, which is a slower beat than the
+ *  panel's on purpose. The digits do not jump to a new number, they roll to it over a few
+ *  hundred milliseconds -- so a fresh number every 60ms lands on a roll that is still going,
+ *  restarts it, and the figure spends the whole read blurred without ever arriving anywhere.
+ *  At 160 each value gets most of its roll before the next one, which reads as counting rather
+ *  than as thrashing. The panel keeps its own faster beat: names and counts are text, and text
+ *  is not mid-animation when it is replaced. */
+const TALLY = 160
+
 /** One line of the panel: a name, and how long it should take to write itself. */
 interface Line {
   key: string
@@ -534,6 +543,7 @@ export function Intake({
     const every = Math.max(1, Math.ceil(files.length / NAMES))
     let wrote = performance.now()
     let painted = 0
+    let counted = 0
 
     /** One file done. Puts a name up when this is one of the files whose turn it is, repaints if
      *  it has been long enough, and hands the frame back when it does. */
@@ -554,10 +564,14 @@ export function Intake({
       if (now - painted < PAINT && !last) return
       painted = now
       setRun({ id, done: i + 1, total, lines: [...lines] })
-      /* On the repaint beat rather than per file: the figure is one more thing drawn in the
-         gap this leaves, and a folder of several hundred transcripts would otherwise ask the
-         header to re-render several hundred times for digits nobody could read going past. */
-      onTally(tally)
+      /* And the figure on its own, slower beat -- see `TALLY`. It rides the panel's repaints
+         rather than opening a gap of its own, so the header changes on a frame the page was
+         already giving up. The last file reports whatever it has whether or not the beat is
+         due: the number the roll finishes on is the number the bill opens with. */
+      if (now - counted >= TALLY || last) {
+        counted = now
+        onTally(tally)
+      }
       // The yield. Everything the panel does, it does in the gaps this leaves.
       await new Promise((r) => setTimeout(r, 0))
     }
