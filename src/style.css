@@ -102,10 +102,12 @@ button {
     animation: none !important;
   }
 }
+/* The tail is short because the colophon ends the page: the deep one here was what stopped the
+   last line of body copy sitting on the bottom of the window, and a footer does that itself. */
 .shell {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 28px 24px 96px;
+  padding: 28px 24px 32px;
 }
 .hidden {
   display: none !important;
@@ -1244,6 +1246,46 @@ tfoot .n {
 .foot strong {
   color: var(--ink);
 }
+/* The page's footer rather than the report's: it stands under both faces, so its rule is the
+   hairline and not the heavier one `.foot` uses to open a section of the report. */
+.colophon {
+  margin-top: 40px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 20px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ink3);
+}
+.colophon nav {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.colophon a {
+  color: var(--ink2);
+  text-decoration: none;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--rule);
+}
+/* The ones beside the signature, which are labels rather than words in a sentence -- except where
+   the label is a name, and `ast-grep` is lowercase wherever it is written. */
+.colophon nav a {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.colophon nav a[data-code="1"] {
+  text-transform: none;
+}
+.colophon a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
 @media (max-width: 820px) {
   .strip {
     grid-template-columns: 1fr 1fr;
@@ -1445,7 +1487,7 @@ tfoot .n {
     justify-content: flex-start;
   }
   .shell {
-    padding: 18px 16px 64px;
+    padding: 18px 16px 24px;
   }
   /* The find box and the view switch get their own line under the heading, and the box takes
      whatever is left of it rather than the 230px it asks for on a desktop. */

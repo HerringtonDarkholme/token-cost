@@ -338,9 +338,8 @@ const EN = {
       <>
         One <code>.jsonl</code> file per session, in one folder per project, under{" "}
         <code>~/.claude/projects/</code> — a dotfile, which is why every file picker hides it until
-        you ask for it by name. Everything you pick is combined into a single report — the breakdown
-        is by what spent the money, not by which folder it was spent in, so pick one project’s
-        folder if that is the bill you want.
+        you ask for it by name. Everything you pick is combined into a single report, so pick one
+        project’s folder if that is the bill you want.
       </>
     ),
     terminal: "Prefer the terminal?",
@@ -359,6 +358,14 @@ const EN = {
     linkBody:
       "The address records which lens and which block you are looking at — never the numbers. " +
       "Whoever opens it gets an empty card and drops their own transcripts in.",
+  },
+
+  /* the page's own footer ---------- The name the page is signed with and the project it links to
+     are not words: they are what those things are called, and the same string in every language. */
+  colophon: {
+    madeBy: (name: React.ReactNode): React.ReactNode => <>Made with ❤️ by {name}</>,
+    source: "Source",
+    book: "My book",
   },
 
   /* the names the engine puts in the tree ---------- Keyed by the English name, which stays in
@@ -657,8 +664,7 @@ const ZH: Dict = {
         每个会话一个 <code>.jsonl</code> 文件，每个项目一个文件夹，都在{" "}
         <code>~/.claude/projects/</code> 下面 ——
         这是个点开头的隐藏目录，所以每个文件选择器都会藏起它，
-        除非你指名要。你选的所有内容会合并成一份报告 ——
-        拆分依据是钱花在了什么上，而不是花在哪个文件夹里，所以如果你只想看某一个项目的账单，就只选那个项目的文件夹。
+        除非你指名要。你选的所有内容会合并成一份报告，所以如果你只想看某一个项目的账单，就只选那个项目的文件夹。
       </>
     ),
     terminal: "更习惯用终端？",
@@ -675,6 +681,11 @@ const ZH: Dict = {
     linkBody:
       "地址栏记录的是你在用哪个视角、在看哪一块 —— 从不记录数字。" +
       "打开它的人看到的是一张空卡片，需要放进他们自己的转录文件。",
+  },
+  colophon: {
+    madeBy: (name) => <>由 {name} 用 ❤️ 做的</>,
+    source: "源码",
+    book: "我的书",
   },
   labels: {
     all: "全部",
@@ -972,8 +983,8 @@ const JA: Dict = {
       <>
         セッションごとに <code>.jsonl</code> ファイルが 1 つ、プロジェクトごとにフォルダが 1 つ、
         <code>~/.claude/projects/</code> の下にあります — ドットファイルなので、名前で指定しない限り
-        どのファイル選択画面でも隠されています。選んだものはすべて 1 つのレポートにまとめられます —
-        内訳はどのフォルダで使ったかではなく何にお金を使ったかで分かれるので、
+        どのファイル選択画面でも隠されています。選んだものはすべて 1
+        つのレポートにまとめられるので、
         特定のプロジェクトの請求が見たいなら、そのプロジェクトのフォルダだけを選んでください。
       </>
     ),
@@ -992,6 +1003,11 @@ const JA: Dict = {
     linkBody:
       "アドレスに記録されるのは、どの視点でどのブロックを見ているかだけです — 数字は決して入りません。" +
       "開いた人には空のカードが表示され、自分のトランスクリプトを渡すことになります。",
+  },
+  colophon: {
+    madeBy: (name) => <>{name} が ❤️ を込めて作りました</>,
+    source: "ソース",
+    book: "私の本",
   },
   labels: {
     all: "全体",
@@ -1299,9 +1315,8 @@ const ES: Dict = {
       <>
         Un archivo <code>.jsonl</code> por sesión, en una carpeta por proyecto, bajo{" "}
         <code>~/.claude/projects/</code> — un dotfile, y por eso todo selector de archivos lo oculta
-        hasta que lo pides por su nombre. Todo lo que elijas se combina en un único informe: el
-        desglose es por en qué se gastó el dinero, no por en qué carpeta se gastó, así que elige la
-        carpeta de un solo proyecto si esa es la factura que quieres.
+        hasta que lo pides por su nombre. Todo lo que elijas se combina en un único informe, así que
+        elige la carpeta de un solo proyecto si esa es la factura que quieres.
       </>
     ),
     terminal: "¿Prefieres la terminal?",
@@ -1320,6 +1335,11 @@ const ES: Dict = {
     linkBody:
       "La dirección registra qué lente y qué bloque estás mirando, nunca los números. Quien lo abra " +
       "verá una tarjeta vacía y soltará sus propias transcripciones.",
+  },
+  colophon: {
+    madeBy: (name) => <>Hecho con ❤️ por {name}</>,
+    source: "Código",
+    book: "Mi libro",
   },
   labels: {
     all: "todo",
@@ -1629,9 +1649,8 @@ const FR: Dict = {
         Un fichier <code>.jsonl</code> par session, un dossier par projet, sous{" "}
         <code>~/.claude/projects/</code> — un dotfile, et c’est pourquoi tout sélecteur de fichiers
         le masque tant que vous ne le demandez pas par son nom. Tout ce que vous choisissez est
-        réuni en un seul rapport : le détail porte sur ce qui a dépensé l’argent, pas sur le dossier
-        où il a été dépensé, donc choisissez le dossier d’un seul projet si c’est cette facture que
-        vous voulez.
+        réuni en un seul rapport, donc choisissez le dossier d’un seul projet si c’est cette facture
+        que vous voulez.
       </>
     ),
     terminal: "Vous préférez le terminal ?",
@@ -1650,6 +1669,11 @@ const FR: Dict = {
     linkBody:
       "L’adresse retient quelle vue et quel bloc vous regardez — jamais les chiffres. Qui l’ouvre " +
       "obtient une carte vide et y dépose ses propres transcriptions.",
+  },
+  colophon: {
+    madeBy: (name) => <>Fait avec ❤️ par {name}</>,
+    source: "Code source",
+    book: "Mon livre",
   },
   labels: {
     all: "tout",
@@ -1957,10 +1981,8 @@ const DE: Dict = {
       <>
         Eine <code>.jsonl</code>-Datei pro Sitzung, ein Ordner pro Projekt, unter{" "}
         <code>~/.claude/projects/</code> — ein Dotfile, weshalb jeder Dateidialog ihn versteckt, bis
-        du ihn beim Namen verlangst. Alles, was du wählst, wird zu einem Bericht zusammengeführt:
-        die Aufschlüsselung erfolgt danach, wofür das Geld ausgegeben wurde, nicht danach, in
-        welchem Ordner — wähle also den Ordner eines einzelnen Projekts, wenn du dessen Rechnung
-        willst.
+        du ihn beim Namen verlangst. Alles, was du wählst, wird zu einem Bericht zusammengeführt —
+        wähle also den Ordner eines einzelnen Projekts, wenn du dessen Rechnung willst.
       </>
     ),
     terminal: "Lieber im Terminal?",
@@ -1979,6 +2001,11 @@ const DE: Dict = {
     linkBody:
       "Die Adresse hält fest, welche Sicht und welchen Block du ansiehst — nie die Zahlen. Wer sie " +
       "öffnet, bekommt eine leere Karte und legt seine eigenen Transkripte hinein.",
+  },
+  colophon: {
+    madeBy: (name) => <>Mit ❤️ gemacht von {name}</>,
+    source: "Quelltext",
+    book: "Mein Buch",
   },
   labels: {
     all: "alles",

@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useRef } from "react"
 import type { Analysis } from "./engine.ts"
 import { ReportContext, useReportCtx } from "./context.ts"
-import { useT, type Word } from "./copy.tsx"
+import { useT, type Dict, type Word } from "./copy.tsx"
 import { money } from "./model.ts"
 import {
   hashFor,
@@ -38,6 +38,53 @@ function useUrlSync(state: ViewState): void {
     window.addEventListener("hashchange", onHash)
     return () => window.removeEventListener("hashchange", onHash)
   }, [])
+}
+
+/** Where the footer points, in the order it reads them. The addresses are the only strings on the
+ *  page that are not the dictionary's to translate. */
+const LINKS: ReadonlyArray<{ href: string; label: (t: Dict) => string; code?: true }> = [
+  { href: "https://github.com/HerringtonDarkholme/token-cost", label: (t) => t.colophon.source },
+  /* A name rather than a label, and one that is lowercase wherever it is written. */
+  { href: "https://ast-grep.github.io/", label: () => "ast-grep", code: true },
+  { href: "https://leanpub.com/ast-grep", label: (t) => t.colophon.book },
+]
+
+/** `noreferrer` for what the page promises rather than out of habit: the address carries the view
+ *  in its hash, and the referrer would hand that to the other end. */
+function Out({
+  href,
+  code,
+  children,
+}: {
+  href: string
+  code?: boolean
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" data-code={code ? 1 : undefined}>
+      {children}
+    </a>
+  )
+}
+
+/** Who made it. Outside both faces and outside the card, because it belongs to the page rather
+ *  than to whatever the card is currently showing. */
+function Colophon(): React.JSX.Element {
+  const t = useT()
+  return (
+    <footer className="colophon">
+      {/* The signature is the link: a name in a sentence says who, and one line down a handle
+          would say it again in a shape nobody reads. */}
+      <span>{t.colophon.madeBy(<Out href="https://x.com/hd_nvim">HerringtonDarkholme</Out>)}</span>
+      <nav>
+        {LINKS.map((l) => (
+          <Out key={l.href} href={l.href} code={l.code}>
+            {l.label(t)}
+          </Out>
+        ))}
+      </nav>
+    </footer>
+  )
 }
 
 /** One face of the heading, set word by word so the words can be told apart. */
@@ -205,6 +252,7 @@ export function Page({
             <Where />
           )}
         </Reveal>
+        <Colophon />
       </div>
     </ReportContext.Provider>
   )
