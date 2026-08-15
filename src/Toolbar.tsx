@@ -7,6 +7,7 @@ import { useId } from "react"
 import { LANGS, useT, type Dict } from "./copy.tsx"
 import type { TtlAssumption } from "./engine.ts"
 import type { Lang } from "./i18n.ts"
+import { transition } from "./Motion.tsx"
 import { Cycle, type SegOption } from "./Seg.tsx"
 import { CopyChartButton, ShareButton } from "./Share.tsx"
 import { setState, useViewState, type ThemeChoice } from "./store.ts"
@@ -150,7 +151,16 @@ function Eye({ off }: { off: boolean }): React.JSX.Element {
  *  contract -- a label that flipped to "Show" would leave a screen reader hearing
  *  "Show, pressed" and no way to tell what that means. The hint is where the flip belongs:
  *  it is a description rather than a name, so it can say what pressing does next, and
- *  `aria-describedby` means it is read out as well as drawn. */
+ *  `aria-describedby` means it is read out as well as drawn.
+ *
+ *  Pressing it is a view transition, because what it changes is spread over the whole page:
+ *  the bill in the header, the four figures in the strip, a number in every panel and every
+ *  row of the table, and the eye in this button. Set between two frames, that is a page that
+ *  flickers and leaves the reader checking what else moved. The page's third transition and
+ *  the plainest of the three: it names nothing and takes the header's standing names away, so
+ *  nothing travels and nothing is stretched -- what is unchanged crosses into itself and is not
+ *  seen to change, and the figures dissolve where they stand. See `data-mask` in the
+ *  stylesheet. */
 function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
   const tip = useId()
   const t = useT()
@@ -162,7 +172,7 @@ function MaskToggle({ on }: { on: boolean }): React.JSX.Element {
         aria-pressed={on}
         aria-label={t.mask.name}
         aria-describedby={tip}
-        onClick={() => setState({ pctOnly: !on })}
+        onClick={() => transition(() => setState({ pctOnly: !on }), { "data-mask": "" })}
       >
         {/* Not translated, and not a word: the dollar sign is the thing being covered up,
             drawn beside the eye that covers it. */}

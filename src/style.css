@@ -727,10 +727,33 @@ button {
   align-items: baseline;
   gap: 10px;
 }
+/* The name, with the group's colour upright beside it. The hue comes down from the component
+   as `--hue`, because the hue is the only part of this the data decides.
+
+   The border and the padding add up to the panel's own 15px of left padding, and the margin
+   pulls that back out into it, so the first letter of the name stays exactly where it was and
+   stays flush with the track below it and the line items under that. A bar that pushed the
+   title right instead would have cost the panel the one vertical edge every other line in it
+   is set against. Widen the bar and the padding gives up the same pixel: 4 + 11, as 3 + 12
+   was.
+
+   Pulled the whole 15px rather than part of it, so the bar sits against the panel's edge with
+   nothing between them. Short of it, the sliver of paper left over read as a misalignment --
+   two vertical lines a few pixels apart, one of them the grid's divider, neither explaining
+   the other.
+
+   `line-height` is stated because the bar's height is the button's line box: left to the font's
+   own default it would be whatever the sans happens to say, and it would say something
+   different in a language set in a different face. 1.25 is a bar that clears the ascenders and
+   stops just under the baseline -- long enough to read as upright, short enough not to reach
+   the figure across from it. */
 .pantop button {
   background: none;
   border: 0;
-  padding: 0 0 2px;
+  border-left: 4px solid var(--hue, currentcolor);
+  padding: 0 0 0 11px;
+  margin-left: -15px;
+  line-height: 1.25;
   cursor: pointer;
   font-size: 14.5px;
   font-weight: 600;
@@ -2001,6 +2024,13 @@ kbd {
   --filter-ease: var(--ease-smooth-out);
   --find-settle: var(--duration-quick);
 
+  /* Covering the dollars. Nothing travels here -- every figure is replaced where it stands by
+     another of a different width -- so this is a cross-fade the length of the filter's move,
+     eased in and out like the text swap it is a page-wide version of rather than out of a
+     position it never leaves. */
+  --mask-dur: var(--duration-fast);
+  --mask-ease: var(--ease-in-out);
+
   /* Bars drawing themselves. `both` on the animation is what holds them at zero through the
      delay, so a bar's first appearance is its own left edge rather than a full-width bar
      waiting to be noticed.
@@ -2540,6 +2570,44 @@ kbd {
 :root[data-filter]::view-transition-new(*) {
   animation-duration: var(--filter-dur);
   animation-timing-function: var(--filter-ease);
+}
+
+/* Covering the dollars, as the page's third view transition and the one that adds no names.
+   ─────────────────────────────────────────────────────────────────────────────
+   The eye in the toolbar rewrites a number in almost every box on the page at once -- the bill
+   becomes four asterisks, the strip's dollars become shares, and every panel and every row of
+   the table trades a per-request figure for a percentage. Landing all of that in one frame is
+   the whole page appearing to flinch, and a reader who has just covered their screen for
+   someone else to see cannot tell from a flinch what was covered.
+
+   So this one is left almost entirely to the root snapshot: what the page holds still is
+   photographed twice, and two identical pictures crossing take nothing across. Only the boxes
+   whose contents actually changed have anything to dissolve, which makes the dissolve itself
+   the answer to where the money went out of the page.
+
+   Nothing new is named, and the header's standing names are taken away for the length of it,
+   which is the whole difference between this and the turn above. A name is a box the browser
+   will travel between two positions, and the header's boxes do move: the caption gains "amount
+   hidden" and gets wider, which widens the column it shares with the figure, which moves that
+   column's left edge. Named, the bill slid sideways on its way to becoming four asterisks --
+   motion the reader has to read and discard, since the figure it is standing in front of never
+   went anywhere. Unnamed, the caption and the figure ride inside the card's own snapshot, which
+   is the same size in both states, and the change happens where it happened.
+
+   The card keeps its name, because that is what makes the header's part of this a cross-fade
+   rather than a repaint: it is one picture the width of the page, dissolving into another that
+   differs only where the numbers are. */
+:root[data-mask] .chead .eyebrow,
+:root[data-mask] .chead h1 [data-w],
+:root[data-mask] .chead .billed,
+:root[data-mask] .chead .total {
+  view-transition-name: none;
+}
+:root[data-mask]::view-transition-group(*),
+:root[data-mask]::view-transition-old(*),
+:root[data-mask]::view-transition-new(*) {
+  animation-duration: var(--mask-dur);
+  animation-timing-function: var(--mask-ease);
 }
 
 /* Controls growing into the toolbar — the five that only mean something once there is a bill.

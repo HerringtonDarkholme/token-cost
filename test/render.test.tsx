@@ -410,6 +410,20 @@ describe("interaction", () => {
     expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(0)
   })
 
+  /* A panel's title carries its group's colour as the bar beside it, and the colour reaches
+     the bar as a custom property the stylesheet reads. That is a wire with nothing on either
+     end to fail loudly: drop the `var()` and every selector still matches, the panel still
+     renders, and the bars come back in ink. `expectClean` catches a token that does not exist;
+     this catches a colour that was never handed over. */
+  it("every panel title carries its group's colour", () => {
+    show({ view: "panels" })
+    const titles = [...container.querySelectorAll<HTMLElement>(".pantop button")]
+    expect(titles.length).toBeGreaterThan(1)
+    for (const b of titles) expect(b.style.getPropertyValue("--hue")).toMatch(/^var\(--c/)
+    // And they are not all the same colour, which is the only thing the bar is there to say.
+    expect(new Set(titles.map((b) => b.style.getPropertyValue("--hue"))).size).toBeGreaterThan(1)
+  })
+
   it("the eye masks the total, and unmasks it again", () => {
     const eye = container.querySelector('button[aria-label="Hide dollar amounts"]')
     const real = container.querySelector(".total")?.textContent

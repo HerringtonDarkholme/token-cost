@@ -51,9 +51,17 @@ const Panel = memo(function Panel({
   return (
     <div className="pan" style={vtName(key)}>
       <div className="pantop">
+        {/* The group's colour, as a bar standing beside the name rather than a rule under it.
+            Underlined, the name read as a link and the colour as its decoration; upright, the
+            colour is a label on the panel and the name is left as a name. The geometry is the
+            stylesheet's -- see `.pantop button`, which hangs the bar out into the panel's own
+            padding so the title stays flush with the bar and the rows beneath it. Handed down
+            as a custom property rather than as the border itself, because only the hue is the
+            data's: a width written here would be a width the padding that offsets it cannot
+            see. */}
         <button
           type="button"
-          style={{ borderBottom: `2px solid ${h}`, opacity: dim ? 0.55 : 1 }}
+          style={{ "--hue": h, opacity: dim ? 0.55 : 1 } as React.CSSProperties}
           onClick={() => drill(panel.name)}
           {...hoverBind({ key, name: panel.name, cost: panel.cost, under: null, group: gname })}
         >
