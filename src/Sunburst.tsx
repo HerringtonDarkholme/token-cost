@@ -15,7 +15,7 @@ import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
 import { labelOf, useT } from "./copy.tsx"
 import { pctOf, sunburst, type SunBranch } from "./model.ts"
-import { hoverBind, setHover, setState, useHover } from "./store.ts"
+import { disarmHover, hoverBind, setState, useHover } from "./store.ts"
 
 /* Ring geometry, in the viewBox's own units: the box is 200 across and centred on the
    origin, so 100 is the outer edge. The hole is wide enough to hold the readout, which is
@@ -25,6 +25,13 @@ const RINGS: Array<[number, number]> = [
   [59, 79],
   [79, 96],
 ]
+
+/** Stem of the mask names, one per sector, suffixed with the sector's place in the ranking.
+ *  A position rather than the branch's own name, which is a line item -- "Tools · content read
+ *  in" is not an XML id. One sunburst is on screen at a time, so the stem needs no more than
+ *  that to be unique, and the PNG carries the whole `<svg>` across with it, so each reference
+ *  still finds its mask inside the picture. */
+const FAN = "sunfan"
 
 const rad = (deg: number): number => ((deg - 90) * Math.PI) / 180
 const pt = (deg: number, r: number): string =>
@@ -47,11 +54,13 @@ function arcPath(a0: number, a1: number, r0: number, r1: number): string {
    arc therefore redraws the branch entered and the branch left, not all nine. */
 const Sector = memo(function Sector({
   branch,
+  at,
   hit,
   anyHover,
   q,
 }: {
   branch: SunBranch
+  at: number
   hit: string | null
   anyHover: boolean
   q: string
@@ -59,46 +68,84 @@ const Sector = memo(function Sector({
   const { pal, amt, drill } = useReport()
   const t = useT()
   const h = pal.hue(branch.group)
+  /* The sector's own sweep, which is the first arc it laid down: `sunburst` walks a branch
+     from its root outward, so `arcs[0]` is the ring-0 wedge every other arc here sits under. */
+  const root = branch.arcs[0]
+  const fan = `${FAN}${at}`
 
   return (
     <g>
-      {branch.arcs.map((a) => {
-        const [r0, r1] = RINGS[a.ring]
-        /* Prose re-billed as input is the one arc the page argues about, so it keeps full
+      {/* This sector's fan, opening across its own width -- see `.sunfan` in the stylesheet.
+          A circle at half the radius stroked at the full width of it, so what the mask paints
+          is a wedge of the disc rather than a ring; `pathLength` restates its length as 360,
+          which puts the dash the stylesheet grows in degrees, the units the arcs are laid out
+          in. Turned to start where this sector starts, and a quarter turn back on top of that,
+          because a circle's own path begins at three o'clock and the ranking begins at twelve.
+
+          `userSpaceOnUse` rather than the default: the mask's region would otherwise be the
+          bounding box of the sector, and a thin sector's box is not the circle this is drawn
+          in. */}
+      <defs>
+        <mask id={fan} maskUnits="userSpaceOnUse" x={-100} y={-100} width={200} height={200}>
+          <circle
+            className="sunfan"
+            r={50}
+            pathLength={360}
+            fill="none"
+            stroke="#fff"
+            strokeWidth={100}
+            transform={`rotate(${(root.a0 - 90).toFixed(3)})`}
+            style={{ "--span": (root.a1 - root.a0).toFixed(3) } as React.CSSProperties}
+          />
+        </mask>
+      </defs>
+      <g mask={`url(#${fan})`}>
+        {branch.arcs.map((a) => {
+          const [r0, r1] = RINGS[a.ring]
+          /* Prose re-billed as input is the one arc the page argues about, so it keeps full
            strength and a dashed edge — the same mark the mosaic gives the same block. */
-        const carry = a.name.includes("re-billed")
-        /* An arc lights up with its own descendants, so hovering a leaf traces the path
+          const carry = a.name.includes("re-billed")
+          /* An arc lights up with its own descendants, so hovering a leaf traces the path
            back to the centre instead of stranding it in a dimmed ring. */
-        const on = hit === a.key || (!!hit && hit.startsWith(a.key + "›"))
-        /* The query dims rather than filters: dropping arcs would leave a circle whose
+          const on = hit === a.key || (!!hit && hit.startsWith(a.key + "›"))
+          /* The query dims rather than filters: dropping arcs would leave a circle whose
            sweeps no longer read as shares of anything. */
-        const miss = !!q && !a.key.toLowerCase().includes(q)
-        const dim = (anyHover && !on) || miss
-        return (
-          <g key={a.key}>
-            <path
-              className="sunarc"
-              data-on={on ? 1 : 0}
-              d={arcPath(a.a0, a.a1, r0, r1)}
-              fill={h}
-              opacity={dim ? 0.24 : on || carry ? 1 : 1 - a.ring * 0.14}
-              onClick={() => drill(branch.name)}
-              {...hoverBind({
-                key: a.key,
-                name: a.name,
-                cost: a.cost,
-                under: a.under,
-                group: branch.group,
-              })}
-            >
-              <title>{`${labelOf(t, a.name)} · ${amt(a.cost)}`}</title>
-            </path>
-            {carry && !on && !dim ? (
-              <path className="suncarry" d={arcPath(a.a0 + 0.6, a.a1 - 0.6, r0 + 1.6, r1 - 1.6)} />
-            ) : null}
-          </g>
-        )
-      })}
+          const miss = !!q && !a.key.toLowerCase().includes(q)
+          const dim = (anyHover && !on) || miss
+          return (
+            /* The wedge and its dashed edge travel together on the arrival -- see `.sunwedge`
+               in the stylesheet, which grows each ring out of the hole a beat after the one
+               inside it. It is the wrapper that moves rather than the arc, so the animation's
+               opacity is a separate thing from the arc's own, which is carrying the dimming
+               below. */
+            <g key={a.key} className="sunwedge" data-ring={a.ring}>
+              <path
+                className="sunarc"
+                data-on={on ? 1 : 0}
+                d={arcPath(a.a0, a.a1, r0, r1)}
+                fill={h}
+                opacity={dim ? 0.24 : on || carry ? 1 : 1 - a.ring * 0.14}
+                onClick={() => drill(branch.name)}
+                {...hoverBind({
+                  key: a.key,
+                  name: a.name,
+                  cost: a.cost,
+                  under: a.under,
+                  group: branch.group,
+                })}
+              >
+                <title>{`${labelOf(t, a.name)} · ${amt(a.cost)}`}</title>
+              </path>
+              {carry && !on && !dim ? (
+                <path
+                  className="suncarry"
+                  d={arcPath(a.a0 + 0.6, a.a1 - 0.6, r0 + 1.6, r1 - 1.6)}
+                />
+              ) : null}
+            </g>
+          )
+        })}
+      </g>
     </g>
   )
 })
@@ -149,7 +196,7 @@ function Core({
           type="button"
           title={t.sun.back}
           onClick={() => {
-            setHover(null)
+            disarmHover()
             setState({ path: state.path.slice(0, -1) })
           }}
         >
@@ -246,10 +293,11 @@ export function Sunburst(): React.JSX.Element {
               highlight. `pointer-events` is spelled out because an unfilled shape is not
               hit-tested, and an arrival nothing can see is an arrival nobody reports. */}
           <rect x={-100} y={-100} width={200} height={200} fill="none" pointerEvents="all" />
-          {branches.map((b) => (
+          {branches.map((b, i) => (
             <Sector
               key={b.name}
               branch={b}
+              at={i}
               q={q}
               anyHover={!!hk}
               hit={hk && (hk === b.key || hk.startsWith(b.key + "›")) ? hk : null}

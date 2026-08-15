@@ -106,6 +106,13 @@ export async function snapshot(el: HTMLElement, scale = SCALE): Promise<Blob> {
   const clone = el.cloneNode(true) as HTMLElement
   for (const gone of Array.from(clone.querySelectorAll(OMIT))) gone.remove()
   flatten(clone)
+  /* The picture is not a performance. The document at the far end of the `data:` URL runs
+     this page's stylesheet from its own beginning of time, so anything that arrives by
+     animation -- the sunburst's rings growing out of the hole -- would be photographed on
+     whichever frame the image loaded on, and a mount animation's first frame is usually
+     nothing at all. The stylesheet turns them off under this attribute; see the block at the
+     end of it. */
+  clone.setAttribute("data-snapshot", "")
   /* Pinned rather than left to re-resolve: the card's height comes from an aspect ratio
      against a width that would otherwise be whatever the foreignObject decided. */
   clone.style.width = `${rect.width}px`

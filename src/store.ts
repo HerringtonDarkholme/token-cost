@@ -126,15 +126,56 @@ export function useHover(): HoverTarget | null {
    margin. Delegation has no such precondition, and the next view to call `hoverBind` cannot
    forget to add its own. */
 
-/** Marks an element as standing for something, and reports it on enter and on focus, so
- *  tabbing through a view gives the same readout the pointer does. */
+/** Whether an arrival is allowed to set the hover at all.
+ *
+ *  A highlight follows a pointer, and a pointer that has not moved has not pointed at
+ *  anything. Switching the chart is the case that made the difference matter: the card is
+ *  16/9 for the mosaic and 4/3 for the sunburst, so the picture changes shape under a pointer
+ *  resting wherever the reader left it -- and the browser, which recomputes what is under the
+ *  cursor whenever the page moves beneath it, reports an arrival at whatever slid into that
+ *  spot. The new chart would then come up with one arbitrary sector lit and the other eight
+ *  dimmed behind it, describing nothing the reader did.
+ *
+ *  So a switch disarms this, and the next real movement of the pointer arms it again. */
+let armed = true
+
+/** Drop the highlight, and stop taking arrivals until the pointer moves. For the changes that
+ *  rearrange the picture rather than move the pointer through it: switching chart or view,
+ *  drilling in, walking back up the breadcrumb. */
+export function disarmHover(): void {
+  armed = false
+  setHover(null)
+}
+
+/** Marks an element as standing for something, and reports it on movement, on enter and on
+ *  focus, so tabbing through a view gives the same readout the pointer does.
+ *
+ *  Movement is what arms the store, and it is bound here rather than on the shell so that the
+ *  same event can arm and report in one step: a pointer that comes to rest on an arc during a
+ *  switch is over something real, and asking it to leave and re-enter before the chart will
+ *  answer would be a chart that ignores the reader. `setHover` drops a repeat of what is
+ *  already showing, so the moves after the first cost a comparison. */
 export function hoverBind(t: HoverTarget): {
+  onMouseMove: () => void
   onMouseEnter: () => void
   onFocus: () => void
   "data-hoversrc": string
 } {
   const on = (): void => setHover(t)
-  return { onMouseEnter: on, onFocus: on, "data-hoversrc": "" }
+  const moved = (): void => {
+    armed = true
+    setHover(t)
+  }
+  return {
+    onMouseMove: moved,
+    onMouseEnter: () => {
+      if (armed) setHover(t)
+    },
+    /* Focus is nobody's accident: it arrives by tab or by click, both of which are the reader
+       saying which thing they mean. It reports whether or not the pointer has moved. */
+    onFocus: on,
+    "data-hoversrc": "",
+  }
 }
 
 /** The other half, spread once on the shell. Closes over nothing, so it is written once
@@ -162,6 +203,12 @@ export const hoverClear: {
 /** Back to a clean slate, keeping the reader's theme and their language: both were chosen for
  *  the session, not for the file. */
 export function resetState(): void {
+  /* Armed again rather than disarmed, which is the opposite of what the changes above do and
+     for the same reason they do it. Those rearrange a picture the pointer is resting in; this
+     one takes the picture away -- the page turns back to the drop zone, and whatever report
+     comes next arrives after the reader has been to a folder picker and back, which is a
+     pointer that has moved. A clean slate is a slate that answers. */
+  armed = true
   setHover(null)
   setState({ ...INITIAL, theme: state.theme, lang: state.lang })
 }

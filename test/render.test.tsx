@@ -211,6 +211,41 @@ describe("interaction", () => {
     expect(container.querySelector(".mosaic")).not.toBeNull()
   })
 
+  /* The switch that made `armed` necessary. The card is 16/9 for the mosaic and 4/3 for the
+     sunburst, so the picture changes shape under a pointer resting wherever the reader left
+     it, and the browser reports an arrival at whatever slid into that spot -- an enter with no
+     move under it. Taken at face value, the chart the reader just asked for comes up with one
+     arbitrary sector lit and the rest dimmed behind it, describing nothing they did. */
+  it("switching the chart lights nothing until the pointer moves", () => {
+    pointerTo(container.querySelector(".hoverbar"), container.querySelector(".colhead"))
+    expect(getHover()).not.toBeNull()
+
+    click(byLabel("button", "Sunburst"))
+    expect(getHover()).toBeNull()
+
+    const arc = container.querySelector("path.sunarc")
+    expect(arc).not.toBeNull()
+    // The page arriving under the pointer: an enter, with nothing having moved.
+    act(() => {
+      arc!.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }))
+    })
+    expect(getHover()).toBeNull()
+    expect(container.querySelectorAll('path.sunarc[data-on="1"]')).toHaveLength(0)
+    expect(container.querySelector('path.sunarc[opacity="0.24"]')).toBeNull()
+    /* The legend is the same store read a second way, so it cannot be the half that lights:
+       one row standing out with the other eight faded is the same false claim in words. */
+    expect(container.querySelectorAll('.legrow[data-on="1"]')).toHaveLength(0)
+    expect(container.querySelector('.legrow[data-dim="1"]')).toBeNull()
+
+    // The pointer itself moving, which is the thing a highlight follows. Answered at once,
+    // without asking it to leave the arc and come back.
+    act(() => {
+      arc!.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }))
+    })
+    expect(getHover()).not.toBeNull()
+    expect(container.querySelectorAll('path.sunarc[data-on="1"]').length).toBeGreaterThan(0)
+  })
+
   it("the sunburst reads from the same hover store, and its legend drills", () => {
     show({ chart: "sun" })
     const g = d.groups.find((x) => (x.items || []).length > 1) || d.groups[0]
@@ -237,13 +272,18 @@ describe("interaction", () => {
   })
 
   /* React synthesises enter/leave from `mouseover`/`mouseout` and their relatedTarget, so
-     that pair is what these dispatch: a bare `mouseleave` would reach no handler at all. */
+     that pair is what these dispatch: a bare `mouseleave` would reach no handler at all.
+     The `mousemove` after them is the third thing a real pointer does and the store now reads
+     -- see `armed` in `store.ts`, which distinguishes a pointer arriving somewhere from a
+     page arriving under a pointer. A helper that only ever crossed boundaries would be
+     modelling the second while claiming to be the first. */
   const pointerTo = (from: Element | null, to: Element | null): void => {
     expect(from).not.toBeNull()
     expect(to).not.toBeNull()
     act(() => {
       from!.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: to }))
       to!.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, relatedTarget: from }))
+      to!.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }))
     })
   }
 

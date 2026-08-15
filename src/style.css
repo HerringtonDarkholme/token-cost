@@ -2018,6 +2018,46 @@ kbd {
   --bar-stagger: var(--duration-stagger);
   --row-stagger: 18ms;
 
+  /* The disc unfurling, which is two movements and one arrival: every sector opening across
+     its own width, and the rings growing out of the hole while they do.
+
+     `--sun-ring-dur` is one ring's leg and `--sun-ring-stagger` is how long the ring outside
+     it waits, and the second is deliberately a third of the first: the rings overlap, each one
+     setting off while the one inside it is still travelling.
+
+     They were tried strictly in turn -- ring 1 starting where ring 0 stopped -- on the theory
+     that a drill-down should be stated a level at a time. It is worse, at every beat length
+     tried. Four legs end to end is four animations queueing however short each one is, and the
+     picture arrives in instalments; overlapped, the same three delays read as one movement
+     that happens to deepen outward, which is what the chart is. The sequence was never the
+     thing carrying the depth -- the *order* is, and an order survives being overlapped.
+
+     A third of the leg is where the three read as three. Much less and they arrive as one
+     swell with no order in it at all; much more and the outer ring is visibly waiting its
+     turn, which is the queue coming back by degrees. The stagger is the one value here with no
+     usage on the scale to point at, because the scale's staggers are for lists where the
+     sequence is texture -- 40ms across nine panels, 18ms down their rows -- and these three
+     beats are most of what the movement says.
+
+     Every sector opens across its own width alongside ring 0, the ring whose width it is, so
+     `--sun-fan-dur` is a leg like the rings' rather than a length of its own -- a touch longer
+     because an angular sweep across a wide sector has further to go than a ring has outward.
+     Every sector opens at once and they all finish together, so what differs between them is
+     the rate rather than the moment: a line item worth a third of the bill crosses 120 degrees
+     in the time a thin one crosses four, which is the same fact the chart states in the
+     picture, said in the arrival. A hand crossing the whole dial instead would have made the
+     ranking a queue, and the tail of the bill something the reader waits through. */
+  --sun-ring-dur: var(--duration-medium);
+  --sun-ring-ease: var(--ease-smooth-out);
+  --sun-ring-stagger: 120ms;
+  --sun-fan-dur: var(--duration-slow);
+  --sun-fan-ease: var(--ease-smooth-out);
+  /* A scale about the centre, so what it sets is how far each ring is from where it belongs:
+     at 0.88 the outer edge travels about eleven units of a 96-unit radius and the innermost
+     ring starts just under the readout, which is where it comes out from. Further would put
+     the first ring across the words in the hole. */
+  --sun-ring-from: 0.88;
+
   /* The intake's two faces. One duration for the crossfade and for the height the box grows
      through, so the note leaving, the list arriving and the box resizing are one movement rather
      than three that end at three different moments. It is read back in `Upload.tsx`, which waits
@@ -2682,4 +2722,122 @@ tbody > tr:nth-child(n + 12) {
   .magbar {
     animation: none !important;
   }
+}
+
+/* The disc unfurling — every sector opening across its own width at once, with the rings
+   growing out of the hole while they do.
+
+   Two movements, because the chart makes two claims and neither one says the other.
+
+   The fans are the claim that these are shares of one turn. Each sector opens from its own
+   start angle, all of them together and all of them finishing together, so the width of a
+   line item is stated as the speed it opens at: the largest crosses a third of the circle in
+   the time the smallest crosses four degrees. Nine sectors, one gesture.
+
+   Which is why they are nine fans rather than one hand going round the dial. A hand makes the
+   ranking a queue -- the biggest line item is drawn while the reader is still looking for the
+   chart, and the tail of the bill is something they wait through -- and it reads as a clock
+   or a progress bar, neither of which this is. The whole point of the picture is that these
+   things are concurrent shares of one bill.
+
+   The growth is the claim about depth. It is the same argument as the bars drawing
+   themselves, made about how far in rather than how far along: this chart answers "how deep
+   does the money go", and the answer is a drill-down -- the line item, then what is inside it,
+   then what is inside that. Ring by ring out of the hole, the picture says which ring is a
+   subdivision of which before a single label is read.
+
+   The rings overlap, and that is a decision that was made twice. Strictly in turn -- ring 1
+   setting off where ring 0 landed -- is the truer diagram of a drill-down and the worse thing
+   to watch: four legs end to end is four animations queueing however short each one is, and a
+   chart that arrives in instalments reads as a page that is slow rather than as a tree with
+   levels. Overlapped, the delays say the same thing in the same order while the disc arrives
+   as one movement. The order is what carries the depth here; the pauses were carrying nothing.
+
+   The two movements compose because they are perpendicular, and they set off together where
+   they meet. The fan is the sector's width, uncovered sideways; the growth is its depth,
+   arriving outward -- so the fan starts with ring 0, the ring whose width it is, and a sector
+   opening and stating its first level is one thing happening.
+
+   The readout leads by a step: the rings are a decomposition of the figure in the middle, so
+   the figure is what they come out of. A total that appeared after its own breakdown would be
+   the sentence backwards.
+
+   The wrapper `<g>` per arc is what moves, not the arc -- see `Sunburst.tsx`. The arc's own
+   `opacity` is already carrying the dimming (hover, query miss) and its ring's fade would be
+   fighting it; on the wrapper the two multiply, which is what they mean.
+
+   Scaled about the centre of the viewBox, which is the centre of the circle: the box is
+   `-100 -100 200 200`, so `transform-box: view-box` and a 50% origin land on the origin --
+   the one point every arc in the chart is measured from. */
+@keyframes t-sun-fan {
+  from {
+    stroke-dasharray: 0 360;
+  }
+}
+@keyframes t-ring-out {
+  from {
+    transform: scale(var(--sun-ring-from));
+    opacity: 0;
+  }
+}
+/* The dash is in degrees, because the circle in the mask declares `pathLength="360"`: a dash
+   as long as this sector's sweep, then a gap as long as the whole turn, so the pattern cannot
+   come round and paint a second wedge somewhere it does not mean. What grows is the dash
+   itself rather than an offset walking it into view -- an offset reveals the *end* of a dash
+   first, which would open every sector against the ranking.
+
+   It rests at the sector's full width, which is the state the mask is in when nothing is
+   animating it: the whole sector, uncovered. That is what the PNG gets, and what a reader who
+   has asked for stillness gets. */
+.sunfan {
+  stroke-dasharray: var(--span) 360;
+  animation: t-sun-fan var(--sun-fan-dur) var(--sun-fan-ease) both;
+  /* One beat in, alongside ring 0: the sector's width and its first ring are one arrival, and
+     a fan that opened before the readout's own beat would be uncovering a wedge with nothing
+     in it yet. */
+  animation-delay: var(--sun-ring-stagger);
+}
+/* Which ring this is, enumerated rather than read off the attribute, for the same reason the
+   panels' ladder is: there are three, and CSS has no arithmetic on an attribute's value. */
+.sunwedge {
+  --ring-i: 0;
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: t-ring-out var(--sun-ring-dur) var(--sun-ring-ease) both;
+  /* The ladder: one step for the readout in front of every ring, and one more per ring. Steps
+     shorter than the leg, so a ring sets off while the one inside it is still moving -- see
+     the token block, where the ratio is the argument. */
+  animation-delay: calc((var(--ring-i) + 1) * var(--sun-ring-stagger));
+}
+.sunwedge[data-ring="1"] {
+  --ring-i: 1;
+}
+.sunwedge[data-ring="2"] {
+  --ring-i: 2;
+}
+.suncore > * {
+  animation: t-ring-out var(--sun-ring-dur) var(--sun-ring-ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sunfan,
+  .sunwedge,
+  .suncore > * {
+    animation: none !important;
+  }
+}
+
+/* And the one place none of the above may run: the PNG.
+   ─────────────────────────────────────────────────────────────────────────────
+   The snapshot hands the browser the card's own markup and this same stylesheet inside an
+   `<img>`, and that document starts its own clock -- a mount animation would be rasterised
+   at whatever frame the image happened to load on, which for anything holding its `from`
+   keyframe through a delay is a chart that is not there yet. The card is drawn as it stands,
+   so inside the clone nothing is standing still on the way to somewhere.
+
+   A blanket rule, like the reduced-motion one it is modelled on, because it is the same
+   claim: this is a still picture. `data-snapshot` is put on the clone by `snapshot()` in
+   `snapshot.ts` and exists nowhere on the live page. */
+[data-snapshot],
+[data-snapshot] * {
+  animation: none !important;
 }

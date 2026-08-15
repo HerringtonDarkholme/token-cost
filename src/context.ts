@@ -15,7 +15,7 @@
 import { createContext, useCallback, useContext, useMemo } from "react"
 import type { Analysis, Dataset } from "./engine.ts"
 import { branches, focusOf, money, palette, type Focus, type Palette } from "./model.ts"
-import { setHover, setState, type ViewState } from "./store.ts"
+import { disarmHover, setState, type ViewState } from "./store.ts"
 
 export interface ReportCtx {
   data: Analysis
@@ -71,7 +71,7 @@ export function useReportCtx(data: Analysis | null, state: ViewState): ReportCtx
     (name: string) => {
       const it = (focus?.node.items || []).find((x) => x.name === name)
       if (!branches(it)) return // nothing to show one level down
-      setHover(null)
+      disarmHover()
       if (!focus?.groupName) setState({ path: [name] })
       else if (state.path.length === 1) setState({ path: [focus.groupName, name] })
     },

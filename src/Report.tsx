@@ -16,7 +16,7 @@ import type { Dataset } from "./engine.ts"
 import { useReport } from "./context.ts"
 import { labelOf, useT, type Dict } from "./copy.tsx"
 import { count, FOLD_MIN, ledger, money, moneyFine, pctOf } from "./model.ts"
-import { setHover, setState, type ViewState } from "./store.ts"
+import { disarmHover, setState, type ViewState } from "./store.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
 import { cssMs, Reveal, transition } from "./Motion.tsx"
 import { HoverBar, Mosaic } from "./Mosaic.tsx"
@@ -37,9 +37,23 @@ const charts = (t: Dict): ReadonlyArray<SegOption<ViewState["chart"]>> => [
 ]
 
 /* Written once rather than closed over per render: a pick is a write to the store, which is a
-   module away, so neither switch needs anything from the component around it. */
-const pickView = (view: ViewState["view"]): void => setState({ view })
-const pickChart = (chart: ViewState["chart"]): void => setState({ chart })
+   module away, so neither switch needs anything from the component around it.
+
+   Both drop the highlight first, and neither lets the next one arrive until the pointer has
+   moved -- see `disarmHover`. A switch replaces the whole picture under a pointer that is
+   resting whereever it was left, so a highlight standing through one describes a block that is
+   no longer there, and the arrival the browser reports when the new picture lands under the
+   cursor describes nothing the reader did. Both are equally true of the legend beside the
+   sunburst, the panels and the table's rows, which is why the rule lives in the store rather
+   than in whichever view happened to notice it first. */
+const pickView = (view: ViewState["view"]): void => {
+  disarmHover()
+  setState({ view })
+}
+const pickChart = (chart: ViewState["chart"]): void => {
+  disarmHover()
+  setState({ chart })
+}
 
 function Crumbs(): React.JSX.Element {
   const { state } = useReport()
@@ -50,7 +64,7 @@ function Crumbs(): React.JSX.Element {
         type="button"
         data-cur={state.path.length ? 0 : 1}
         onClick={() => {
-          setHover(null)
+          disarmHover()
           setState({ path: [] })
         }}
       >
@@ -65,7 +79,7 @@ function Crumbs(): React.JSX.Element {
             type="button"
             data-cur={i === state.path.length - 1 ? 1 : 0}
             onClick={() => {
-              setHover(null)
+              disarmHover()
               setState({ path: state.path.slice(0, i + 1) })
             }}
           >
