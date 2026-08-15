@@ -227,6 +227,37 @@ describe("interaction", () => {
     expect(container.querySelector(".mosaic")).not.toBeNull()
   })
 
+  /* The stylesheet does the turning, but two things it cannot reach have to turn with it: the
+     caption naming both axes, and the gutter, which has to lead in the markup rather than be
+     pulled left by `order` -- a name read before its row should be tabbed to before it too. */
+  it("a phone gets the mosaic on its side, and a caption that says so", () => {
+    const width = (w: number): void =>
+      act(() => {
+        ;(
+          window as unknown as { happyDOM: { setViewport: (v: { width: number }) => void } }
+        ).happyDOM.setViewport({ width: w })
+      })
+    const lay = (): string | null =>
+      container.querySelector(".mosaicwrap")?.getAttribute("data-lay") ?? null
+    const caption = (): string => container.querySelector(".mosaichead .lbl")?.textContent ?? ""
+    const headFirst = (): boolean =>
+      container.querySelector(".col")?.firstElementChild?.className === "colhead"
+
+    expect(lay()).toBe("cols")
+    expect(caption()).toContain("column width = share of bill")
+    expect(headFirst()).toBe(false)
+
+    width(390)
+    expect(lay()).toBe("rows")
+    expect(caption()).toContain("row height = share of bill")
+    expect(headFirst()).toBe(true)
+    expectClean()
+
+    width(1024)
+    expect(lay()).toBe("cols")
+    expect(headFirst()).toBe(false)
+  })
+
   /* The switch that made `armed` necessary. */
   it("switching the chart lights nothing until the pointer moves", () => {
     pointerTo(container.querySelector(".hoverbar"), container.querySelector(".colhead"))

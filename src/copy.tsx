@@ -120,6 +120,9 @@ const EN = {
     breadcrumb: "Breadcrumb",
     all: "all",
     headMosaic: "Every line item · column width = share of bill · block height = share of column",
+    /* The same two claims, for the narrow window where the chart is turned on its side. Both
+       axes swap, so neither half of the sentence survives the rotation. */
+    headMosaicRows: "Every line item · row height = share of bill · block width = share of row",
     headSun: "Every line item · arc = share of the ring inside it · each ring one level deeper",
     /* One line of the card's closing rule, in every language: the sentence that used to sit in
        the middle -- carry cost tracks survival, not size -- is the footnotes' `compact` note
@@ -464,6 +467,7 @@ const ZH: Dict = {
     breadcrumb: "面包屑导航",
     all: "全部",
     headMosaic: "每一条明细 · 列宽＝占账单的比例 · 块高＝占该列的比例",
+    headMosaicRows: "每一条明细 · 行高＝占账单的比例 · 块宽＝占该行的比例",
     headSun: "每一条明细 · 弧长＝占内圈的比例 · 每一圈深入一层",
     hoverIdle: (gen, carry) =>
       `高亮的块＝模型写了一次、花了 ${gen} 的文字，之后又作为输入被重新计费 ${carry}。` +
@@ -768,6 +772,7 @@ const JA: Dict = {
     breadcrumb: "パンくずリスト",
     all: "全体",
     headMosaic: "全項目 · 列幅＝請求に占める割合 · ブロックの高さ＝その列に占める割合",
+    headMosaicRows: "全項目 · 行の高さ＝請求に占める割合 · ブロックの幅＝その行に占める割合",
     headSun: "全項目 · 弧＝内側のリングに占める割合 · リング一つで一階層深く",
     hoverIdle: (gen, carry) =>
       `強調ブロック＝モデルが一度 ${gen} で書いた文章が、入力として ${carry} 分だけ再課金されたもの。` +
@@ -1084,6 +1089,8 @@ const ES: Dict = {
     all: "todo",
     headMosaic:
       "Cada línea · ancho de columna = parte de la factura · alto del bloque = parte de la columna",
+    headMosaicRows:
+      "Cada línea · alto de fila = parte de la factura · ancho del bloque = parte de la fila",
     headSun: "Cada línea · arco = parte del anillo interior · cada anillo, un nivel más",
     hoverIdle: (gen, carry) =>
       `Bloque acentuado = prosa que el modelo escribió una vez por ${gen}, recobrada como entrada por ${carry} más. ` +
@@ -1407,6 +1414,8 @@ const FR: Dict = {
     all: "tout",
     headMosaic:
       "Chaque ligne · largeur de colonne = part de la facture · hauteur de bloc = part de la colonne",
+    headMosaicRows:
+      "Chaque ligne · hauteur de ligne = part de la facture · largeur de bloc = part de la ligne",
     headSun: "Chaque ligne · arc = part de l’anneau intérieur · chaque anneau, un niveau de plus",
     hoverIdle: (gen, carry) =>
       `Bloc accentué = de la prose écrite une fois par le modèle pour ${gen}, refacturée en entrée pour ${carry} de plus. ` +
@@ -1729,6 +1738,8 @@ const DE: Dict = {
     all: "alles",
     headMosaic:
       "Jeder Posten · Spaltenbreite = Anteil an der Rechnung · Blockhöhe = Anteil an der Spalte",
+    headMosaicRows:
+      "Jeder Posten · Zeilenhöhe = Anteil an der Rechnung · Blockbreite = Anteil an der Zeile",
     headSun: "Jeder Posten · Bogen = Anteil am inneren Ring · jeder Ring eine Ebene tiefer",
     hoverIdle: (gen, carry) =>
       `Hervorgehobener Block = Prosa, einmal für ${gen} geschrieben, als Eingabe für weitere ${carry} neu berechnet. ` +

@@ -619,6 +619,64 @@ button {
 .colhead .cum80 {
   color: var(--accent);
 }
+
+/* The same chart, turned on its side.
+   ───────────────────────────────────────────────────────────────────────────── The `min-width`
+   floor above is what keeps a small column legible, and it is also exactly what forces 620px of
+   horizontal scroll onto a phone. Transposed the floor becomes vertical extent, which a phone
+   has: a row per line item, height = share of the bill, blocks running across it, and the name
+   in a gutter down the left. Only the narrowest band, because the one shape rows are worse for
+   is a phone held sideways -- 740px across and 360px tall. Keyed off an attribute rather than a
+   media query so the PNG is taken in the layout it was looking at, and so every rule here
+   outranks its upright twin whatever the source order. */
+.mosaicwrap[data-lay="rows"] {
+  overflow-x: visible;
+  height: auto;
+  min-height: 0;
+}
+[data-lay="rows"] .mosaic {
+  flex-direction: column;
+  min-width: 0;
+  height: auto;
+  /* `min-height` rather than `height`: fifteen folded rows against their own floor need more
+     than this, and a minimum lets the block grow for them while still handing flex a definite
+     size to divide into row heights whenever they fit. */
+  min-height: min(72vh, 560px);
+}
+[data-lay="rows"] .col {
+  flex-direction: row;
+  min-width: 0;
+  min-height: 46px;
+  border-right: 0;
+  border-bottom: 1px solid var(--hair);
+}
+[data-lay="rows"] .colsegs {
+  flex-direction: row;
+}
+[data-lay="rows"] .segb {
+  justify-content: center;
+  min-width: 2px;
+  min-height: 0;
+  border-bottom: 0;
+  border-right: 1px solid var(--panel);
+}
+[data-lay="rows"] .colhead {
+  /* Every pixel here comes off the bar, which is the thing being read -- so the gutter is sized
+     to the widest figure it has to hold rather than to the longest name, and names longer than
+     that are cut. */
+  flex: 0 0 clamp(74px, 22%, 96px);
+  justify-content: center;
+  min-height: 0;
+  padding: 4px 8px 4px 0;
+  overflow: hidden;
+}
+/* Three lines in a row that may be no taller than its floor, so the name is cut rather than
+   wrapped -- a wrap here would push the row past the share it stands for. */
+[data-lay="rows"] .colhead .cn {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  word-break: normal;
+}
 /* Footnote and chart switch share one row on the closing rule, so the switch reads as belonging
    to the card rather than to the mosaic's header. */
 .cardfoot {
@@ -2955,6 +3013,15 @@ tbody > tr:nth-child(n + 12) {
 }
 .colsegs > .segb:nth-child(n + 7) {
   --seg-i: 6;
+}
+/* Transposed, the two claims are the same two and are still made in that order -- so the roles
+   stay where they are and only the direction swaps: rows uncover down the block, blocks fill
+   across each row. */
+[data-lay="rows"] .col {
+  animation-name: t-mos-fill;
+}
+[data-lay="rows"] .segb {
+  animation-name: t-mos-wipe;
 }
 @media (prefers-reduced-motion: reduce) {
   .col,

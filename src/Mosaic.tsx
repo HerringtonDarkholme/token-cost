@@ -5,7 +5,12 @@ import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
 import { isCode, labelOf, nodeName, useT } from "./copy.tsx"
 import { branches, fold, kidsOf, pctOf, type CostNode } from "./model.ts"
-import { hoverBind, useHover } from "./store.ts"
+import { hoverBind, useHover, useNarrow } from "./store.ts"
+
+/** How much of its parent a block has to be worth before its name is written on it. Two numbers
+ *  because the axis changes: 7% of a column is a readable band of a chart that is tall, while 7%
+ *  of a transposed row is fifteen pixels of one that is not. */
+const LABEL_MIN = { cols: 7, rows: 25 }
 
 /** A column's blocks: its children, or one block standing for the column itself when it has no
  *  breakdown. */
@@ -26,6 +31,7 @@ const Column = memo(function Column({
   width,
   hit,
   anyHover,
+  rows,
 }: {
   node: CostNode
   gname: string
@@ -34,6 +40,8 @@ const Column = memo(function Column({
   width: number
   hit: string | null
   anyHover: boolean
+  /** The chart is transposed: this is a row, and its head is a gutter down the left. */
+  rows: boolean
 }): React.JSX.Element {
   const { pal, focus, amt, drill } = useReport()
   const t = useT()
@@ -51,6 +59,75 @@ const Column = memo(function Column({
   /* At the root a column is a group, and a group has a short label for the narrow ones. */
   const short = focus.groupName ? undefined : pal.short(node.name)
 
+  const bar = (
+    <div className="colsegs">
+      {segs.map((s, i) => {
+        const share = s.cost / segTotal,
+          pct = share * 100
+        const segKey = key + "›" + s.name
+        const active = hit === segKey || hit === key
+        const named = pct > (rows ? LABEL_MIN.rows : LABEL_MIN.cols)
+        /* Prose re-billed as input is the one block the page argues about, so it keeps full
+           strength and a dashed edge while the rest of the column ramps down. */
+        const carry = s.name.includes("re-billed")
+        return (
+          <button
+            type="button"
+            key={segKey}
+            className="segb"
+            title={`${nodeName(t, s)} · ${amt(s.cost)}`}
+            onClick={() => drill(node.name)}
+            {...hoverBind({
+              key: segKey,
+              name: s.name,
+              cost: s.cost,
+              under: node.name,
+              group: gname,
+            })}
+            style={{
+              flex: Math.max(share, 0.002),
+              background: h,
+              opacity: active || carry ? 1 : Math.max(0.42, 0.96 - i * 0.075),
+              padding: named ? "4px 6px" : 0,
+              filter: active ? "brightness(1.07)" : undefined,
+              boxShadow: active ? "inset 0 0 0 2px var(--paper)" : undefined,
+              outline: carry && !active ? "2px dashed var(--paper)" : undefined,
+              outlineOffset: carry && !active ? "-4px" : undefined,
+            }}
+          >
+            {named ? (
+              <span className="sl" data-code={isCode(t, s.name, node.name, gname) ? 1 : 0}>
+                {nodeName(t, s)}
+              </span>
+            ) : null}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const head = (
+    <button
+      type="button"
+      className="colhead"
+      onClick={() => drill(node.name)}
+      {...hoverBind({ key, name: node.name, cost: node.cost, under: null, group: gname })}
+    >
+      <span
+        className="cn"
+        data-code={!short && isCode(t, node.name, null, gname) ? 1 : 0}
+        style={{ fontSize: width < 0.08 ? "10.5px" : "11.5px" }}
+      >
+        {short ? labelOf(t, short) : nodeName(t, node)}
+      </span>
+      <span className="cc">{amt(node.cost)}</span>
+      <span className="cp">
+        <span>{(width * 100).toFixed(1)}%</span>
+        <span className={crosses80 ? "cum80" : undefined}>{cum}</span>
+      </span>
+    </button>
+  )
+
   return (
     <div
       className="col"
@@ -58,68 +135,11 @@ const Column = memo(function Column({
       data-flat={branches(node) ? 0 : 1}
       style={{ flex: Math.max(width, 0.012) }}
     >
-      <div className="colsegs">
-        {segs.map((s, i) => {
-          const share = s.cost / segTotal,
-            pct = share * 100
-          const segKey = key + "›" + s.name
-          const active = hit === segKey || hit === key
-          /* Prose re-billed as input is the one block the page argues about, so it keeps full
-             strength and a dashed edge while the rest of the column ramps down. */
-          const carry = s.name.includes("re-billed")
-          return (
-            <button
-              type="button"
-              key={segKey}
-              className="segb"
-              title={`${nodeName(t, s)} · ${amt(s.cost)}`}
-              onClick={() => drill(node.name)}
-              {...hoverBind({
-                key: segKey,
-                name: s.name,
-                cost: s.cost,
-                under: node.name,
-                group: gname,
-              })}
-              style={{
-                flex: Math.max(share, 0.002),
-                background: h,
-                opacity: active || carry ? 1 : Math.max(0.42, 0.96 - i * 0.075),
-                padding: pct > 7 ? "4px 6px" : 0,
-                filter: active ? "brightness(1.07)" : undefined,
-                boxShadow: active ? "inset 0 0 0 2px var(--paper)" : undefined,
-                outline: carry && !active ? "2px dashed var(--paper)" : undefined,
-                outlineOffset: carry && !active ? "-4px" : undefined,
-              }}
-            >
-              {pct > 7 ? (
-                <span className="sl" data-code={isCode(t, s.name, node.name, gname) ? 1 : 0}>
-                  {nodeName(t, s)}
-                </span>
-              ) : null}
-            </button>
-          )
-        })}
-      </div>
-      <button
-        type="button"
-        className="colhead"
-        onClick={() => drill(node.name)}
-        {...hoverBind({ key, name: node.name, cost: node.cost, under: null, group: gname })}
-      >
-        <span
-          className="cn"
-          data-code={!short && isCode(t, node.name, null, gname) ? 1 : 0}
-          style={{ fontSize: width < 0.08 ? "10.5px" : "11.5px" }}
-        >
-          {short ? labelOf(t, short) : nodeName(t, node)}
-        </span>
-        <span className="cc">{amt(node.cost)}</span>
-        <span className="cp">
-          <span>{(width * 100).toFixed(1)}%</span>
-          <span className={crosses80 ? "cum80" : undefined}>{cum}</span>
-        </span>
-      </button>
+      {/* Swapped in the markup rather than with `order`, because the gutter really is read
+          before the row it names -- and `order` would have left it after in the tab order. */}
+      {rows ? head : null}
+      {bar}
+      {rows ? null : head}
     </div>
   )
 })
@@ -129,6 +149,9 @@ export function Mosaic(): React.JSX.Element {
   const hover = useHover()
   const hk = hover?.key ?? null
   const rootCost = focus.node.cost || 1
+  /* Where the chart turns on its side -- see `[data-lay]` in the stylesheet for what that costs
+     and what it buys. */
+  const rows = useNarrow()
 
   /* Memoised so the folded nodes keep their identity when only the hover moved -- otherwise
      every column would get a fresh `node` prop and the memo above would never hit. */
@@ -140,7 +163,7 @@ export function Mosaic(): React.JSX.Element {
 
   let run = 0
   return (
-    <div className="mosaicwrap">
+    <div className="mosaicwrap" data-lay={rows ? "rows" : "cols"}>
       <div className="mosaic">
         {cols.map((n) => {
           const cumFrom = pctOf(run, rootCost)
@@ -156,6 +179,7 @@ export function Mosaic(): React.JSX.Element {
               width={n.cost / colTotal}
               hit={hk && (hk === key || hk.startsWith(key + "›")) ? hk : null}
               anyHover={!!hk}
+              rows={rows}
             />
           )
         })}

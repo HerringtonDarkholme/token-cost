@@ -282,7 +282,13 @@ export function CardBody(): React.JSX.Element {
     <>
       <Strip only={narrow ? "thesis" : undefined} />
       <div className="mosaichead">
-        <span className="lbl">{state.chart === "sun" ? t.chart.headSun : t.chart.headMosaic}</span>
+        <span className="lbl">
+          {state.chart === "sun"
+            ? t.chart.headSun
+            : narrow
+              ? t.chart.headMosaicRows
+              : t.chart.headMosaic}
+        </span>
         <Crumbs />
       </div>
       {/* Keyed on the chart, so the picture the switch asks for arrives rather than
