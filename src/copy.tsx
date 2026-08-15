@@ -245,21 +245,22 @@ const EN = {
   /* the empty card */
   intake: {
     heading: (folder: React.ReactNode): React.ReactNode => <>Drop your {folder} folder here</>,
-    /** What the heading says where there is nothing to drop: the example is the whole of what a
-     *  phone can do, so it says so, and says where the rest of it is. */
-    headingTouch: "Try it here, then open it on your desktop",
-    lede: "Chart your bill: every tool, every subcommand, every dollar.",
+    /** What the heading says on a device that probably cannot reach the folder: the two-step,
+     *  since the example is here and the real thing is where the transcripts are. */
+    headingTouch: "Try it here, open it on your dev machine",
+    lede: "Chart your AI bill: every tool, every subcommand, every dollar.",
     choose: "Choose folder",
     /** The other way in, for a reader with no `~/.claude` to point at -- a phone, or a machine
      *  Claude Code has never run on. */
     example: "Try an example",
     hidden: "The folder is hidden",
-    /** The help a phone gets in place of the keystrokes. */
+    /** The help a phone gets in place of the keystrokes. Where the folder is and what to do about
+     *  it -- not a claim about what this device has, which the page cannot see. */
     yours: "Your own transcripts",
     yoursBody: (
       <>
-        They sit in <code>~/.claude/projects</code>, on the machine Claude Code runs on — there is
-        nothing here for a phone to point at.
+        They sit in <code>~/.claude/projects</code> on the machine you run Claude Code on. Open this
+        page there to read yours.
       </>
     ),
     osTip: (current: string, next: string): string =>
@@ -575,16 +576,16 @@ const ZH: Dict = {
   },
   intake: {
     heading: (folder) => <>把你的 {folder} 文件夹拖到这里</>,
-    headingTouch: "先在手机上看看，真数据请用电脑打开",
-    lede: "把账单画出来：每个工具、每条子命令、每一块钱。",
+    headingTouch: "先在这里试试，真数据请在开发机上打开",
+    lede: "把 AI 账单画出来：每个工具、每条子命令、每一块钱。",
     choose: "选择文件夹",
     example: "查看示例",
     hidden: "这个文件夹是隐藏的",
     yours: "你自己的记录",
     yoursBody: (
       <>
-        它们在运行 Claude Code 的那台电脑的 <code>~/.claude/projects</code>{" "}
-        里，手机上没有可以指向的文件夹。
+        它们在你运行 Claude Code 的那台机器的 <code>~/.claude/projects</code>{" "}
+        里。在那台机器上打开本页即可读取。
       </>
     ),
     osTip: (current, next) => `不是 ${current}？点一下切到 ${next} 的说明。`,
@@ -894,8 +895,8 @@ const JA: Dict = {
   },
   intake: {
     heading: (folder) => <>{folder} フォルダをここにドロップ</>,
-    headingTouch: "ここで試して、自分のデータはパソコンで",
-    lede: "請求を図にする：すべてのツール、すべてのサブコマンド、すべてのドル。",
+    headingTouch: "ここで試して、自分のデータは開発マシンで",
+    lede: "AI の請求を図にする：すべてのツール、すべてのサブコマンド、すべてのドル。",
     choose: "フォルダを選ぶ",
     example: "サンプルを見る",
     hidden: "このフォルダは隠されています",
@@ -903,7 +904,7 @@ const JA: Dict = {
     yoursBody: (
       <>
         Claude Code を動かしているマシンの <code>~/.claude/projects</code>{" "}
-        にあります。スマートフォンには指定できるフォルダがありません。
+        にあります。そのマシンでこのページを開いてください。
       </>
     ),
     osTip: (current, next) => `${current} ではない？押すと ${next} の手順に切り替わります。`,
@@ -1224,16 +1225,16 @@ const ES: Dict = {
   },
   intake: {
     heading: (folder) => <>Suelta aquí tu carpeta {folder}</>,
-    headingTouch: "Pruébalo aquí y ábrelo en tu ordenador",
-    lede: "Grafica tu factura: cada herramienta, cada subcomando, cada dólar.",
+    headingTouch: "Pruébalo aquí, ábrelo en tu máquina de trabajo",
+    lede: "Grafica tu factura de IA: cada herramienta, cada subcomando, cada dólar.",
     choose: "Elegir carpeta",
     example: "Ver un ejemplo",
     hidden: "La carpeta está oculta",
     yours: "Tus propias transcripciones",
     yoursBody: (
       <>
-        Están en <code>~/.claude/projects</code>, en la máquina donde corre Claude Code: aquí no hay
-        ninguna carpeta que un teléfono pueda señalar.
+        Están en <code>~/.claude/projects</code>, en la máquina donde ejecutas Claude Code. Abre
+        esta página allí para leerlas.
       </>
     ),
     osTip: (current, next) => `¿No usas ${current}? Pulsa para la ruta de ${next}.`,
@@ -1557,16 +1558,16 @@ const FR: Dict = {
   },
   intake: {
     heading: (folder) => <>Déposez ici votre dossier {folder}</>,
-    headingTouch: "Essayez ici, puis ouvrez la page sur votre ordinateur",
-    lede: "Cartographiez votre facture : chaque outil, chaque sous-commande, chaque dollar.",
+    headingTouch: "Essayez ici, ouvrez la page sur votre machine de dev",
+    lede: "Cartographiez votre facture d’IA : chaque outil, chaque sous-commande, chaque dollar.",
     choose: "Choisir un dossier",
     example: "Voir un exemple",
     hidden: "Le dossier est masqué",
     yours: "Vos propres transcriptions",
     yoursBody: (
       <>
-        Elles sont dans <code>~/.claude/projects</code>, sur la machine où tourne Claude Code : un
-        téléphone n’a ici aucun dossier à désigner.
+        Elles sont dans <code>~/.claude/projects</code>, sur la machine où vous lancez Claude Code.
+        Ouvrez cette page là-bas pour les lire.
       </>
     ),
     osTip: (current, next) => `Pas ${current} ? Appuyez pour la marche à suivre ${next}.`,
@@ -1889,16 +1890,16 @@ const DE: Dict = {
   },
   intake: {
     heading: (folder) => <>Lege deinen Ordner {folder} hier ab</>,
-    headingTouch: "Hier ausprobieren, deine echten Daten am Rechner",
-    lede: "Zeichne deine Rechnung: jedes Tool, jedes Unterkommando, jeden Dollar.",
+    headingTouch: "Hier ausprobieren, am Entwicklungsrechner öffnen",
+    lede: "Zeichne deine KI-Rechnung: jedes Tool, jedes Unterkommando, jeden Dollar.",
     choose: "Ordner wählen",
     example: "Beispiel ansehen",
     hidden: "Der Ordner ist versteckt",
     yours: "Deine eigenen Transkripte",
     yoursBody: (
       <>
-        Sie liegen in <code>~/.claude/projects</code>, auf dem Rechner, auf dem Claude Code läuft —
-        ein Telefon hat hier keinen Ordner, auf den es zeigen könnte.
+        Sie liegen in <code>~/.claude/projects</code>, auf dem Rechner, auf dem du Claude Code
+        ausführst. Öffne diese Seite dort, um sie zu lesen.
       </>
     ),
     osTip: (current, next) => `Nicht ${current}? Drücken für den Weg unter ${next}.`,

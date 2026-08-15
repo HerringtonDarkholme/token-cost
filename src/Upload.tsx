@@ -125,9 +125,10 @@ function guessOs(): Os {
   return "linux"
 }
 
-/** A reader with no `~/.claude` to point at. Touch as the *only* pointer is what says phone or
- *  tablet rather than a laptop with a touchscreen, which has a mouse and a real folder both.
- *  Taken once: pointer hardware does not change under a reader the way an orientation does. */
+/** A reader who is probably not at the machine they run Claude Code on. Touch as the *only*
+ *  pointer is what says phone or tablet rather than a laptop with a touchscreen -- a guess about
+ *  the device, which is all the page has: it cannot see whether a `~/.claude` is there. Taken
+ *  once, because pointer hardware does not change under a reader the way an orientation does. */
 const HANDHELD: boolean =
   typeof matchMedia === "function" &&
   matchMedia("(pointer: coarse)").matches &&
@@ -585,8 +586,8 @@ export function Intake({
             one folder is a single pick that catches everything under it. Loose files dragged in
             still work -- the filter above does not care how they arrived -- there is just no
             longer a button that recommends it. */}
-        {/* Nothing to drop on a phone, and no folder under it to drop: there the heading is the
-            two-step instead -- have a look here, come back at the machine that has the folder. */}
+        {/* Where a folder is unlikely to be droppable, the heading is the two-step instead: have a
+            look here, come back at the machine that has the folder. */}
         <h2>
           {HANDHELD ? t.intake.headingTouch : t.intake.heading(<code>~/.claude/projects</code>)}
         </h2>
@@ -640,7 +641,7 @@ export function Intake({
                 the folder is hidden is in the help below the card; what a reader stuck at a
                 dialog needs is the keystrokes. */}
             {/* On a phone the same slot says where the reader's own transcripts are instead:
-                keystrokes for a dialog are no use to someone with no dialog and no folder. */}
+                keystrokes for a file dialog are no use until they are at the machine. */}
             <div className="howhead">
               <span className="howlbl">{HANDHELD ? t.intake.yours : t.intake.hidden}</span>
               {HANDHELD ? null : <OsSwitch os={os} onPick={setOs} />}
