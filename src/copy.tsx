@@ -25,6 +25,7 @@
    palette, and they travel in the shared link -- and are translated on the way to the screen.
    See `labelOf`. */
 
+import { GROUPS } from "./engine.ts"
 import { LANGS, type Lang } from "./i18n.ts"
 import type { CostNode } from "./model.ts"
 import { useViewState } from "./store.ts"
@@ -171,7 +172,11 @@ const EN = {
     foldedNote: "the folded tail · shown whole, listed in the table",
     itemsNote: (n: number): string => `${n} item${n === 1 ? "" : "s"}`,
     leafNote: "single line item · no further breakdown",
-    ofLabel: (share: string, label: string): string => `${share} of ${label}`,
+    ofLabel: (share: React.ReactNode, label: string): React.ReactNode => (
+      <>
+        {share} of {label}
+      </>
+    ),
   },
 
   /* ---------- panels ---------- */
@@ -506,7 +511,11 @@ const ZH: Dict = {
     foldedNote: "折叠起来的长尾 · 数额完整，表格里逐条列出",
     itemsNote: (n) => `${n} 项`,
     leafNote: "单条明细 · 没有更细的拆分",
-    ofLabel: (share, label) => `占${label} ${share}`,
+    ofLabel: (share, label) => (
+      <>
+        占{label} {share}
+      </>
+    ),
   },
   panels: {
     leaf: "单条明细 · 没有更细的拆分",
@@ -807,7 +816,11 @@ const JA: Dict = {
     foldedNote: "折りたたまれた末尾 · 金額はそのまま、テーブルに一覧",
     itemsNote: (n) => `${n} 件`,
     leafNote: "単一項目 · これ以上の内訳なし",
-    ofLabel: (share, label) => `${label}の ${share}`,
+    ofLabel: (share, label) => (
+      <>
+        {label}の {share}
+      </>
+    ),
   },
   panels: {
     leaf: "単一項目 · これ以上の内訳なし",
@@ -1115,7 +1128,11 @@ const ES: Dict = {
     foldedNote: "la cola plegada · íntegra, detallada en la tabla",
     itemsNote: (n) => `${n} elemento${n === 1 ? "" : "s"}`,
     leafNote: "línea única · sin más desglose",
-    ofLabel: (share, label) => `${share} de ${label}`,
+    ofLabel: (share, label) => (
+      <>
+        {share} de {label}
+      </>
+    ),
   },
   panels: {
     leaf: "línea única · sin más desglose",
@@ -1430,7 +1447,11 @@ const FR: Dict = {
     foldedNote: "la queue repliée · intégrale, détaillée dans le tableau",
     itemsNote: (n) => `${n} élément${n === 1 ? "" : "s"}`,
     leafNote: "ligne unique · pas de détail supplémentaire",
-    ofLabel: (share, label) => `${share} de ${label}`,
+    ofLabel: (share, label) => (
+      <>
+        {share} de {label}
+      </>
+    ),
   },
   panels: {
     leaf: "ligne unique · pas de détail supplémentaire",
@@ -1744,7 +1765,11 @@ const DE: Dict = {
     foldedNote: "der eingeklappte Rest · vollständig, in der Tabelle aufgeführt",
     itemsNote: (n) => `${n} Eintr${n === 1 ? "ag" : "äge"}`,
     leafNote: "einzelner Posten · keine weitere Aufschlüsselung",
-    ofLabel: (share, label) => `${share} von ${label}`,
+    ofLabel: (share, label) => (
+      <>
+        {share} von {label}
+      </>
+    ),
   },
   panels: {
     leaf: "einzelner Posten · keine weitere Aufschlüsselung",
@@ -2002,4 +2027,24 @@ export function labelOf(t: Dict, name: string): string {
  *  count as well as a word, and the count is the node's rather than the dictionary's. */
 export function nodeName(t: Dict, n: CostNode): string {
   return n.folded ? t.folded(n.foldCount ?? 0) : labelOf(t, n.name)
+}
+
+/** The group whose rows are programs rather than tools. */
+const SHELL = GROUPS.find((g) => g.id === "shell")?.name
+
+/** Whether a name is text off the reader's own machine -- `git status`, `*.ts`, a path -- and
+ *  so is set as code rather than as prose.
+ *
+ *  Structural, not guessed from the string. `under` is whatever this row hangs beneath, which
+ *  every view already tracks for the hover; where that is the group itself the row is a line
+ *  item -- a tool, or a program -- and only the shell group's are the reader's own. Anything
+ *  below a line item is theirs whatever the group: the command under `git`, the path under
+ *  `Read`. A row hanging under its own name is neither -- it is a leaf drawn as its own only
+ *  child, which the mosaic does to every column that does not branch -- so it answers with
+ *  whatever its parent would. The dictionary keeps the last word, because `(no path parsed)`
+ *  and the folded tail are sentences of ours sitting at that same depth. */
+export function isCode(t: Dict, name: string, under: string | null, group: string): boolean {
+  if (t.labels[name] !== undefined) return false
+  if (under !== null && under !== group && under !== name) return true
+  return group === SHELL
 }

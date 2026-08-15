@@ -13,7 +13,8 @@
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
-import { labelOf, useT } from "./copy.tsx"
+import { isCode, labelOf, useT } from "./copy.tsx"
+import { Figure, TextCross } from "./Motion.tsx"
 import { pctOf, sunburst, type SunBranch } from "./model.ts"
 import { disarmHover, hoverBind, setState, useHover } from "./store.ts"
 
@@ -151,7 +152,11 @@ const Sector = memo(function Sector({
 })
 
 /** The hole. It is the readout — hovered line item, its amount, its share — and falls back
- *  to the focused total, which is the number the ring around it adds up to. */
+ *  to the focused total, which is the number the ring around it adds up to.
+ *
+ *  All three lines change every time the pointer crosses an arc, so all three are given the
+ *  page's own primitives rather than cutting: the figure rolls between the amounts, the words
+ *  around it crossfade. See `Figure` and `TextCross` in `Motion.tsx`. */
 function Core({
   rootCost,
   label,
@@ -161,30 +166,53 @@ function Core({
   label: string
   kids: number
 }): React.JSX.Element {
-  const { state, amt } = useReport()
+  const { state, focus, amt } = useReport()
   const t = useT()
   const h = useHover()
   const up = state.path.length > 0
   const pct = pctOf(h?.cost ?? 0, rootCost)
 
-  const inner = h ? (
+  /* What each line stands for, as an identifier rather than as the words -- a token built out
+     of translated copy would fade on a language change. The eyebrow names the group, so it
+     holds still across the rings inside one sector; the line below names the arc. */
+  const kAt = h ? "h›" + (h.under ? h.under : h.group) : "r›" + focus.node.name
+  const sAt = h ? "h›" + h.key : "r›" + focus.node.name
+  /* The amount twice over: a number for the rolling digits, text for the state that is not one.
+     Only one is ever rendered; see `Figure`. */
+  const cost = h ? h.cost : rootCost
+  const pctText = pct.toFixed(pct < 1 ? 2 : 1) + "%"
+
+  const inner = (
     <>
-      <span className="k">{labelOf(t, h.under ? h.under : h.group)}</span>
-      <span className="v">{amt(h.cost)}</span>
-      <span className="s">
-        {labelOf(t, h.name)}
-        <br />
-        <span className="dim">{t.sun.ofLabel(pct.toFixed(pct < 1 ? 2 : 1) + "%", label)}</span>
+      <span className="k">
+        <TextCross token={kAt}>{h ? labelOf(t, h.under ? h.under : h.group) : label}</TextCross>
       </span>
-    </>
-  ) : (
-    <>
-      <span className="k">{label}</span>
-      <span className="v">{amt(rootCost)}</span>
+      <Figure className="v" value={state.pctOnly ? null : cost} text={amt(cost)} />
       <span className="s">
-        {t.sun.lineItems(kids)}
-        <br />
-        <span className="dim">{up ? t.sun.goBack : t.sun.drillIn}</span>
+        <TextCross token={sAt}>
+          {h ? (
+            <span data-code={isCode(t, h.name, h.under, h.group) ? 1 : 0}>
+              {labelOf(t, h.name)}
+            </span>
+          ) : (
+            t.sun.lineItems(kids)
+          )}
+        </TextCross>
+        {/* Only the share crosses. The next arc's line is the same sentence with a different
+            number in it, and fading four identical words out and back in says nothing -- so
+            the words stay put and travel to wherever the arriving figure leaves them. */}
+        <span className="dim">
+          {h
+            ? t.sun.ofLabel(
+                <TextCross inline token={"p›" + pctText}>
+                  {pctText}
+                </TextCross>,
+                label,
+              )
+            : up
+              ? t.sun.goBack
+              : t.sun.drillIn}
+        </span>
       </span>
     </>
   )
@@ -252,7 +280,12 @@ const LegRow = memo(function LegRow({
       })}
     >
       <span className="sw" style={{ background: hue }} />
-      <button type="button" data-folded={branch.folded ? 1 : 0} onClick={() => drill(branch.name)}>
+      <button
+        type="button"
+        data-folded={branch.folded ? 1 : 0}
+        data-code={isCode(t, branch.name, null, branch.group) ? 1 : 0}
+        onClick={() => drill(branch.name)}
+      >
         {labelOf(t, branch.name)}
       </button>
       <span className="note">{note}</span>

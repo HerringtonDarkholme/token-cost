@@ -4,7 +4,7 @@
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
-import { labelOf, nodeName, useT } from "./copy.tsx"
+import { isCode, labelOf, nodeName, useT } from "./copy.tsx"
 import { branches, fold, kidsOf, pctOf, type CostNode } from "./model.ts"
 import { hoverBind, useHover } from "./store.ts"
 
@@ -97,7 +97,11 @@ const Column = memo(function Column({
                 outlineOffset: carry && !active ? "-4px" : undefined,
               }}
             >
-              {pct > 7 ? <span className="sl">{nodeName(t, s)}</span> : null}
+              {pct > 7 ? (
+                <span className="sl" data-code={isCode(t, s.name, node.name, gname) ? 1 : 0}>
+                  {nodeName(t, s)}
+                </span>
+              ) : null}
             </button>
           )
         })}
@@ -108,7 +112,11 @@ const Column = memo(function Column({
         onClick={() => drill(node.name)}
         {...hoverBind({ key, name: node.name, cost: node.cost, under: null, group: gname })}
       >
-        <span className="cn" style={{ fontSize: width < 0.08 ? "10.5px" : "11.5px" }}>
+        <span
+          className="cn"
+          data-code={!short && isCode(t, node.name, null, gname) ? 1 : 0}
+          style={{ fontSize: width < 0.08 ? "10.5px" : "11.5px" }}
+        >
           {short ? labelOf(t, short) : nodeName(t, node)}
         </span>
         <span className="cc">{amt(node.cost)}</span>

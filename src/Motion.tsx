@@ -13,6 +13,12 @@ import NumberFlow, { useIsSupported, type Format } from "@number-flow/react"
 import { tagOf } from "./i18n.ts"
 import { useViewState } from "./store.ts"
 
+/** A custom property off the document root, or `fallback` where the stylesheet has not
+ *  loaded -- which is every test run, since the suites mount into a bare DOM. */
+export function cssVal(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+}
+
 /** A duration from the stylesheet, in milliseconds. `parseFloat` is enough because every
  *  duration on the scale is written in `ms`. */
 export function cssMs(name: string, fallback: number): number {
@@ -239,6 +245,92 @@ export function useCountingUp(source: React.RefObject<number>, watch: boolean): 
  *  stay in step with the CSS that draws them. */
 function swapMs(): number {
   return cssMs("--text-swap-dur", 150)
+}
+
+/** Copy that crossfades: the arriving line fades up while the departing one is still fading
+ *  out, rather than after it.
+ *
+ *  `TextSwap` below is the other shape -- exit, *then* enter -- and the empty beat between its
+ *  legs is part of what it says: something happened, and the slot was cleared for the news.
+ *  Under a pointer that beat is just a hole, punched into the readout on every arc the cursor
+ *  crosses. So the legs overlap here, at the price of both lines being on screen at once.
+ *
+ *  Animations rather than transitions, since a transition needs a painted starting state and a
+ *  line that has only just mounted has never been painted. The `key` is what runs them.
+ *
+ *  `inline` is for a crossfade with a sentence around it -- the share in "2.7% of the bill",
+ *  which is the only part of that line with any news in it. The words after it are the same
+ *  words either way, so they should travel to where the new figure leaves them rather than
+ *  cutting there, and the way to carry them is to interpolate the box: the ghost is out of
+ *  flow, so the box would otherwise snap to the arriving figure's width in one frame. */
+export function TextCross({
+  token,
+  inline,
+  children,
+}: {
+  token: string
+  inline?: boolean
+  children: ReactNode
+}): React.JSX.Element {
+  const { lang } = useViewState()
+  const [shown, setShown] = useState<{ token: string; body: ReactNode }>({ token, body: children })
+  const [gone, setGone] = useState<{ token: string; body: ReactNode } | null>(null)
+
+  /* A language change rewrites the words without moving any caller's token, and that is a
+     replacement rather than a crossfade -- see `TextSwap` below, which explains why. */
+  const drawn = useRef(lang)
+  if (drawn.current !== lang) {
+    drawn.current = lang
+    setShown({ token: shown.token, body: children })
+    setGone(null)
+  }
+
+  /* During the render, so the new words are in the commit: nothing is held back here, which is
+     also what makes this safe inside a capture without the check `TextSwap` needs. */
+  if (token !== shown.token) {
+    setGone(shown)
+    setShown({ token, body: children })
+  }
+
+  useEffect(() => {
+    if (!gone) return
+    const t = setTimeout(() => setGone(null), swapMs())
+    return () => clearTimeout(t)
+  }, [gone])
+
+  /* Measured on every commit rather than keyed on the token, because what has to travel is the
+     *layout*, and the box can be resized by copy that never changed -- a font arriving, the
+     card being dragged narrower. Read before paint and animated from the width it had, so the
+     line beside it is pushed across the gap over the same beat the figure fades in. */
+  const box = useRef<HTMLSpanElement>(null)
+  const wide = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const node = box.current
+    if (!inline || !node) return
+    const now = node.getBoundingClientRect().width
+    const was = wide.current
+    wide.current = now
+    if (was === null || Math.abs(was - now) < 0.5 || reduced()) return
+    node.animate([{ width: `${was}px` }, { width: `${now}px` }], {
+      duration: swapMs(),
+      easing: cssVal("--text-swap-ease", "ease-in-out"),
+    })
+  })
+
+  return (
+    <span ref={box} className="t-text-cross" data-inline={inline ? 1 : undefined}>
+      {/* `data-nosnap` because the PNG freezes every animation, and a ghost held at full
+          strength would print both lines on top of each other. */}
+      {gone ? (
+        <span key={gone.token} className="leg" data-gone="1" data-nosnap>
+          {gone.body}
+        </span>
+      ) : null}
+      <span key={shown.token} className="leg">
+        {shown.body}
+      </span>
+    </span>
+  )
 }
 
 /** Copy that says what just happened -- "Copy chart" becoming "Rendering…" becoming "Chart

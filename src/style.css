@@ -115,6 +115,12 @@ button {
 .hidden {
   display: none !important;
 }
+/* A name that came off the reader's machine rather than out of the dictionary -- `git status`,
+   `*.ts`, a path. Which names those are is `isCode` in `copy.tsx`; every view marks them the
+   same way, so the answer looks the same in the table as it does in the sunburst's hole. */
+[data-code="1"] {
+  font-family: var(--mono);
+}
 /* Positioned, and above what follows it. Its hints hang below the bar, which is where the card
    starts -- and the card is a positioned element further down the document, so with both at the
    same level the later one wins and the hint is painted underneath it. A stacking context here
@@ -920,9 +926,10 @@ button {
 /* The hole's type is sized off the chart, not the viewport: the disc takes its size from
    whatever the card has left, so a readout fixed in px is either lost in it or spilling out
    of it. Each rule keeps a px fallback first for anything without container queries. */
+/* The eyebrow is ours -- a tool, a group -- so it is set in the page's own face, and the mono
+   is spent on the line below it, which is usually a path or a command. */
 .suncore .k {
   max-width: 92%;
-  font-family: var(--mono);
   font-size: 9.5px;
   font-size: clamp(9px, 1.9cqw, 15px);
   letter-spacing: 0.12em;
@@ -950,7 +957,14 @@ button {
   text-wrap: balance;
 }
 .suncore .s .dim {
+  display: block;
   color: var(--ink3);
+}
+/* The name crossfades, which puts a box between the line's own rules and its words -- so the
+   eyebrow's trim has to move onto the box that holds them. */
+.suncore .k .leg {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sunlegend {
   flex: 1 1 auto;
@@ -2280,6 +2294,69 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .t-text-swap {
     transition: none !important;
+  }
+}
+
+/* Text states crossfade — the sunburst's readout, whose copy changes under the pointer
+   rather than because something happened. Both legs run at once, so the slot is never
+   empty; the one on its way out leaves the flow, so the box is sized by the line arriving. */
+.t-text-cross {
+  display: block;
+  position: relative;
+}
+/* The variant that sits inside a sentence: `inline-block`, so the box has a width to
+   interpolate and the words after it are carried along by it.
+
+   The clip goes on the ghost rather than on the box around it, which is the whole reason the
+   figure sits on the same baseline as the sentence: an inline-block that hides its overflow
+   is baselined off its bottom edge instead of off the text inside it, and `2.7%` would ride
+   a descender high. The ghost keeps the width it was written at, so left unclipped a figure
+   shrinking would reach across the words it is handing over to. */
+.t-text-cross[data-inline] {
+  display: inline-block;
+}
+.t-text-cross[data-inline] > .leg {
+  white-space: nowrap;
+}
+.t-text-cross[data-inline] > .leg[data-gone] {
+  overflow: hidden;
+}
+.t-text-cross > .leg {
+  display: block;
+  animation: t-text-cross-in var(--text-swap-dur) var(--text-swap-ease) both;
+}
+.t-text-cross > .leg[data-gone] {
+  position: absolute;
+  inset: 0;
+  animation-name: t-text-cross-out;
+}
+@keyframes t-text-cross-in {
+  from {
+    opacity: 0;
+    filter: blur(var(--text-swap-blur));
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@keyframes t-text-cross-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(var(--text-swap-blur));
+  }
+}
+/* Nothing fades, so the two would stack. The one leaving is dropped outright. */
+@media (prefers-reduced-motion: reduce) {
+  .t-text-cross > .leg {
+    animation: none !important;
+  }
+  .t-text-cross > .leg[data-gone] {
+    display: none;
   }
 }
 

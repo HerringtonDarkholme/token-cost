@@ -4,7 +4,7 @@
 
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
-import { nodeName, useT } from "./copy.tsx"
+import { isCode, nodeName, useT } from "./copy.tsx"
 import { fold, kidsOf, maxCost, moneyFine, pctOf, type CostNode } from "./model.ts"
 import { vtName } from "./Motion.tsx"
 import { hoverBind, useHover } from "./store.ts"
@@ -61,6 +61,7 @@ const Panel = memo(function Panel({
             see. */}
         <button
           type="button"
+          data-code={isCode(t, panel.name, null, gname) ? 1 : 0}
           style={{ "--hue": h, opacity: dim ? 0.55 : 1 } as React.CSSProperties}
           onClick={() => drill(panel.name)}
           {...hoverBind({ key, name: panel.name, cost: panel.cost, under: null, group: gname })}
@@ -106,6 +107,7 @@ const Panel = memo(function Panel({
               <button
                 type="button"
                 data-folded={k.folded ? 1 : 0}
+                data-code={isCode(t, k.name, panel.name, gname) ? 1 : 0}
                 onClick={() => drill(panel.name)}
               >
                 {nodeName(t, k)}

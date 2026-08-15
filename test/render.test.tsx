@@ -8,6 +8,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
+import { dict } from "../src/copy.tsx"
 import { analyze, type Analysis } from "../src/engine.ts"
 import { LANGS } from "../src/i18n.ts"
 import { Page, type Dir } from "../src/Page.tsx"
@@ -148,6 +149,39 @@ describe("view states", () => {
     }
   })
 
+  /* `isCode` decides which names are set in the mono face, and it decides it from where the
+     engine put the row rather than from what the string looks like -- so what it actually
+     marks is worth pinning against a real tree. A program and the command under it are the
+     reader's own; the tool above a path is not, and neither is anything the dictionary knows. */
+  it("only the names off the reader's machine are set as code", () => {
+    const named = (code: boolean): string[] =>
+      Array.from(container.querySelectorAll(`[data-code="${code ? 1 : 0}"]`), (e) =>
+        (e.textContent || "").trim(),
+      )
+
+    const shell = d.groups.find((g) => g.id === "shell")
+    if (shell?.items?.length) {
+      show({ view: "table", path: [shell.name] })
+      expect(named(true), "a shell program is the reader's own").toContain(shell.items[0].name)
+    }
+
+    const tool = d.groups
+      .filter((g) => g.id !== "shell")
+      .flatMap((g) => (g.items || []).map((i) => [g, i] as const))
+      .find(([, i]) => (i.children || []).length)
+    if (tool) {
+      const [g, item] = tool
+      show({ view: "table", path: [g.name] })
+      expect(named(false), "a tool is named, not typed").toContain(item.name)
+      expect(named(true), "the path under it was typed").toContain(item.children![0].name)
+    }
+
+    // And nothing the dictionary answers for is ever code, at any depth.
+    show({ view: "table" })
+    for (const name of named(true))
+      expect(dict("en").labels[name], `${name} is ours`).toBeUndefined()
+  })
+
   it("hover readout", () => {
     const g = d.groups[0]
     act(() => {
@@ -262,8 +296,11 @@ describe("interaction", () => {
     const lit = container.querySelectorAll('path.sunarc[data-on="1"]')
     expect(lit.length).toBeGreaterThan(0)
     expect(lit.length).toBeLessThan(container.querySelectorAll("path.sunarc").length)
-    // Arcs carry no labels, so the hole is the readout.
-    expect(container.querySelector(".suncore .s")?.textContent).toContain(g.name)
+    /* Arcs carry no labels, so the hole is the readout. Read off the leg arriving rather than
+       off the line, which also holds the one crossfading out for as long as that lasts. */
+    expect(container.querySelector(".suncore .s .leg:not([data-gone])")?.textContent).toContain(
+      g.name,
+    )
     expect(container.querySelector(".suncore .v")?.textContent).toMatch(/^\$[\d,.]+$/)
 
     click(byLabel(".legrow button", g.name))

@@ -4,7 +4,7 @@
 
 import { memo } from "react"
 import { useReport } from "./context.ts"
-import { nodeName, useT } from "./copy.tsx"
+import { isCode, nodeName, useT } from "./copy.tsx"
 import { maxCost, moneyFine, pctOf, rowIsOpen, type LedgerRow, type Ledger } from "./model.ts"
 import { vtName } from "./Motion.tsx"
 import { hoverBind, setState, useHover } from "./store.ts"
@@ -44,7 +44,11 @@ const Row = memo(function Row({
   const h = pal.hue(r.group)
   const pct = (r.node.cost / rootCost) * 100
   const name = (
-    <span className="nm" data-folded={r.node.folded ? 1 : 0}>
+    <span
+      className="nm"
+      data-folded={r.node.folded ? 1 : 0}
+      data-code={isCode(t, r.node.name, r.under, r.group || "") ? 1 : 0}
+    >
       {nodeName(t, r.node)}
     </span>
   )
