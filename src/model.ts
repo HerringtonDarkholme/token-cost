@@ -1,7 +1,7 @@
 /* The report's view model: everything that turns an `Analysis` into the rows, columns and
    numbers the components draw, with no React and no DOM in sight. */
 
-import type { Analysis, Dataset, GroupId } from "./engine.ts"
+import type { Analysis, Dataset, GroupId, Insights } from "./engine.ts"
 import { lang, tag, type Lang } from "./i18n.ts"
 import { postCopy, type PostCopy } from "./post-copy.ts"
 
@@ -455,10 +455,21 @@ export interface Facts {
   /** How many times the model's prose was re-billed as input for every dollar spent generating
    *  it. */
   carry: number
+  /** The insight lines, for the captions that quote one of them on its own. */
+  ins: Insights
+  /** What the model's own output cost, which the insights carry only in pieces. */
+  wrote: number
+  /** Dollars of bill for every dollar of typing. */
+  perTyped: number
   amt: (cost: number) => string
   outOf: (cost: number) => string
   /** Whether a figure survives being formatted. */
   sayable: (cost: number) => boolean
+  /** A share, or null where it rounds away to nothing. */
+  pct: (cost: number) => string | null
+  /** A cost divided n ways -- always null when covered, because a per-request figure is money
+   *  whatever the toolbar says. */
+  per: (cost: number, n: number) => string | null
 }
 
 function factsOf(d: Dataset, pctOnly: boolean, l: Lang): Facts {
@@ -474,6 +485,7 @@ function factsOf(d: Dataset, pctOnly: boolean, l: Lang): Facts {
       .sort((a, b) => b.cost - a.cost)
 
   const { proseGen, proseCarry } = d.insights
+  const typed = (d.groups.find((g) => g.id === "typed") as CostNode | undefined) || null
   return {
     d,
     masked: pctOnly,
@@ -481,12 +493,24 @@ function factsOf(d: Dataset, pctOnly: boolean, l: Lang): Facts {
     scope: d.days ? c.scopeDays(d.days) : c.scopeSessions(d.sessions, count(d.sessions)),
     tools: leaves("shell", "ingest", "emit", "twoway"),
     progs: leaves("shell"),
-    typed: (d.groups.find((g) => g.id === "typed") as CostNode | undefined) || null,
+    typed,
     carry: proseGen > 0 && proseCarry > 0 ? proseCarry / proseGen : 0,
+    ins: d.insights,
+    wrote: d.groups.find((g) => g.id === "output")?.cost || 0,
+    perTyped: typed && typed.cost > 0 ? d.total / typed.cost : 0,
     amt,
     sayable,
     outOf: (cost) =>
       pctOnly ? c.outOfMasked(share(cost, d.total)) : c.outOf(money(cost), money(d.total)),
+    pct: (cost) => {
+      const s = share(cost, d.total)
+      return /[1-9]/.test(s) ? s : null
+    },
+    per: (cost, n) => {
+      if (pctOnly || !(n > 0)) return null
+      const each = money(cost / n)
+      return /[1-9]/.test(each) ? each : null
+    },
   }
 }
 
@@ -497,8 +521,9 @@ export interface Draft {
 }
 
 /** The variants, each returning null when the data cannot support it honestly rather than
- *  printing a hole. */
-const VARIANTS: ((f: Facts) => Draft | null)[] = [
+ *  printing a hole. The first six carry one phrasing; the styles added after them carry two or
+ *  three, so a style that keeps coming up does not arrive in the same words twice. */
+const VARIANTS: ((f: Facts) => Draft | Draft[] | null)[] = [
   /* A. The tool question. */
   (f) => {
     const [a, b] = f.tools
@@ -572,12 +597,119 @@ const VARIANTS: ((f: Facts) => Draft | null)[] = [
       share: share(top.cost, f.d.total),
     })
   },
+
+  /* G. The figures with no sentence around them. */
+  (f) => {
+    const top = f.d.groups[0]
+    const part = top && f.pct(top.cost)
+    if (!top || !part || !(f.d.requests > 0)) return null
+    return f.c.g({
+      total: f.masked || !f.sayable(f.d.total) ? null : money(f.d.total),
+      scope: f.scope,
+      requests: count(f.d.requests),
+      each: f.per(f.d.total, f.d.requests),
+      said: f.c.said[top.id] || top.name.toLowerCase(),
+      share: part,
+    })
+  },
+
+  /* H. What it costs by the day and by the keystroke, which is how a habit is priced. */
+  (f) => {
+    const perDay = f.d.days && f.d.days > 1 ? f.per(f.d.total, f.d.days) : null
+    if (!perDay || !f.d.days) return null
+    return f.c.h({
+      perDay,
+      perRequest: f.per(f.d.total, f.d.requests),
+      days: count(f.d.days),
+      requests: count(f.d.requests),
+    })
+  },
+
+  /* I. The ratio between the typing and everything the typing drags in -- the one figure that
+     says the same thing covered as it does open, because it carries no unit. */
+  (f) => {
+    if (!f.typed || !(f.perTyped >= 4) || !isFinite(f.perTyped)) return null
+    return f.c.i({
+      times: `${f.perTyped.toFixed(0)}×`,
+      scope: f.scope,
+      requests: count(f.d.requests),
+    })
+  },
+
+  /* J. The thinking nobody reads and everybody buys. */
+  (f) => {
+    const { thinking } = f.ins
+    if (!(thinking > 0) || !f.sayable(thinking)) return null
+    return f.c.j({
+      amt: f.amt(thinking),
+      share: f.masked ? null : f.pct(thinking),
+      scope: f.scope,
+      masked: f.masked,
+    })
+  },
+
+  /* K. The meter that is already running when you start typing. */
+  (f) => {
+    const { fixed } = f.ins
+    if (!(fixed > 0) || !f.sayable(fixed) || !(f.d.requests > 0)) return null
+    return f.c.k({ amt: f.amt(fixed), requests: count(f.d.requests), scope: f.scope })
+  },
+
+  /* L. The same carry as E, said as a confession rather than as a ratio. */
+  (f) => {
+    const { proseCarry } = f.ins
+    if (!(proseCarry > 0) || !f.sayable(proseCarry)) return null
+    return f.c.l({ amt: f.amt(proseCarry), scope: f.scope, masked: f.masked })
+  },
+
+  /* M. All promise and no figure, and viable against any dataset because it quotes none. */
+  (f) => f.c.m(),
+
+  /* N. The bill as a bill: a column of lines, which is the shape a reader stops scrolling for. */
+  (f) => {
+    const rows = f.d.groups
+      .filter((g) => f.c.said[g.id] && f.sayable(g.cost))
+      .slice(0, 4)
+      .map((g) => ({ name: f.c.said[g.id] as string, amt: f.amt(g.cost) }))
+    if (rows.length < 3) return null
+    return f.c.n({ scope: f.scope, rows })
+  },
+
+  /* O. Two halves of the bill nobody guesses the order of. */
+  (f) => {
+    const { ingest } = f.ins
+    if (!f.sayable(f.wrote) || !f.sayable(ingest)) return null
+    const hi = Math.max(f.wrote, ingest),
+      lo = Math.min(f.wrote, ingest)
+    /* Too close together and "bigger" is a coin toss the reader was right to lose. */
+    if (!(lo > 0) || hi / lo < 1.2) return null
+    return f.c.o({ wroteMore: f.wrote > ingest, hi: f.amt(hi), lo: f.amt(lo) })
+  },
+
+  /* P. The winner named and nothing else, because the name is the joke. */
+  (f) => {
+    const [a] = f.progs
+    if (!a) return null
+    return f.c.p({ name: a.name, amt: f.amt(a.cost) })
+  },
+
+  /* Q. The one that leaves the reader something to do. */
+  (f) => {
+    const [a] = f.tools
+    if (!a) return null
+    return f.c.q({ name: a.name, amt: f.amt(a.cost), scope: f.scope, masked: f.masked })
+  },
+
+  /* R. A question with a reply in mind. */
+  (f) => f.c.r(),
 ]
 
 /** A draft as the composer will receive it, trimmed to fit. */
 function assemble(draft: Draft, home?: string | null): string {
   const link = home ? [`${draft.cta}: ${home}`] : []
-  for (let keep = draft.lines.length; keep > 1; keep--) {
+  /* Down to the hook alone, which for a one-line draft is the whole caption: stopping at two
+     would send something that already fits to the truncator to have an ellipsis put on it. */
+  for (let keep = draft.lines.length; keep >= 1; keep--) {
     const out = [...draft.lines.slice(0, keep), ...link].join("\n\n")
     if (postLength(out) <= POST_MAX) return out
   }
@@ -597,9 +729,7 @@ export function postVariants(
   l: Lang = lang(),
 ): string[] {
   const f = factsOf(d, pctOnly, l)
-  return VARIANTS.map((v) => v(f))
-    .filter((x): x is Draft => x !== null)
-    .map((draft) => assemble(draft, home))
+  return VARIANTS.flatMap((v) => v(f) || []).map((draft) => assemble(draft, home))
 }
 
 /** The caption that travels with the shared image, drawn at random from the ones this dataset
