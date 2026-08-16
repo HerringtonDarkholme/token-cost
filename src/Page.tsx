@@ -27,7 +27,12 @@ export type Dir = "fwd" | "back"
  *  of its own -- opening the report, and drilling into a group -- while the settings in the hash
  *  rewrite the entry they are held on, so Back is not a walk through every chart the reader
  *  tried. */
-function useUrlSync(state: ViewState, report: boolean, leaving: boolean): void {
+function useUrlSync(
+  state: ViewState,
+  data: Analysis | null,
+  report: boolean,
+  leaving: boolean,
+): void {
   const where = pathFor(report, state.path)
   const url = where + location.search + hashFor(state)
   const prev = useRef(where)
@@ -55,11 +60,11 @@ function useUrlSync(state: ViewState, report: boolean, leaving: boolean): void {
      its way out would reshape the picture as it leaves. */
   useEffect(() => {
     const onHash = (): void => {
-      if (readPath(location.pathname).report === report) applyUrl()
+      if (readPath(location.pathname).report === report) applyUrl(data)
     }
     window.addEventListener("hashchange", onHash)
     return () => window.removeEventListener("hashchange", onHash)
-  }, [report])
+  }, [report, data])
 }
 
 /** Where the footer points, in the order it reads them. The addresses are the only strings on the
@@ -153,7 +158,7 @@ export function Page({
   /* One string, so the two faces cannot mount different panels by disagreeing about which one is
      on show. */
   const face = ctx ? "report" : "empty"
-  useUrlSync(state, !!ctx, leaving)
+  useUrlSync(state, data, !!ctx, leaving)
 
   const billed = ctx ? t.card.billed(state.ttl, state.pctOnly) : t.card.nothingYet
   /* What the empty card's figure counts from, and what it counts through: the walk writes its

@@ -132,7 +132,7 @@ export function App(): React.JSX.Element {
         if (turn.data) onReset()
         return
       }
-      applyUrl()
+      applyUrl(want.data)
       if (!turn.data) turnTo(want.data, "fwd", want.sample)
     }
     window.addEventListener("popstate", onPop)

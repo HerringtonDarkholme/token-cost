@@ -109,9 +109,13 @@ pnpm dlx vercel --prod
 Connecting the repo in the Vercel dashboard builds the same way.
 
 The address is in two halves, split by what Back is for. The path is where the reader is —
-`/` before a folder is picked, `/report` once there is a bill, `/report/shell/git` a drill
-into a group and then an item — so each of those moves gets a history entry and the browser's
-own Back comes out of it. The settings held on that location ride in the hash: the TTL lens,
+`/` before a folder is picked, `/report` once there is a bill, `/report/shell-commands/git` a
+drill into a group and then an item — so each of those moves gets a history entry and the
+browser's own Back comes out of it. A segment is the node's name with its punctuation taken
+out rather than escaped, since the names are prose ("Tools · content read in") and a reader
+should not be handed `%C2%B7`; it is read back by matching it against the names in the tree
+on show, which is the only thing that knows which one it stood for. The settings held on that
+location ride in the hash: the TTL lens,
 which chart, panels-or-table, the query, whether amounts are covered, the theme and the
 language. They rewrite the entry they are on rather than pushing one, so Back is not a walk
 through every chart the reader tried. `vercel.json` rewrites `/report/*` to the document,
@@ -290,7 +294,7 @@ file tool under any name gets the same treatment.
 | `index.html` | document shell and Vite entry (needs the dev server) |
 | `vercel.json` | the deploy: `pnpm build`, serve `dist/`, hand `/report/*` to the document |
 | `src/engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
-| `src/model.ts` | view model: folding, drill-down, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
+| `src/model.ts` | view model: folding, drill-down and the names it wears in the address, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
 | `src/store.ts` | view state, held outside the tree so the address and the tests can drive it; also which half of the address each key lives in; hover is a separate slice |
 | `src/i18n.ts` | the language: which six ship, the guess at the reader's, and the tag the number formatters use |
 | `src/copy.tsx` | every word on the page, six times over, typed against English so a missing key is a build error |

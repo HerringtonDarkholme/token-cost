@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { analyze } from "../src/engine.ts"
+import { pathOf, slug } from "../src/model.ts"
 import { Page } from "../src/Page.tsx"
 import { applyUrl, getState, pathFor, readPath, resetState, setState } from "../src/store.ts"
 import { corpus } from "./fixture.ts"
 
 const data = analyze(corpus())
+const d = data.datasets["1h"]
 const noop = (): void => {}
 
 let container: HTMLElement
@@ -81,7 +83,7 @@ describe("the address", () => {
 
   it("comes home from however deep the reader got, in one move", () => {
     show(true)
-    act(() => setState({ path: ["shell", "git"] }))
+    act(() => setState({ path: ["Shell commands", "git"] }))
     pushed = 0
     /* One act, because the turn clears the view state and drops the report together -- see the
        `swap` in App. */
@@ -96,20 +98,20 @@ describe("the address", () => {
   it("gives the drill one too, a segment per level", () => {
     show(true)
     pushed = 0
-    act(() => setState({ path: ["shell"] }))
-    expect(location.pathname).toBe("/report/shell")
-    act(() => setState({ path: ["shell", "git"] }))
-    expect(location.pathname).toBe("/report/shell/git")
+    act(() => setState({ path: ["Shell commands"] }))
+    expect(location.pathname).toBe("/report/shell-commands")
+    act(() => setState({ path: ["Shell commands", "git"] }))
+    expect(location.pathname).toBe("/report/shell-commands/git")
     expect(pushed).toBe(2)
   })
 
   it("holds the settings in the hash, on the entry the reader is already on", () => {
     show(true)
-    act(() => setState({ path: ["shell"] }))
+    act(() => setState({ path: ["Shell commands"] }))
     pushed = 0
     replaced = 0
     act(() => setState({ chart: "sun", view: "table", pctOnly: true }))
-    expect(location.pathname).toBe("/report/shell")
+    expect(location.pathname).toBe("/report/shell-commands")
     expect(location.hash).toContain("c=sun")
     expect(location.hash).toContain("v=table")
     expect(pushed).toBe(0)
@@ -118,13 +120,13 @@ describe("the address", () => {
 
   it("writes nothing when the browser is already where the page is going", () => {
     show(true)
-    act(() => setState({ path: ["shell"] }))
+    act(() => setState({ path: ["Shell commands"] }))
     /* What a Back looks like from here: the address moves first, the page follows it. */
     replace(null, "", "/report")
     pushed = 0
     replaced = 0
     act(() => {
-      applyUrl()
+      applyUrl(data)
     })
     expect(getState().path).toEqual([])
     expect(pushed).toBe(0)
@@ -133,7 +135,7 @@ describe("the address", () => {
 
   it("does not write from a face that is on its way out", () => {
     show(true)
-    act(() => setState({ path: ["shell"] }))
+    act(() => setState({ path: ["Shell commands"] }))
     replace(null, "", "/")
     pushed = 0
     replaced = 0
@@ -142,20 +144,34 @@ describe("the address", () => {
     expect(pushed + replaced).toBe(0)
   })
 
-  it("reads back what it writes, name by name", () => {
-    const path = ["Read", "some dir/a file.ts"]
-    expect(readPath(pathFor(true, path)).path).toEqual(path)
-    expect(readPath("/report").path).toEqual([])
+  it("spells the names out rather than escaping them", () => {
+    const group = d.groups.find((g) => g.name === "Tools · content read in")!
+    const item = group.items![1]!
+    const url = pathFor(true, [group.name, item.name])
+    expect(url).toBe("/report/tools-content-read-in/read")
+    expect(url).not.toMatch(/%/)
+    /* And back through the tree, which is the only thing that knows what a slug stood for. */
+    expect(pathOf(d, readPath(url).slugs)).toEqual([group.name, item.name])
+    expect(readPath("/report").slugs).toEqual([])
     expect(readPath("/report").report).toBe(true)
     expect(readPath("/").report).toBe(false)
   })
 
+  it("keeps a name whose alphabet is not this page's", () => {
+    expect(slug("读取 src/文件.ts")).toBe("读取-src-文件-ts")
+  })
+
+  it("drops a name the tree does not have, rather than drilling into nothing", () => {
+    expect(pathOf(d, ["no-such-group"])).toEqual([])
+    expect(pathOf(d, ["shell-commands", "no-such-tool"])).toEqual(["Shell commands"])
+  })
+
   it("undoes what a longer address added when a shorter one arrives", () => {
     show(true)
-    act(() => setState({ path: ["shell"], view: "table", ttl: "5m" }))
+    act(() => setState({ path: ["Shell commands"], view: "table", ttl: "5m" }))
     replace(null, "", "/report")
     act(() => {
-      applyUrl()
+      applyUrl(data)
     })
     expect(getState().view).toBe("panels")
     expect(getState().ttl).toBe("1h")

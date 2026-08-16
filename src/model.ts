@@ -119,6 +119,29 @@ export interface Focus {
   groupName: string | null
 }
 
+/** A node name as it goes into the address. The names are prose -- "Tools · content read in",
+ *  "assistant prose (generated)" -- and percent-escapes are not something to hand a reader.
+ *  What goes is the punctuation and the spacing; letters are kept whatever their script, since a
+ *  transcript is full of paths and commands this page did not choose the alphabet of. */
+export function slug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "") || "-"
+  )
+}
+
+/** And back, against the tree on show: the slug drops the case and the punctuation, so the names
+ *  it could have come from are the only place it can be read. One that names nothing at this
+ *  level ends the path rather than being carried as a name no view will find. */
+export function pathOf(d: Dataset, slugs: string[]): string[] {
+  const g = d.groups.find((x) => slug(x.name) === slugs[0])
+  if (!g) return []
+  const it = slugs[1] ? (g.items || []).find((x) => slug(x.name) === slugs[1]) : null
+  return it ? [g.name, it.name] : [g.name]
+}
+
 /** The subtree the page is currently focused on, from a breadcrumb path of at most two levels. */
 export function focusOf(d: Dataset, path: string[]): Focus {
   let node: CostNode = { name: "all", cost: d.total, items: d.groups }

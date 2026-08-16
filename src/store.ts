@@ -1,8 +1,9 @@
 /* View state, held outside the component tree. */
 
 import { useSyncExternalStore } from "react"
-import type { TtlAssumption } from "./engine.ts"
+import type { Analysis, TtlAssumption } from "./engine.ts"
 import { GUESSED, isLang, noteLang, type Lang } from "./i18n.ts"
+import { pathOf, slug } from "./model.ts"
 
 /** What the pointer (or keyboard focus) is on. */
 export interface HoverTarget {
@@ -200,33 +201,39 @@ const HERE = typeof location === "object" ? location.pathname : "/"
 const ROUTED = !/\.html?$/i.test(HERE)
 const ROOT = HERE.replace(/\/report(\/.*)?$/, "").replace(/\/+$/, "") + "/"
 
-/** `/`, `/report`, `/report/shell`, `/report/shell/git`. */
+/** `/`, `/report`, `/report/shell-commands`, `/report/shell-commands/git`. */
 export function pathFor(report: boolean, path: string[]): string {
   if (!ROUTED) return HERE
   if (!report) return ROOT
-  return ROOT + ["report", ...path].map(encodeURIComponent).join("/")
+  return ROOT + ["report", ...path.map(slug)].join("/")
 }
 
-export function readPath(pathname: string): { report: boolean; path: string[] } {
-  if (!ROUTED || !pathname.startsWith(ROOT)) return { report: false, path: [] }
+export function readPath(pathname: string): { report: boolean; slugs: string[] } {
+  if (!ROUTED || !pathname.startsWith(ROOT)) return { report: false, slugs: [] }
   const seg = pathname.slice(ROOT.length).split("/").filter(Boolean)
-  if (seg[0] !== "report") return { report: false, path: [] }
+  if (seg[0] !== "report") return { report: false, slugs: [] }
   /* Two deep, the same bound the drill itself has. */
-  return { report: true, path: seg.slice(1, 3).map(decodeURIComponent) }
+  return { report: true, slugs: seg.slice(1, 3).map((s) => decodeURIComponent(s).toLowerCase()) }
 }
 
 /** The address applied whole, which is what a Back or a Forward needs: keys the new address does
  *  not carry go back to their defaults, since coming out of a view has to undo what going in
  *  added. The exceptions are the two the reader chose for the session rather than for the file,
- *  and the disclosure the address never carried. */
-export function applyUrl(): void {
+ *  and the disclosure the address never carried.
+ *
+ *  The bill is passed in because the drill is slugs on the way out and names on the way back,
+ *  and only the tree knows which name a slug stood for -- under the lens the same address names,
+ *  since that is the tree the address was written from. */
+export function applyUrl(data: Analysis | null): void {
+  const hash = readHash(location.hash)
+  const d = data?.datasets[hash.ttl ?? INITIAL.ttl]
   setState({
     ...INITIAL,
     theme: state.theme,
     lang: state.lang,
     open: state.open,
-    path: readPath(location.pathname).path,
-    ...readHash(location.hash),
+    path: d ? pathOf(d, readPath(location.pathname).slugs) : [],
+    ...hash,
   })
 }
 
