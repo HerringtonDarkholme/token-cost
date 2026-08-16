@@ -838,10 +838,12 @@ describe("the card's two faces", () => {
     /* Four, not five: the corpus records every cache write's TTL, so the switch that reprices
        the unrecorded ones has nothing to offer and is not drawn. */
     expect(box.querySelectorAll(".toolbar .t-grow")).toHaveLength(4)
-    // And the stagger still counts outward from the anchor without a gap in it.
+    /* And the stagger still counts outward from the anchor without a gap in it. Sorted, not read
+       in document order: the mask is drawn in the bar rather than in the panel, so the document
+       no longer runs the same way the bar does. */
     expect(
-      [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")),
-    ).toEqual(["3", "2", "1", "0"])
+      [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")).sort(),
+    ).toEqual(["0", "1", "2", "3"])
     expect(
       [...box.querySelectorAll(".tools > .tool")].at(-1)?.querySelector(".seg:not(.langseg)"),
     ).not.toBeNull()
@@ -862,17 +864,23 @@ describe("the card's two faces", () => {
     /* One set of controls, not two: every control the bar holds is inside the panel element, so
        there is no second copy to fall out of step with this one. Scoped to the bar because the
        card runs its own switches off the same `.seg`. */
-    for (const sel of [".linkish", ".seg", ".freshbtn", ".eyebtn", ".langsel"])
+    for (const sel of [".linkish", ".freshbtn", ".langsel"])
       expect(box.querySelectorAll(".toolbar " + sel).length, `${sel} outside the panel`).toBe(
         box.querySelectorAll(".tools " + sel).length,
       )
+    /* Except the mask, which is the point of the exception: it is drawn once, in the bar, so
+       covering the dollars in front of someone does not cost a trip through the menu. */
+    expect(box.querySelectorAll(".toolbar .eyebtn")).toHaveLength(1)
+    expect(box.querySelectorAll(".tools .eyebtn")).toHaveLength(0)
+    expect(box.querySelectorAll(".toolbar .seg").length).toBe(
+      box.querySelectorAll(".tools .seg").length + 1,
+    )
     // And every row that is a lens rather than an action says what it sets.
     const named = [...box.querySelectorAll(".tools > .tool")].filter((row) =>
       row.querySelector(".toollbl"),
     )
     expect(named.map((row) => row.querySelector(".toollbl")!.textContent)).toEqual([
       "New analysis",
-      "Hide dollar amounts",
       "Language",
       "Theme",
     ])
@@ -1018,8 +1026,8 @@ describe("the TTL lens, where there is one to offer", () => {
     expect(btn.hasAttribute("aria-pressed")).toBe(false)
     // Five controls now, and the stagger still runs unbroken outward from the anchor.
     expect(
-      [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")),
-    ).toEqual(["4", "3", "2", "1", "0"])
+      [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")).sort(),
+    ).toEqual(["0", "1", "2", "3", "4"])
   })
 
   it("pressing it reprices the bill, and walks back", () => {

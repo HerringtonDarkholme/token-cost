@@ -250,6 +250,15 @@ export function Toolbar({
   return (
     <div className="toolbar" data-leaving={leaving ? "1" : undefined} data-open={open ? "1" : "0"}>
       <span className="tick" />
+      {/* Out in the bar rather than down in the panel: covering the dollars is what you reach for
+          with someone already looking at the screen, and a menu is two taps too many for that. */}
+      {report ? (
+        <span className="maskslot t-grow" data-i={first - 3}>
+          <span className="seg t-tt-host">
+            <MaskToggle on={state.pctOnly} />
+          </span>
+        </span>
+      ) : null}
       {/* Below the breakpoint the whole bar is behind this; above it, this is not drawn. */}
       <button
         type="button"
@@ -286,13 +295,6 @@ export function Toolbar({
             <Tool label={t.reset.name}>
               <span className="t-grow" data-i={first - 2}>
                 <ResetButton onReset={reset} />
-              </span>
-            </Tool>
-            <Tool label={t.mask.name}>
-              <span className="t-grow" data-i={first - 3}>
-                <span className="seg t-tt-host">
-                  <MaskToggle on={state.pctOnly} />
-                </span>
               </span>
             </Tool>
             {ttl ? (

@@ -147,6 +147,16 @@ button {
 .scrim {
   display: none;
 }
+/* The mask is drawn in the bar rather than in the panel, so it comes before the panel's controls
+   in the document: up here the rule and the actions step in front of it, which seats it back
+   among the lenses where it has always been. Nothing to undo below the breakpoint -- there the
+   panel reads in document order -- so this is the one rule in the file naming the wide side. */
+@media (min-width: 821px) {
+  .tick,
+  .tool:has(.linkish, .freshbtn) {
+    order: -1;
+  }
+}
 /* An action rather than a lens, so it is words on the paper with a rule under them rather than a
    button in a box. */
 .linkish {
@@ -1339,6 +1349,10 @@ tfoot .n {
   .burger .glyph {
     width: 17px;
     height: 17px;
+  }
+  /* The one control that stays out of the panel, held to the height of the button beside it. */
+  .maskslot .seg {
+    height: 40px;
   }
   .tools {
     display: flex;
