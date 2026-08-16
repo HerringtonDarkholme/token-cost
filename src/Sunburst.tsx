@@ -140,7 +140,7 @@ function Core({
   label: string
   kids: number
 }): React.JSX.Element {
-  const { state, focus, amt } = useReport()
+  const { state, focus, amt, d } = useReport()
   const t = useT()
   const h = useHover()
   const up = state.path.length > 0
@@ -150,7 +150,9 @@ function Core({
      translated copy would fade on a language change. */
   const kAt = h ? "h›" + (h.under ? h.under : h.group) : "r›" + focus.node.name
   const sAt = h ? "h›" + h.key : "r›" + focus.node.name
-  /* The amount twice over: a number for the rolling digits, text for the state that is not one. */
+  /* The amount twice over: a number for the rolling digits, text for the words beside them. Once
+     the dollars are covered the readout is a share of the whole bill -- the same figure `amt()`
+     writes -- and it rolls the same way rather than cutting to the next arc's. */
   const cost = h ? h.cost : rootCost
   const pctText = pct.toFixed(pct < 1 ? 2 : 1) + "%"
 
@@ -159,7 +161,12 @@ function Core({
       <span className="k">
         <TextCross token={kAt}>{h ? labelOf(t, h.under ? h.under : h.group) : label}</TextCross>
       </span>
-      <Figure className="v" value={state.pctOnly ? null : cost} text={amt(cost)} />
+      <Figure
+        className="v"
+        value={state.pctOnly ? pctOf(cost, d.total) : cost}
+        text={amt(cost)}
+        share={state.pctOnly}
+      />
       <span className="s">
         <TextCross token={sAt}>
           {h ? (

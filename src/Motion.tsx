@@ -128,15 +128,25 @@ const MONEY: Format = {
   maximumFractionDigits: 2,
 }
 
+/* A share is written the same way in every language here -- `amt()` and every `toFixed` beside it
+   print a dot and a bare `%` -- so the rolling one is pinned to match rather than localised into
+   a comma and a space the rest of the page's percentages would not have. */
+const SHARE: Format = { minimumFractionDigits: 1, maximumFractionDigits: 1 }
+const SHARE_FINE: Format = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+
 /** The bill, as a figure that travels between the numbers rather than cutting between them. */
 export function Figure({
   value,
   text,
   className,
+  share,
 }: {
   value: number | null
   text: string
   className?: string
+  /** The figure is a share of the bill rather than an amount of it -- what the hub reads out
+   *  once the dollars are covered. */
+  share?: boolean
 }): React.JSX.Element {
   const supported = useIsSupported()
   const { lang } = useViewState()
@@ -146,11 +156,15 @@ export function Figure({
   }
   return (
     <span className={className} data-snaptext={text}>
-      {/* The locale as well as the format, because the two halves of the agreement with
-          `money()` are both locale-dependent: where the grouping separators fall and which
-          side the symbol sits on. Handed the tag rather than left to the browser's own
-          default, which is the reader's machine and not the page's language. */}
-      <NumberFlow value={value} locales={tagOf(lang)} format={MONEY} />
+      {share ? (
+        <NumberFlow value={value} locales="en" format={value < 1 ? SHARE_FINE : SHARE} suffix="%" />
+      ) : (
+        /* The locale as well as the format, because the two halves of the agreement with
+           `money()` are both locale-dependent: where the grouping separators fall and which
+           side the symbol sits on. Handed the tag rather than left to the browser's own
+           default, which is the reader's machine and not the page's language. */
+        <NumberFlow value={value} locales={tagOf(lang)} format={MONEY} />
+      )}
     </span>
   )
 }
