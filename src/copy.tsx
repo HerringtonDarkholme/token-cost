@@ -242,6 +242,9 @@ const EN = {
       "reprices the remainder." +
       (models ? ` Models: ${models}.` : ""),
     unknownShare: "an unknown share",
+    skippedCaveat: (n: string): string =>
+      `${n} transcript(s) could not be read and are not in the total; a folder with a live ` +
+      "session in it changes under the read.",
   },
 
   /* the empty card */
@@ -585,6 +588,8 @@ const ZH: Dict = {
       `写入 token 中有 ${share} 记录了缓存写入的 TTL，所以上面的开关只重新定价其余部分。` +
       (models ? ` 模型：${models}。` : ""),
     unknownShare: "未知比例",
+    skippedCaveat: (n) =>
+      `有 ${n} 个会话记录读取失败，未计入总额；正在运行的会话会在读取过程中改动文件。`,
   },
   intake: {
     heading: (folder) => <>把你的 {folder} 文件夹拖到这里</>,
@@ -906,6 +911,8 @@ const JA: Dict = {
       `書き込みトークンのうち ${share} でキャッシュ書き込みの TTL が記録されていたため、上の切り替えは残りだけを再計算します。` +
       (models ? ` モデル：${models}。` : ""),
     unknownShare: "不明な割合",
+    skippedCaveat: (n) =>
+      `${n} 件のトランスクリプトを読み取れず、合計に含まれていません。実行中のセッションがあるフォルダーは読み取り中に変化します。`,
   },
   intake: {
     heading: (folder) => <>{folder} フォルダをここにドロップ</>,
@@ -1238,6 +1245,9 @@ const ES: Dict = {
       "lente de arriba solo recalcula el resto." +
       (models ? ` Modelos: ${models}.` : ""),
     unknownShare: "una parte desconocida",
+    skippedCaveat: (n) =>
+      `No se pudieron leer ${n} transcripción(es) y no están en el total; una carpeta con una ` +
+      "sesión activa cambia durante la lectura.",
   },
   intake: {
     heading: (folder) => <>Suelta aquí tu carpeta {folder}</>,
@@ -1571,6 +1581,9 @@ const FR: Dict = {
       "ne retarife que le reste." +
       (models ? ` Modèles : ${models}.` : ""),
     unknownShare: "une part inconnue",
+    skippedCaveat: (n) =>
+      `${n} transcription(s) n'ont pas pu être lues et ne sont pas dans le total : un dossier ` +
+      "où une session tourne change pendant la lecture.",
   },
   intake: {
     heading: (folder) => <>Déposez ici votre dossier {folder}</>,
@@ -1904,6 +1917,9 @@ const DE: Dict = {
       "Sicht oben nur den Rest neu." +
       (models ? ` Modelle: ${models}.` : ""),
     unknownShare: "einen unbekannten Anteil",
+    skippedCaveat: (n) =>
+      `${n} Transkript(e) konnten nicht gelesen werden und fehlen in der Summe; ein Ordner mit ` +
+      "einer laufenden Sitzung ändert sich während des Lesens.",
   },
   intake: {
     heading: (folder) => <>Lege deinen Ordner {folder} hier ab</>,

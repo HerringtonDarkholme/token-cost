@@ -731,6 +731,8 @@ const DISPATCH_MIN_CALLS = 5,
  *  could not be known until all of them had been. */
 export interface Scanned {
   filesUsed: number
+  /** Transcripts the reader could not get bytes out of at all. */
+  filesSkipped: number
   duplicatesDropped: number
   badLines: number
   dispatchers: Set<string>
@@ -785,6 +787,7 @@ export interface Walk {
   /** Accumulators for the two-class least-squares fit described above. */
   S: Accum
   filesUsed: number
+  filesSkipped: number
   duplicatesDropped: number
   badLines: number
   /** The interned buckets, and the index each one was given. */
@@ -828,6 +831,7 @@ export function openWalk(): Walk {
     verbs: new Map(),
     S: { cc: 0, ct: 0, tt: 0, cy: 0, ty: 0, yy: 0, n: 0, code: 0, text: 0, tok: 0 },
     filesUsed: 0,
+    filesSkipped: 0,
     duplicatesDropped: 0,
     badLines: 0,
     slots: [{ rec: PRE_REC, verb: null }],
@@ -868,6 +872,12 @@ function hold(
 
 /** Read one file into `st`. `false` means it was a duplicate of one already read -- the answer
  *  goes back to the caller because the caller is the one keeping count of what it handed over. */
+/** A transcript the reader could not open, which the bill has to admit to rather than quietly
+ *  leave out. */
+export function skipFile(st: Walk): void {
+  st.filesSkipped++
+}
+
 export function walkOne(st: Walk, f: RawFile): boolean {
   const m = SESSION_RE.exec(f.text || "")
   const id = detach((m ? m[1] : f.name) + "::" + (f.text || "").length)
@@ -1280,6 +1290,7 @@ export function closeWalk(st: Walk): { scanned: Scanned; alloc: Allocation } {
   const fit = solveDensities(st.S)
   const scanned: Scanned = {
     filesUsed: st.filesUsed,
+    filesSkipped: st.filesSkipped,
     duplicatesDropped: st.duplicatesDropped,
     badLines: st.badLines,
     dispatchers,
@@ -1653,6 +1664,7 @@ export interface Analysis {
   spanFrom: number | null
   spanTo: number | null
   filesUsed: number
+  filesSkipped: number
   duplicatesDropped: number
   badLines: number
   models: ModelReport[]
@@ -1711,6 +1723,7 @@ export function report(scanned: Scanned, alloc: Allocation): Analysis {
     spanFrom: alloc.spanFrom,
     spanTo: alloc.spanTo,
     filesUsed: scanned.filesUsed,
+    filesSkipped: scanned.filesSkipped,
     duplicatesDropped: scanned.duplicatesDropped,
     badLines: scanned.badLines,
     models: [...alloc.models]
