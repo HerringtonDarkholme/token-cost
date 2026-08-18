@@ -59,8 +59,7 @@ SSH: the URL goes to stdout and the totals to stderr, so it pipes.
 
 Your transcripts are read and priced inside the page. There is no server to send them to, and
 the build fails if the document references anything it does not carry inline. The hosted copy
-counts pageviews and reports one of two strings, `/` or `/report` — never a drill path, because
-those are built from your own tool and server names.
+uses Vercel Analytics to track pageviews.
 
 Want it fully offline? `pnpm build` writes `cost-report.html` — one double-clickable file that
 works from disk and counts nothing.
