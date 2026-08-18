@@ -7,7 +7,9 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "preserve",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    /* `vite/client` is here for one thing: `import.meta.env.PROD`, which is how the page tells a
+       built copy from the dev server it is being previewed on. */
+    "types": ["node", "vite/client"],
 
     /* The automatic runtime: components import nothing to write JSX, and the transform
        Vite applies in the browser is the one `tsc` type-checks against here. */

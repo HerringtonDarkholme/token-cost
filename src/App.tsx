@@ -1,13 +1,21 @@
 /* The turn: which face the page's one card is showing, and the phase in between. */
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { Analytics, type BeforeSendEvent } from "@vercel/analytics/react"
 import type { Analysis } from "./engine.ts"
+import { hosted, scrub } from "./analytics.ts"
 import { applyUrl, readPath, resetState, useViewState } from "./store.ts"
 import { useT } from "./copy.tsx"
 import { tagOf } from "./i18n.ts"
 import { canTransition, cssMs, reduced, transition } from "./Motion.tsx"
 import { Page, type Dir } from "./Page.tsx"
 import { decodeImport, pendingImport } from "./transfer.ts"
+
+/** A view goes out under the name of the face it is, never the one in the address bar -- see
+ *  `scrub`, which is where the reader's own line items are kept out of it. The `PROD` half of the
+ *  guard beside it is what keeps the dev server and the suites off the network: unbuilt, the
+ *  component fetches its debug script from a Vercel domain, and this page reaches nobody. */
+const rename = (event: BeforeSendEvent): BeforeSendEvent => ({ ...event, url: scrub(event.url) })
 
 /** How long the departing face is held on the fallback path. */
 function exitMs(): number {
@@ -156,13 +164,18 @@ export function App(): React.JSX.Element {
   }, [turn.data, turnTo, onReset])
 
   return (
-    <Page
-      data={turn.data}
-      leaving={turn.leaving}
-      dir={turn.dir}
-      sample={turn.sample}
-      onData={onData}
-      onReset={onReset}
-    />
+    <>
+      <Page
+        data={turn.data}
+        leaving={turn.leaving}
+        dir={turn.dir}
+        sample={turn.sample}
+        onData={onData}
+        onReset={onReset}
+      />
+      {import.meta.env.PROD && hosted(location.protocol, location.pathname) && (
+        <Analytics beforeSend={rename} />
+      )}
+    </>
   )
 }

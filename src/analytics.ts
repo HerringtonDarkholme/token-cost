@@ -1,6 +1,6 @@
-/* Pageviews for the hosted copy, and nothing that came out of anyone's transcripts. */
-
-import { inject } from "@vercel/analytics"
+/* What a pageview is allowed to say. Kept apart from the component that sends one, because both
+   answers below are plain functions over strings and the suite that guards them runs under bare
+   `node`, where a `.tsx` would not parse. */
 
 /** What the address carries that Vercel may not be told. Two things, and the second is the one
  *  worth spelling out: the drill path is built from the *reader's own* line-item names, so
@@ -31,9 +31,4 @@ export function scrub(url: string): string {
  *  whether the address can hold a path at all. */
 export function hosted(protocol: string, pathname: string): boolean {
   return /^https?:$/.test(protocol) && !/\.html?$/i.test(pathname)
-}
-
-export function startAnalytics(): void {
-  if (typeof location !== "object" || !hosted(location.protocol, location.pathname)) return
-  inject({ beforeSend: (event) => ({ ...event, url: scrub(event.url) }) })
 }

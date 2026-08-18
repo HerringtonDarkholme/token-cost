@@ -5,7 +5,6 @@ import { createRoot } from "react-dom/client"
 import { App } from "./App.tsx"
 import { readHash, setState } from "./store.ts"
 import { takeImport } from "./transfer.ts"
-import { startAnalytics } from "./analytics.ts"
 
 const host = document.getElementById("app")
 if (!host) throw new Error("missing #app in the document")
@@ -18,10 +17,9 @@ if (!host) throw new Error("missing #app in the document")
 takeImport()
 setState(readHash(location.hash))
 
-/* After `takeImport`, which is not an ordering to lose: it is what takes the report back out of
-   the address before anything is in a position to report that address anywhere. */
-startAnalytics()
-
+/* Both lines above run before this one, which is what puts the report out of reach of the
+   `<Analytics>` inside the tree: it cannot mount until the render below, and by then the address
+   no longer holds anything that came out of a transcript. */
 createRoot(host).render(
   <StrictMode>
     <App />
