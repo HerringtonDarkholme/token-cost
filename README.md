@@ -41,6 +41,17 @@ Node **22.18 or newer**, because the command is TypeScript that Node runs by str
 types, and that is when it stopped needing a flag. 22.17 and every 20.x fail at the shebang
 with `ERR_UNKNOWN_FILE_EXTENSION`, which is why the floor is not lower.
 
+Two switches, both for when there is no browser to open — a machine reached over SSH, or a
+check that should not take over the one you are reading this in:
+
+```sh
+npx token-billing --print                       # write the URL to stdout, open nothing
+TOKEN_BILLING_URL=http://127.0.0.1:8000/ pnpm cli --print   # against `pnpm dev`
+```
+
+`--print` puts the URL alone on stdout and the figures on stderr, so it pipes. Together they
+are how the hand-off is checked against the working tree instead of against production.
+
 No transcripts to hand it? **Try an example** builds a corpus in the page — nine invented
 sessions, priced by the same walk a real folder gets — so the report can be read on a phone,
 or on any machine Claude Code has never run on. The card says *example data* in its eyebrow

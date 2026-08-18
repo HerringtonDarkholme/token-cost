@@ -10,7 +10,10 @@ import { basename, join } from "node:path"
 import { gzipSync } from "node:zlib"
 import { closeWalk, openWalk, report, walkOne } from "../src/engine.ts"
 
-const REPORT_URL = "https://token-billing.vercel.app/"
+/** Where the report is read. The override is what lets `pnpm dev`, or a copy of the page someone
+ *  hosts themselves, stand in for the deployed one -- which is how the hand-off gets tested
+ *  against the working tree rather than against whatever is currently in production. */
+const REPORT_URL = process.env.TOKEN_BILLING_URL || "https://token-billing.vercel.app/"
 
 /** Windows caps a `cmd` command line at 8191 characters, which a corpus with enough distinct
  *  tools in it can exceed on its own. Past this the address goes through a file instead of
@@ -70,7 +73,11 @@ function handOff(url: string): void {
 }
 
 function main(): void {
-  const dir = process.argv[2] ?? join(homedir(), ".claude", "projects")
+  const argv = process.argv.slice(2)
+  /* Printing rather than opening is what a machine you reached over SSH needs, and it is how the
+     hand-off is tested without a browser being taken over to do it. */
+  const print = argv.includes("--print") || argv.includes("-p")
+  const dir = argv.find((a) => !a.startsWith("-")) ?? join(homedir(), ".claude", "projects")
   const paths: string[] = []
   try {
     walk(dir, paths)
@@ -130,11 +137,22 @@ function main(): void {
   }
 
   const payload = gzipSync(Buffer.from(JSON.stringify(data), "utf8")).toString("base64url")
+  const url = `${REPORT_URL.replace(/\/*$/, "/")}#d=${payload}`
+  if (print) {
+    /* The URL alone on stdout, so it can be piped. What it cost goes to stderr with the rest of
+       the narration. */
+    console.error(
+      `$${data.datasets["1h"].total.toFixed(2)} across ${data.requests} requests, ` +
+        `${data.sessions} session(s)`,
+    )
+    console.log(url)
+    return
+  }
   console.log(
     `$${data.datasets["1h"].total.toFixed(2)} across ${data.requests} requests, ` +
       `${data.sessions} session(s) -- opening ${REPORT_URL}`,
   )
-  handOff(`${REPORT_URL}#d=${payload}`)
+  handOff(url)
 }
 
 main()
