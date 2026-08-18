@@ -39,6 +39,7 @@
     "skipLibCheck": true
   },
   /* `*.ts` at the root is the two Vite configs, which are type-checked like anything else.
-     The app itself is under `src/`; the suites stay a peer of it rather than inside it. */
-  "include": ["*.ts", "src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"]
+     The app itself is under `src/`; the suites stay a peer of it rather than inside it; `bin/`
+     is the CLI, a Node entry point that imports the engine rather than living inside it. */
+  "include": ["*.ts", "src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "bin/**/*.ts"]
 }

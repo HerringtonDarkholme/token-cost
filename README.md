@@ -14,6 +14,19 @@ open cost-report.html          # standalone build — no server needed
 
 `cost-report.html` is build output, not something the repo carries.
 
+Or run it from a terminal instead of a browser tab — same engine, same walk, and it still
+never uploads a transcript anywhere:
+
+```sh
+pnpm cli                        # ~/.claude/projects, by default
+pnpm cli ~/.claude/projects/some-project
+```
+
+It prices your transcripts on your machine, then opens the deployed page with the answer —
+not the transcripts — carried in the URL's fragment, the one part of an address a browser
+never sends to a server. The page reads it, draws the report, and immediately rewrites the
+address down to a plain `/report`, so the fragment doesn't linger in history or a bookmark.
+
 No transcripts to hand it? **Try an example** builds a corpus in the page — nine invented
 sessions, priced by the same walk a real folder gets — so the report can be read on a phone,
 or on any machine Claude Code has never run on. The card says *example data* in its eyebrow
@@ -168,9 +181,10 @@ fetchable by any page that can reach localhost while the server runs.
 ## Tests
 
 ```sh
-pnpm test                            # all three suites
+pnpm test                            # all four suites
 pnpm test:engine                     # synthetic corpus: unknown model, tool, command, tag
 pnpm test:model                      # folding, drill-down and reconciliation, no DOM
+pnpm test:transfer                   # the CLI's gzip + base64url round-trip, byte for byte
 pnpm test:render                     # every view state, and the address, in a real DOM
 
 node test/engine.test.ts <dir>       # optionally also check a real transcript directory
@@ -293,6 +307,8 @@ file tool under any name gets the same treatment.
 |---|---|
 | `index.html` | document shell and Vite entry (needs the dev server) |
 | `vercel.json` | the deploy: `pnpm build`, serve `dist/`, hand `/report/*` to the document |
+| `bin/cli.ts` | `pnpm cli`: walks a folder, runs the engine, opens the deployed page with the answer in the URL's fragment |
+| `src/transfer.ts` | the page's half of that hand-off: reads the fragment, gzip-inflates it back into an `Analysis` |
 | `src/engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
 | `src/model.ts` | view model: folding, drill-down and the names it wears in the address, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
 | `src/store.ts` | view state, held outside the tree so the address and the tests can drive it; also which half of the address each key lives in; hover is a separate slice |
@@ -323,8 +339,9 @@ file tool under any name gets the same treatment.
 
 ### Reading the numbers from a terminal
 
-There is no CLI, but there doesn't need to be one: Node runs the engine's TypeScript directly,
-so a few lines get you any view of the data you want.
+`pnpm cli` (see **Run it**, above) is the visual report, opened from a terminal instead of a
+folder drop. For a bare number instead of a picture, Node runs the engine's TypeScript
+directly, so a few lines get you any view of the data you want.
 
 ```sh
 node --input-type=module -e '

@@ -237,14 +237,21 @@ export function applyUrl(data: Analysis | null): void {
   })
 }
 
-export function readHash(hash: string): Partial<ViewState> {
+/** The hash, split into its `key=value` pairs. Shared with `transfer.ts`, which reads the one
+ *  key that is not a view setting. */
+export function parseHash(hash: string): Record<string, string> {
   const h = (hash || "").replace(/^#/, "")
-  if (!h) return {}
   const p: Record<string, string> = {}
+  if (!h) return p
   h.split("&").forEach((kv) => {
     const [a, b] = kv.split("=")
     if (a) p[a] = decodeURIComponent(b || "")
   })
+  return p
+}
+
+export function readHash(hash: string): Partial<ViewState> {
+  const p = parseHash(hash)
   const out: Partial<ViewState> = {}
   if (p.ttl === "5m" || p.ttl === "1h") out.ttl = p.ttl
   if (p.c === "sun" || p.c === "mosaic") out.chart = p.c
