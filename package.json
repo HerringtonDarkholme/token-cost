@@ -20,11 +20,10 @@
   ],
   "packageManager": "pnpm@10.8.0",
   "bin": {
-    "token-billing": "./bin/cli.ts"
+    "token-billing": "./bin/cli.js"
   },
   "files": [
-    "bin/cli.ts",
-    "src/engine.ts"
+    "bin/cli.js"
   ],
   "scripts": {
     "dev": "vite",
@@ -33,6 +32,7 @@
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "build": "vite build",
+    "build:cli": "vite build --config vite.cli.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "pnpm run test:engine && pnpm run test:model && pnpm run test:transfer && pnpm run test:analytics && pnpm run test:render",
@@ -41,16 +41,21 @@
     "test:transfer": "node test/transfer.test.ts",
     "test:analytics": "node test/analytics.test.ts",
     "test:render": "vitest run",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test"
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run build:cli && pnpm run test",
+    "prepack": "pnpm run build:cli"
   },
   "devDependencies": {
+    "@number-flow/react": "^0.6.2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@vercel/analytics": "^2.0.1",
     "@vitejs/plugin-react": "^6.0.5",
     "happy-dom": "^20.11.2",
     "oxfmt": "^0.63.0",
     "oxlint": "^1.78.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vite-plugin-singlefile": "^2.3.3",
@@ -58,11 +63,5 @@
   },
   "engines": {
     "node": ">=22.18.0"
-  },
-  "dependencies": {
-    "@number-flow/react": "^0.6.2",
-    "@vercel/analytics": "^2.0.1",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
   }
 }

@@ -44,17 +44,16 @@ changes language — English, 简体中文, 日本語, Español, Français, Deut
 Same engine, no browser needed to do the work. Needs **Node 22.18+**.
 
 ```sh
-git clone https://github.com/HerringtonDarkholme/token-cost && cd token-cost
-pnpm install
-
-pnpm cli                                  # ~/.claude/projects, then opens the report
-pnpm cli ~/.claude/projects/some-project  # one project
-pnpm cli --print                          # print the URL instead of opening it
+npx token-billing                                  # ~/.claude/projects, then opens the report
+npx token-billing ~/.claude/projects/some-project  # just one project
+npx token-billing --print                          # print the URL instead of opening it
 ```
+
+Nothing to install and no dependencies — it is one bundled file that imports only Node builtins.
 
 It prices everything on your machine and puts the *answer* — not your transcripts — in the
 URL's fragment, which browsers never send to a server. `--print` is for a machine reached over
-SSH: it puts the URL on stdout and the totals on stderr.
+SSH: the URL goes to stdout and the totals to stderr, so it pipes.
 
 ## Nothing is uploaded
 
@@ -85,7 +84,15 @@ context by token share. **Totals are exact; the per-row split is estimated.**
 
 ## Contributing
 
+```sh
+git clone https://github.com/HerringtonDarkholme/token-cost && cd token-cost
+pnpm install
+pnpm dev        # the page, on http://127.0.0.1:8000
+pnpm cli        # the command, straight from source
+pnpm check      # format, lint, typecheck, both builds, all five test suites
+```
+
 See [CLAUDE.md](CLAUDE.md) for repo conventions and [DESIGN_BRIEF.md](DESIGN_BRIEF.md) for the
-UI constraints. `pnpm check` runs format, lint, typecheck, build and all five test suites.
+UI constraints.
 
 MIT

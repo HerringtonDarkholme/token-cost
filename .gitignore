@@ -14,6 +14,7 @@ report_data.json
 node_modules/
 dist/
 cost-report.html
+bin/cli.js
 .vite/
 *.log
 *.tsbuildinfo
