@@ -8,7 +8,7 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { gzipSync } from "node:zlib"
-import { closeWalk, openWalk, report, walkOne } from "../src/engine.ts"
+import { closeWalk, openWalk, report, skipFile, walkOne } from "../src/engine.ts"
 
 /** Where the report is read. The override is what lets `pnpm dev`, or a copy of the page someone
  *  hosts themselves, stand in for the deployed one -- which is how the hand-off gets tested
@@ -101,6 +101,9 @@ function main(): void {
     try {
       walkOne(w, { name: basename(p), text: readFileSync(p, "utf8") })
     } catch (e) {
+      /* Counted, not just printed: the report rides into the page over a URL, and a total that is
+         short has to say so there too. */
+      skipFile(w)
       console.error(`skipped ${basename(p)}: ${(e as Error).message}`)
       continue
     }

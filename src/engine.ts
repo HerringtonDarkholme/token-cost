@@ -870,14 +870,14 @@ function hold(
   h.adds.push({ slot, amt, cls })
 }
 
-/** Read one file into `st`. `false` means it was a duplicate of one already read -- the answer
- *  goes back to the caller because the caller is the one keeping count of what it handed over. */
 /** A transcript the reader could not open, which the bill has to admit to rather than quietly
  *  leave out. */
 export function skipFile(st: Walk): void {
   st.filesSkipped++
 }
 
+/** Read one file into `st`. `false` means it was a duplicate of one already read -- the answer
+ *  goes back to the caller because the caller is the one keeping count of what it handed over. */
 export function walkOne(st: Walk, f: RawFile): boolean {
   const m = SESSION_RE.exec(f.text || "")
   const id = detach((m ? m[1] : f.name) + "::" + (f.text || "").length)

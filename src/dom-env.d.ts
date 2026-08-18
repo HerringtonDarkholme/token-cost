@@ -13,3 +13,9 @@ declare function showDirectoryPicker(options?: {
     | "pictures"
     | "videos"
 }): Promise<FileSystemDirectoryHandle>
+
+interface DataTransferItem {
+  /** Chrome and Edge only, and the reason a dropped store can be read from a live handle rather
+   *  than from a snapshot; the others hand over a `FileSystemEntry` instead. */
+  getAsFileSystemHandle?: () => Promise<FileSystemHandle | null>
+}

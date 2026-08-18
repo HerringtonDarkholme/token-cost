@@ -140,7 +140,7 @@ interface Picked {
   file: File
   /** Relative to the chosen folder, that folder's own name first. */
   path: string
-  /** Kept for the retry below, and absent on the drop and the input, which hand over no handle. */
+  /** What the read takes its bytes from, and absent on the file input, which hands over none. */
   handle?: FileSystemFileHandle
 }
 
@@ -180,6 +180,18 @@ async function walkDir(dir: FileSystemDirectoryHandle, at: string, out: Picked[]
     const path = `${at}/${kid.name}`
     if (kid.kind === "directory") await walkDir(kid, path, out)
     else out.push({ file: await kid.getFile(), path, handle: kid })
+  }
+}
+
+/** One dropped item, taken as a handle rather than as an entry: a folder is walked the same way a
+ *  picked one is, so a transcript arriving this way carries the handle its read needs. */
+export async function pickHandle(h: FileSystemHandle, out: Picked[]): Promise<void> {
+  /* `kind` is what tells the two apart at runtime, and the cast is the type system being told the
+     same thing: `FileSystemHandle` is not a union the check can narrow. */
+  if (h.kind === "directory") await walkDir(h as FileSystemDirectoryHandle, h.name, out)
+  else {
+    const f = h as FileSystemFileHandle
+    out.push({ file: await f.getFile(), path: f.name, handle: f })
   }
 }
 
@@ -329,13 +341,11 @@ export interface Source {
   read: () => Promise<string>
 }
 
-/** A `File` is a snapshot, and Chrome rejects the read with `NotReadableError` if the transcript
- *  grew under it, so the retry takes a fresh one. */
+/** The `File` beside the handle is a snapshot from the listing, minutes stale by the time the read
+ *  reaches it, and Chrome rejects `text()` with `NotReadableError` if a live session appended in
+ *  between -- so where there is a handle the bytes are taken from a fresh one. */
 export function readPicked(p: Picked): Promise<string> {
-  return p.file.text().catch((e: unknown) => {
-    if (!p.handle || (e as DOMException).name !== "NotReadableError") throw e
-    return p.handle.getFile().then((f) => f.text())
-  })
+  return p.handle ? p.handle.getFile().then((f) => f.text()) : p.file.text()
 }
 
 /** The corpus one transcript at a time, `null` for the ones that would not read: a store is a
@@ -490,7 +500,10 @@ export function Intake({
     }
 
     const w = openWalk()
-    const { skipped, firstErr } = await readEach(files, (name, text, i) => {
+    /* A rejected read is `null` and counted inside, so what is left for the `catch` is the walk
+       itself coming apart -- which has to end with a message rather than with the column sitting
+       there. */
+    const read = await readEach(files, (name, text, i) => {
       if (text !== null) {
         walkOne(w, { name, text })
         /* Left where the header can find it, on every file rather than on a beat: this is two
@@ -499,9 +512,13 @@ export function Intake({
         sofar.current = billedSoFar(w)
       } else skipFile(w)
       return step(i, files.length, name)
+    }).catch((e: unknown) => {
+      stop(t.intake.errRead((e as Error).message))
+      return null
     })
-    if (firstErr && skipped === files.length) {
-      stop(t.intake.errRead(firstErr.message))
+    if (!read) return
+    if (read.firstErr && read.skipped === files.length) {
+      stop(t.intake.errRead(read.firstErr.message))
       return
     }
 
@@ -536,18 +553,35 @@ export function Intake({
   async function onDrop(e: React.DragEvent): Promise<void> {
     e.preventDefault()
     setOver(false)
-    const items = e.dataTransfer?.items
-    if (items && items.length && typeof items[0].webkitGetAsEntry === "function") {
-      const out: Picked[] = []
-      const entries = [...items]
-        .map((i) => i.webkitGetAsEntry())
-        .filter((x): x is FileSystemEntry => !!x)
-      await Promise.all(entries.map((entry) => walkEntry(entry, out)))
-      await handle(out)
-    } else {
-      // Loose files, and no folder above them to name: the path is the file.
-      await handle([...(e.dataTransfer?.files ?? [])].map((f) => ({ file: f, path: f.name })))
+    /* Everything the drop is carrying, read off the event before the first `await`: the item list
+       and its files are only good for the duration of the handler. Both APIs are asked at once
+       because which one answers is the browser's business -- Chrome hands over a handle, and the
+       rest hand over an entry whose `File` is a snapshot the read cannot refresh. */
+    const items = [...(e.dataTransfer?.items ?? [])]
+    const handles = items.map((i) =>
+      typeof i.getAsFileSystemHandle === "function"
+        ? i.getAsFileSystemHandle().catch(() => null)
+        : null,
+    )
+    const entries = items.map((i) =>
+      typeof i.webkitGetAsEntry === "function" ? i.webkitGetAsEntry() : null,
+    )
+    const loose = [...(e.dataTransfer?.files ?? [])]
+    const out: Picked[] = []
+    const got = await Promise.all(handles)
+    await Promise.all(
+      got.map((h, i) => {
+        if (h) return pickHandle(h, out)
+        const entry = entries[i]
+        return entry ? walkEntry(entry, out) : Promise.resolve()
+      }),
+    )
+    // Loose files, and no folder above them to name: the path is the file.
+    if (!out.length && loose.length) {
+      await handle(loose.map((f) => ({ file: f, path: f.name })))
+      return
     }
+    await handle(out)
   }
 
   /* Which of the two carries the weight is the device's answer, so both are written once and the
