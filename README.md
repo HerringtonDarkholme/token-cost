@@ -63,6 +63,20 @@ it has no filesystem access of its own, and **nothing here points at or serves y
 transcripts.** Handing over a folder hands over its contents to *the page*, not to a server:
 the build gate fails if anything in here reaches the network at all.
 
+The hosted copy counts pageviews, and that is the only request it makes that is not the page
+itself. What it reports is one of two strings — `/` or `/report` — because the address is not
+safe to send: a drill segment is one of *your* line-item names, and
+`/report/tools-content-read-in/acmeinternal-fetch-ledger` names an in-house MCP server after
+somebody's employer. `scrub` in `src/analytics.ts` answers with a whitelist of those two rather
+than by rewriting what it recognises, so a name it has never seen cannot get out; the hash
+never rides along either, which matters because a report handed over by the CLI travels in it.
+`pnpm test:analytics` walks every name a corpus produces and asserts each one scrubs away.
+
+The standalone `cost-report.html` counts nothing. It is opened from disk, where the promise
+above is absolute, and `hosted()` declines on both counts — the `file:` protocol, and the
+`.html` that tells the saved copy apart from the deployed page when someone serves it
+themselves.
+
 The one thing that ever leaves is what you choose to post. *Share to X* renders the card to
 your clipboard and opens a composer with a caption already written — one of six, drawn at
 random. A caption quotes figures, and at most the names of widely known programs (`git`,
@@ -81,7 +95,7 @@ pnpm dev              # http://127.0.0.1:8000
 pnpm format           # oxfmt, which owns everything under src/
 pnpm typecheck        # tsc --noEmit, the only thing that judges types
 pnpm build            # bundle + inline everything into dist/ and cost-report.html
-pnpm check            # format, lint, typecheck, build, then all three test suites
+pnpm check            # format, lint, typecheck, build, then all five test suites
 ```
 
 `pnpm build` writes `dist/index.html` — what Vercel serves — and copies it to
@@ -89,7 +103,11 @@ pnpm check            # format, lint, typecheck, build, then all three test suit
 classic (non-module) inline script, because a `type="module"` script is fetched under module
 rules that a `file://` page cannot rely on. The build then asserts the result is genuinely
 self-contained — no `<script src>`, no stylesheet link, no absolute URL, no CSS `@import` —
-and fails rather than ship a page that would reach the network when opened.
+and fails rather than ship a page that would reach the network when opened. It reads HTML
+attributes, so it is a check on what the document *links*, not on every URL a bundled script
+could build at runtime: the analytics endpoint is assembled from a template literal and goes
+straight past it, which is why what keeps it out of the standalone file is `hosted()` and a
+test, rather than this.
 
 ## Languages
 
@@ -206,10 +224,11 @@ fetchable by any page that can reach localhost while the server runs.
 ## Tests
 
 ```sh
-pnpm test                            # all four suites
+pnpm test                            # all five suites
 pnpm test:engine                     # synthetic corpus: unknown model, tool, command, tag
 pnpm test:model                      # folding, drill-down and reconciliation, no DOM
 pnpm test:transfer                   # the CLI's gzip + base64url round-trip, byte for byte
+pnpm test:analytics                  # what a pageview may say, and which copies say it
 pnpm test:render                     # every view state, and the address, in a real DOM
 
 node test/engine.test.ts <dir>       # optionally also check a real transcript directory
@@ -334,6 +353,7 @@ file tool under any name gets the same treatment.
 | `vercel.json` | the deploy: `pnpm build`, serve `dist/`, hand `/report/*` to the document |
 | `bin/cli.ts` | `pnpm cli`: walks a folder, runs the engine, opens the deployed page with the answer in the URL's fragment |
 | `src/transfer.ts` | the page's half of that hand-off: reads the fragment, gzip-inflates it back into an `Analysis` |
+| `src/analytics.ts` | the hosted copy's pageview counter, and the whitelist that keeps your line-item names out of it |
 | `src/engine.ts` | attribution engine: JSONL → cost tree. No React, no DOM |
 | `src/model.ts` | view model: folding, drill-down and the names it wears in the address, the ledger walk, the sunburst's ring geometry, the palette, the share captions. No React, no DOM |
 | `src/store.ts` | view state, held outside the tree so the address and the tests can drive it; also which half of the address each key lives in; hover is a separate slice |

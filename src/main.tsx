@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client"
 import { App } from "./App.tsx"
 import { readHash, setState } from "./store.ts"
 import { takeImport } from "./transfer.ts"
+import { startAnalytics } from "./analytics.ts"
 
 const host = document.getElementById("app")
 if (!host) throw new Error("missing #app in the document")
@@ -16,6 +17,10 @@ if (!host) throw new Error("missing #app in the document")
    taken out of the address rather than left in it. */
 takeImport()
 setState(readHash(location.hash))
+
+/* After `takeImport`, which is not an ordering to lose: it is what takes the report back out of
+   the address before anything is in a position to report that address anywhere. */
+startAnalytics()
 
 createRoot(host).render(
   <StrictMode>
