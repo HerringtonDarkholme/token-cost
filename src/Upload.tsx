@@ -7,6 +7,7 @@ import {
   closeWalk,
   openWalk,
   report,
+  skipFile,
   walkOne,
   type Analysis,
   type Scanned,
@@ -139,6 +140,8 @@ interface Picked {
   file: File
   /** Relative to the chosen folder, that folder's own name first. */
   path: string
+  /** Kept for the retry below, and absent on the drop and the input, which hand over no handle. */
+  handle?: FileSystemFileHandle
 }
 
 /** Claude Code names a project's folder after the directory it ran in, separators and all
@@ -176,7 +179,7 @@ async function walkDir(dir: FileSystemDirectoryHandle, at: string, out: Picked[]
   for await (const kid of dir.values()) {
     const path = `${at}/${kid.name}`
     if (kid.kind === "directory") await walkDir(kid, path, out)
-    else out.push({ file: await kid.getFile(), path })
+    else out.push({ file: await kid.getFile(), path, handle: kid })
   }
 }
 
@@ -321,9 +324,55 @@ function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
 /** One transcript, however it is going to be produced: a file off the disk, or a line of the
  *  example built on demand. The walk below reads them strictly one at a time, so neither kind is
  *  ever held in full. */
-interface Source {
+export interface Source {
   name: string
   read: () => Promise<string>
+}
+
+/** A `File` is a snapshot, and Chrome rejects the read with `NotReadableError` if the transcript
+ *  grew under it, so the retry takes a fresh one. */
+export function readPicked(p: Picked): Promise<string> {
+  return p.file.text().catch((e: unknown) => {
+    if (!p.handle || (e as DOMException).name !== "NotReadableError") throw e
+    return p.handle.getFile().then((f) => f.text())
+  })
+}
+
+/** The corpus one transcript at a time, `null` for the ones that would not read: a store is a
+ *  live directory, so stopping at the first bad file threw away everything already priced. */
+export async function readEach(
+  files: readonly Source[],
+  onFile: (name: string, text: string | null, i: number) => Promise<void> | void,
+): Promise<{ skipped: number; firstErr: Error | null }> {
+  /* One read runs ahead of the walk, and only one: reading a transcript is the disk's work and
+     walking it is this thread's, and done strictly in turn each waits out the other. The empty
+     `catch` marks the read as handled so a failure mid-corpus is not also an unhandled
+     rejection -- the `await` below still throws it. */
+  const readAt = (i: number): Promise<string> | null => {
+    if (i >= files.length) return null
+    const p = files[i].read()
+    p.catch(() => {})
+    return p
+  }
+  let ahead = readAt(0)
+  let skipped = 0
+  let firstErr: Error | null = null
+  /* oxlint-disable no-await-in-loop -- awaiting each file in turn is the point of the loop rather
+     than an oversight in it. `Promise.all` over the reads holds the whole folder at once, which
+     for a real store is a few hundred megabytes of string and twice that in memory. */
+  for (const [i, p] of files.entries()) {
+    let text: string | null = null
+    try {
+      text = await ahead!
+    } catch (e) {
+      skipped++
+      firstErr ??= e as Error
+    }
+    ahead = readAt(i + 1)
+    await onFile(p.name, text, i)
+  }
+  /* oxlint-enable no-await-in-loop */
+  return { skipped, firstErr }
 }
 
 export function Intake({
@@ -382,7 +431,7 @@ export function Intake({
       return
     }
     await walkFiles(
-      files.map((p) => ({ name: p.file.name, read: () => p.file.text() })),
+      files.map((p) => ({ name: p.file.name, read: () => readPicked(p) })),
       where,
       false,
     )
@@ -440,38 +489,19 @@ export function Intake({
       await new Promise((r) => setTimeout(r, 0))
     }
 
-    /* oxlint-disable no-await-in-loop -- awaiting each file in turn is the point of the loop
-       rather than an oversight in it. `Promise.all` over the reads is what this replaced: it
-       resolves with every transcript in the folder held at once, which for a real store is a few
-       hundred megabytes of string and twice that in memory, and it hands the page a single
-       uninterruptible block of work at the end. One at a time costs wall-clock and buys back the
-       memory and the frame. A block rather than a line comment, since which line the `await`
-       lands on is the formatter's to decide. */
     const w = openWalk()
-    /* One read runs ahead of the walk, and only one: reading a transcript is the disk's work and
-       walking it is this thread's, and done strictly in turn each waits out the other. The empty
-       `catch` marks the read as handled so a failure mid-corpus is not also an unhandled
-       rejection -- the `await` below still throws it. */
-    const readAt = (i: number): Promise<string> | null => {
-      if (i >= files.length) return null
-      const p = files[i].read()
-      p.catch(() => {})
-      return p
-    }
-    let ahead = readAt(0)
-    try {
-      for (const [i, p] of files.entries()) {
-        const text = await ahead!
-        ahead = readAt(i + 1)
-        walkOne(w, { name: p.name, text })
+    const { skipped, firstErr } = await readEach(files, (name, text, i) => {
+      if (text !== null) {
+        walkOne(w, { name, text })
         /* Left where the header can find it, on every file rather than on a beat: this is two
            adds and a multiply, and deciding how often it is worth looking at is the job of
            whoever is drawing it. */
         sofar.current = billedSoFar(w)
-        await step(i, files.length, p.name)
-      }
-    } catch (e) {
-      stop(t.intake.errRead((e as Error).message))
+      } else skipFile(w)
+      return step(i, files.length, name)
+    })
+    if (firstErr && skipped === files.length) {
+      stop(t.intake.errRead(firstErr.message))
       return
     }
 
@@ -498,7 +528,6 @@ export function Intake({
       )
       return
     }
-    /* oxlint-enable no-await-in-loop */
     /* Handed over only once the walk is done and scored, so the card's turn plays against a free
        main thread rather than against the tail of the work. */
     onData(data, sample)

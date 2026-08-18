@@ -250,6 +250,7 @@ export function Footnotes(): React.JSX.Element {
       <div>
         <h3>{t.foot.caveats}</h3>
         <ul className="cav">
+          {data.filesSkipped ? <li>{t.foot.skippedCaveat(count(data.filesSkipped))}</li> : null}
           <li>{t.foot.ttlCaveat(money(lensGap))}</li>
           <li>{t.foot.outputCaveat}</li>
           <li>{t.foot.foldCaveat((FOLD_MIN * 100).toFixed(1) + "%")}</li>
