@@ -31,6 +31,16 @@ not the transcripts — carried in the URL's fragment, the one part of an addres
 never sends to a server. The page reads it, draws the report, and immediately rewrites the
 address down to a plain `/report`, so the fragment doesn't linger in history or a bookmark.
 
+It reads one transcript at a time rather than gathering the folder first, for the reason the
+page does: a real `~/.claude/projects` runs to hundreds of megabytes, and holding that as
+strings costs twice that. Where the report is big enough that the URL would outrun a Windows
+command line, the address goes to the browser through a `0600` temp file instead of through
+the shell.
+
+Node **22.18 or newer**, because the command is TypeScript that Node runs by stripping the
+types, and that is when it stopped needing a flag. 22.17 and every 20.x fail at the shebang
+with `ERR_UNKNOWN_FILE_EXTENSION`, which is why the floor is not lower.
+
 No transcripts to hand it? **Try an example** builds a corpus in the page — nine invented
 sessions, priced by the same walk a real folder gets — so the report can be read on a phone,
 or on any machine Claude Code has never run on. The card says *example data* in its eyebrow

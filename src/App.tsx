@@ -7,7 +7,7 @@ import { useT } from "./copy.tsx"
 import { tagOf } from "./i18n.ts"
 import { canTransition, cssMs, reduced, transition } from "./Motion.tsx"
 import { Page, type Dir } from "./Page.tsx"
-import { decodeImport, readImport, stripImport } from "./transfer.ts"
+import { decodeImport, pendingImport } from "./transfer.ts"
 
 /** How long the departing face is held on the fallback path. */
 function exitMs(): number {
@@ -117,21 +117,15 @@ export function App(): React.JSX.Element {
     [turnTo],
   )
 
-  /* A report the CLI dropped in the address rather than a folder dropped on the card. Stripped
-     from the hash before it is even decoded, so a payload that fails to come back as an
-     `Analysis` does not linger in the address bar either. */
+  /* A report the CLI dropped in the address rather than a folder dropped on the card. It was
+     lifted out of the hash before the first render -- see `takeImport` -- so what is left here is
+     the decode. Latched rather than left to the dependency list: StrictMode runs an effect twice
+     on mount, and turning the card over twice would push a second history entry. */
+  const imported = useRef(false)
   useEffect(() => {
-    const raw = readImport(location.hash)
-    if (!raw) return
-    try {
-      history.replaceState(
-        null,
-        "",
-        location.pathname + location.search + stripImport(location.hash),
-      )
-    } catch {
-      /* file:// can refuse */
-    }
+    const raw = pendingImport()
+    if (!raw || imported.current) return
+    imported.current = true
     void (async () => {
       const data = await decodeImport(raw)
       if (data) onData(data, false)
