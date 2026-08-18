@@ -7,20 +7,10 @@ settings:
 importers:
 
   .:
-    dependencies:
+    devDependencies:
       '@number-flow/react':
         specifier: ^0.6.2
         version: 0.6.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@vercel/analytics':
-        specifier: ^2.0.1
-        version: 2.0.1(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
-    devDependencies:
       '@types/node':
         specifier: ^24.13.3
         version: 24.13.3
@@ -30,6 +20,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.4
         version: 19.2.4(@types/react@19.2.18)
+      '@vercel/analytics':
+        specifier: ^2.0.1
+        version: 2.0.1(react@19.2.8)
       '@vitejs/plugin-react':
         specifier: ^6.0.5
         version: 6.0.5(vite@8.2.1(@types/node@24.13.3)(esbuild@0.28.2))
@@ -42,6 +35,12 @@ importers:
       oxlint:
         specifier: ^1.78.0
         version: 1.78.0
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
