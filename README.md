@@ -18,7 +18,11 @@ Or run it from a terminal instead of a browser tab — same engine, same walk, a
 never uploads a transcript anywhere:
 
 ```sh
-pnpm cli                        # ~/.claude/projects, by default
+npx token-billing                              # ~/.claude/projects, by default
+npx token-billing ~/.claude/projects/some-project
+
+# from inside this repo, without installing the published package:
+pnpm cli
 pnpm cli ~/.claude/projects/some-project
 ```
 

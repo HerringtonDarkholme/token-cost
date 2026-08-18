@@ -1,5 +1,5 @@
 {
-  "name": "claude-cost-report",
+  "name": "token-billing",
   "version": "0.1.0",
   "type": "module",
   "description": "Trace Claude Code session spend to whatever put the tokens in context",
@@ -13,7 +13,7 @@
   "keywords": ["claude-code", "claude", "cost", "billing", "token", "cli"],
   "packageManager": "pnpm@10.8.0",
   "bin": {
-    "claude-cost-report": "./bin/cli.ts"
+    "token-billing": "./bin/cli.ts"
   },
   "files": ["bin/cli.ts", "src/engine.ts"],
   "scripts": {
