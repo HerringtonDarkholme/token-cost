@@ -3,11 +3,22 @@
 import { useEffect, useRef, useState } from "react"
 import { useReport } from "./context.ts"
 import { useT, type Dict } from "./copy.tsx"
+import { onIdle } from "./idle.ts"
 import { postText } from "./model.ts"
 import { TextSwap } from "./Motion.tsx"
 import { download, snapshot } from "./snapshot.ts"
 
 const FILENAME = "where-the-money-went.png"
+
+/** The captions, which are six languages of prose and the only thing on the page that reads them
+ *  is the button below: they are fetched rather than bundled, so a visit that shares nothing never
+ *  pays for them. Kept once fetched, because the promise is what both the prefetch and the click
+ *  wait on. */
+let captions: Promise<typeof import("./post-copy.ts")> | null = null
+
+function loadCaptions(): Promise<typeof import("./post-copy.ts")> {
+  return (captions ??= import("./post-copy.ts"))
+}
 
 /** Not a result, so it never times out: "busy" ends when the work does. */
 type Outcome = "busy" | "copied" | "saved" | "failed"
@@ -34,10 +45,10 @@ function useOutcome(ms = 6000): [Outcome | null, (o: Outcome | null) => void] {
 }
 
 /** The card as a PNG, on the clipboard or on disk, with `then` run only if it got there. */
-function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
+function useChartPng(): [Outcome | null, (then?: () => void | Promise<void>) => Promise<void>] {
   const [at, setAt] = useOutcome()
 
-  const run = async (then?: () => void): Promise<void> => {
+  const run = async (then?: () => void | Promise<void>): Promise<void> => {
     const card = document.querySelector<HTMLElement>(".card")
     if (!card) {
       setAt("failed")
@@ -65,7 +76,7 @@ function useChartPng(): [Outcome | null, (then?: () => void) => Promise<void>] {
       }
     }
     setAt(done)
-    then?.()
+    await then?.()
   }
 
   return [at, run]
@@ -122,17 +133,28 @@ export function ShareButton(): React.JSX.Element {
   const t = useT()
   const words = shareWords(t)
 
+  /* Asked for as soon as this button is on screen, which is only ever where there is a report to
+     share: by the time anyone clicks, the fetch is a resolved promise. */
+  useEffect(() => onIdle(() => void loadCaptions()), [])
+
   const share = (): void => {
     /* Where the invitation points: this page, if it is somewhere a reader can be sent. */
     const home =
       location.protocol === "http:" || location.protocol === "https:"
         ? location.origin + location.pathname
         : null
-    const url =
-      "https://x.com/intent/post?text=" + encodeURIComponent(postText(d, state.pctOnly, home))
+    /* Started here rather than awaited before `run`: the clipboard write inside it only counts as
+       tied to this click while nothing has been awaited yet. */
+    const fetching = loadCaptions()
     /* Opened last, and only on success, so a blocked popup cannot cost the reader the image. */
-    void run(() => {
-      window.open(url, "_blank", "noopener,noreferrer")
+    void run(async () => {
+      const { postCopy } = await fetching
+      const text = postText(d, state.pctOnly, home, postCopy(state.lang))
+      window.open(
+        "https://x.com/intent/post?text=" + encodeURIComponent(text),
+        "_blank",
+        "noopener,noreferrer",
+      )
     })
   }
 

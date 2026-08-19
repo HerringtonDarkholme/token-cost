@@ -43,9 +43,9 @@ function boot(address: string): void {
 }
 
 /** The turn is a timeout, and the decode is a stream: both have to drain. */
-async function settle(): Promise<void> {
+async function settle(ms = 600): Promise<void> {
   await act(async () => {
-    await new Promise((r) => setTimeout(r, 600))
+    await new Promise((r) => setTimeout(r, ms))
   })
 }
 
@@ -71,7 +71,9 @@ describe("a report handed over by the CLI", () => {
 
   it("ignores a fragment that is not a report", async () => {
     boot("/#d=not-a-real-payload")
-    await settle()
+    /* Longer than the rest: a fragment that fails to decode has to drain the stream *and* then
+       fetch the face it was never going to need, which the successful path already has in hand. */
+    await settle(1500)
     expect(location.pathname).toBe("/")
     /* And falls back to the face it did not fetch: the card has to be droppable again. */
     expect(container.querySelector(".cardslot > .dropzone")).not.toBeNull()

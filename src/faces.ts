@@ -3,6 +3,7 @@
 
 import { useSyncExternalStore } from "react"
 import type { Dict } from "./copy.tsx"
+import { onIdle } from "./idle.ts"
 import type { Analysis, Dataset } from "./engine.ts"
 
 /** What the card holds once there is a bill, and what stands under it. */
@@ -66,9 +67,7 @@ async function fetchFace(kind: FaceKind): Promise<void> {
  *  click away in either direction, and a card that turns to an empty slot is worse than a chunk
  *  fetched and never used. */
 export function prefetchFace(kind: FaceKind): void {
-  const idle = globalThis.requestIdleCallback
-  if (idle) idle(() => void loadFace(kind))
-  else setTimeout(() => void loadFace(kind), 1000)
+  onIdle(() => void loadFace(kind))
 }
 
 /** Whichever faces are in hand, re-read when one arrives. */

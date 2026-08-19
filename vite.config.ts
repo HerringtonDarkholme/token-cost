@@ -4,12 +4,14 @@ import { fileURLToPath } from "node:url"
 
 const root = fileURLToPath(new URL(".", import.meta.url))
 
-/** What each face is fetched *for*: the empty card owns the walk and the picker, the report owns
- *  the charts. A static import from anywhere else quietly moves one of these back into the entry,
+/** What each chunk is fetched *for*: the empty card owns the walk and the picker, the report owns
+ *  the charts, and the share captions are six languages of prose nobody who does not click Share
+ *  ever needs. A static import from anywhere else quietly moves one of these back into the entry,
  *  where every visit pays for it -- which looks like nothing until you read the chunk sizes. */
 const OWNED: Record<string, string[]> = {
   FaceIntake: ["Upload.tsx", "engine.ts", "sample.ts"],
   FaceReport: ["Report.tsx", "Sunburst.tsx", "Mosaic.tsx", "Ledger.tsx", "Panels.tsx"],
+  "post-copy": ["post-copy.ts"],
 }
 
 /** Which source files went into a chunk, in the one spelling both bundlers agree on. */
@@ -18,26 +20,26 @@ function ids(c: { moduleIds?: string[]; modules?: Record<string, unknown> }): st
 }
 
 /** The split, asserted rather than hoped for. */
-function faces(): Plugin {
+function split(): Plugin {
   return {
-    name: "faces-are-split",
+    name: "chunks-are-split",
     generateBundle(_options, bundle) {
       const chunks = Object.values(bundle).filter((c) => c.type === "chunk")
       const entry = chunks.find((c) => c.isEntry)
       if (!entry) throw new Error("build produced no entry chunk")
 
-      for (const [face, owned] of Object.entries(OWNED)) {
-        const chunk = chunks.find((c) => c.name === face)
-        if (!chunk) throw new Error(`${face} is no longer a chunk of its own`)
+      for (const [lazy, owned] of Object.entries(OWNED)) {
+        const chunk = chunks.find((c) => c.name === lazy)
+        if (!chunk) throw new Error(`${lazy} is no longer a chunk of its own`)
         for (const file of owned) {
           const tail = `/src/${file}`
           if (ids(entry).some((id) => id.endsWith(tail)))
             throw new Error(
-              `src/${file} is in the entry chunk rather than ${face} — something imports it ` +
+              `src/${file} is in the entry chunk rather than ${lazy} — something imports it ` +
                 "statically, so every visit downloads it",
             )
           if (!ids(chunk).some((id) => id.endsWith(tail)))
-            throw new Error(`src/${file} is no longer in ${face}`)
+            throw new Error(`src/${file} is no longer in ${lazy}`)
         }
       }
     },
@@ -53,7 +55,7 @@ function faces(): Plugin {
 export default defineConfig({
   root,
   base: "/",
-  plugins: [react(), faces()],
+  plugins: [react(), split()],
   build: { target: "es2022" },
   server: { host: "127.0.0.1", port: 8000 },
 })

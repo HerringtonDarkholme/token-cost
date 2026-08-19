@@ -2,8 +2,8 @@
    numbers the components draw, with no React and no DOM in sight. */
 
 import type { Analysis, Dataset, GroupId, Insights } from "./engine.ts"
-import { lang, tag, type Lang } from "./i18n.ts"
-import { postCopy, type PostCopy } from "./post-copy.ts"
+import { tag } from "./i18n.ts"
+import type { PostCopy } from "./post-copy.ts"
 
 /* Every level of the tree -- group, item, child, and the synthetic "other" row folding produces
    -- is drawn by the same components, so they share one shape. */
@@ -472,8 +472,7 @@ export interface Facts {
   per: (cost: number, n: number) => string | null
 }
 
-function factsOf(d: Dataset, pctOnly: boolean, l: Lang): Facts {
-  const c = postCopy(l)
+function factsOf(d: Dataset, pctOnly: boolean, c: PostCopy): Facts {
   const amt = (cost: number): string => (pctOnly ? share(cost, d.total) : money(cost))
   const sayable = (cost: number): boolean => /[1-9]/.test(amt(cost))
 
@@ -724,11 +723,13 @@ function assemble(draft: Draft, home?: string | null): string {
 export function postVariants(
   d: Dataset,
   pctOnly: boolean,
-  home?: string | null,
-  /** Which language to write them in. */
-  l: Lang = lang(),
+  home: string | null | undefined,
+  /** The sentences to write them in, handed over rather than picked here: the captions are six
+   *  languages of prose that only the Share button ever reads, so they are fetched on the click
+   *  instead of riding into the entry chunk with the arithmetic. */
+  c: PostCopy,
 ): string[] {
-  const f = factsOf(d, pctOnly, l)
+  const f = factsOf(d, pctOnly, c)
   return VARIANTS.flatMap((v) => v(f) || []).map((draft) => assemble(draft, home))
 }
 
@@ -737,11 +738,11 @@ export function postVariants(
 export function postText(
   d: Dataset,
   pctOnly: boolean,
-  home?: string | null,
+  home: string | null | undefined,
+  c: PostCopy,
   pick: number = Math.random(),
-  l: Lang = lang(),
 ): string {
-  const all = postVariants(d, pctOnly, home, l)
+  const all = postVariants(d, pctOnly, home, c)
   const i = Math.min(all.length - 1, Math.max(0, Math.floor(pick * all.length)))
   return all[i]
 }

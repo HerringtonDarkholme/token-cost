@@ -174,7 +174,12 @@ export function Page({
   /* The face on show, and then the other one once the browser goes quiet -- a turn is one click
      away in either direction, and it has to find the face it turns to already here. */
   useEffect(() => {
-    if (!wants) return
+    /* Neither face is wanted while a handed-over report decodes -- but that decode can come back
+       with nothing, and the empty card is what stands in for it. */
+    if (!wants) {
+      prefetchFace("intake")
+      return
+    }
     void loadFace(wants)
     prefetchFace(wants === "report" ? "intake" : "report")
   }, [wants])

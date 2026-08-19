@@ -147,8 +147,14 @@ export function App(): React.JSX.Element {
       /* Together rather than in turn: the decode is a gzip stream and the face is a fetch, and
          neither is waiting on the other. */
       const [data] = await Promise.all([decodeImport(raw), loadFace("report")])
-      if (data) onData(data, false)
-      else setImporting(false)
+      if (data) {
+        onData(data, false)
+        return
+      }
+      /* Awaited before the card is handed back, the way `onReset` does it: a link that decodes to
+         nothing has to arrive at a droppable card rather than at an empty slot. */
+      await loadFace("intake")
+      setImporting(false)
     })()
   }, [onData])
 

@@ -2,6 +2,7 @@
 
 import { analyze, type Dataset } from "../src/engine.ts"
 import { LANGS } from "../src/i18n.ts"
+import { postCopy } from "../src/post-copy.ts"
 import {
   fold,
   focusOf,
@@ -196,8 +197,11 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
 {
   const dd = data.datasets["1h"]
   const home = "https://a-fairly-long-deployment-name.example.vercel.app/"
-  const open = postVariants(dd, false, home),
-    masked = postVariants(dd, true, home)
+  /* The captions are no longer bundled with the arithmetic that fills them in, so the language
+     is handed over here the way the Share button hands it over. */
+  const en = postCopy("en")
+  const open = postVariants(dd, false, home, en),
+    masked = postVariants(dd, true, home, en)
   const both = [...open, ...masked]
 
   ok(
@@ -218,7 +222,7 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
     "the invitation survives whatever else has to be cut",
   )
   ok(
-    !postVariants(dd, false).some((s) => /yours|https?:/i.test(s)),
+    !postVariants(dd, false, null, en).some((s) => /yours|https?:/i.test(s)),
     "with nowhere to point, the invitation is dropped rather than left dangling",
   )
 
@@ -236,14 +240,15 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
   /* The draw only ever lands on a caption that was built, for any fraction including the
      endpoints -- an out-of-range index here would ship `undefined` into the composer. */
   ok(
-    [0, 0.25, 0.5, 0.999, 1].every((p) => open.includes(postText(dd, false, home, p))),
+    [0, 0.25, 0.5, 0.999, 1].every((p) => open.includes(postText(dd, false, home, en, p))),
     "the random draw always lands on one of the built captions",
   )
 
   /* And every claim above, in every language the page speaks. */
   for (const { value: l, label } of LANGS) {
-    const covered = postVariants(dd, true, home, l)
-    const all = [...postVariants(dd, false, home, l), ...covered]
+    const c = postCopy(l)
+    const covered = postVariants(dd, true, home, c)
+    const all = [...postVariants(dd, false, home, c), ...covered]
     const longest = Math.max(...all.map(postLength))
     ok(
       all.length > 0 && longest <= POST_MAX,
@@ -255,7 +260,7 @@ ok(rowIsOpen({ "k›0": false }, "k›0", 0) === false, "an explicit toggle over
       `${label}: covering the amounts keeps money out of every caption`,
     )
     ok(
-      postVariants(dd, false, null, l).every((s) => !s.includes(home)),
+      postVariants(dd, false, null, c).every((s) => !s.includes(home)),
       `${label}: with nowhere to point, the invitation is dropped`,
     )
   }
