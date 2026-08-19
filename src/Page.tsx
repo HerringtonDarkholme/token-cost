@@ -11,14 +11,12 @@ import {
   hoverClear,
   pathFor,
   readPath,
-  useNarrow,
   useViewState,
   type ViewState,
 } from "./store.ts"
+import { loadFace, prefetchFace, useFaces } from "./faces.ts"
 import { Figure, Reveal, TextSwap, useCountingUp } from "./Motion.tsx"
 import { Toolbar } from "./Toolbar.tsx"
-import { Breakdown, CardBody, Footnotes, scopeOf, Strip } from "./Report.tsx"
-import { Intake, Where } from "./Upload.tsx"
 
 /** Which way the page is moving. */
 export type Dir = "fwd" | "back"
@@ -137,6 +135,7 @@ export function Page({
   leaving,
   dir,
   sample,
+  importing,
   onData,
   onReset,
 }: {
@@ -147,18 +146,38 @@ export function Page({
   dir: Dir
   /** The bill came from the example rather than from a folder, which the eyebrow has to say. */
   sample: boolean
+  /** A report the CLI handed over is still decoding, which is the one state that wants neither
+   *  face: the empty one would be an invitation the page is about to withdraw. */
+  importing: boolean
   onData: (data: Analysis, sample: boolean) => void
   onReset: () => void
 }): React.JSX.Element {
   const state = useViewState()
   const t = useT()
   const ctx = useReportCtx(data, state)
-  const narrow = useNarrow()
+  const faces = useFaces()
+
+  /** Which face this visit needs, or nothing at all while the CLI's report decodes -- and then
+   *  whichever of the two is in hand, capitalised because JSX reads a lowercase tag as HTML. */
+  const wants = ctx ? "report" : importing ? null : "intake"
+  const R = ctx ? faces.report : null
+  const I = wants === "intake" ? faces.intake : null
 
   /* One string, so the two faces cannot mount different panels by disagreeing about which one is
-     on show. */
-  const face = ctx ? "report" : "empty"
+     on show. `loading` is a bill on the way with no face yet to draw it: the card keeps its frame
+     and its heading, and stops offering itself as a dropzone it is about to stop being -- while an
+     empty card still waiting on its own slot stays `empty`, since flipping the border to solid and
+     back is worse than a slot that fills in. */
+  const face = R ? "report" : ctx || importing ? "loading" : "empty"
   useUrlSync(state, data, !!ctx, leaving)
+
+  /* The face on show, and then the other one once the browser goes quiet -- a turn is one click
+     away in either direction, and it has to find the face it turns to already here. */
+  useEffect(() => {
+    if (!wants) return
+    void loadFace(wants)
+    prefetchFace(wants === "report" ? "intake" : "report")
+  }, [wants])
 
   const billed = ctx ? t.card.billed(state.ttl, state.pctOnly) : t.card.nothingYet
   /* What the empty card's figure counts from, and what it counts through: the walk writes its
@@ -207,7 +226,9 @@ export function Page({
               <div className="eyebrow">
                 {t.card.eyebrow}
                 <TextSwap token={face}>
-                  {ctx ? (sample ? " · " + t.card.example : "") + " · " + scopeOf(t, ctx.d) : ""}
+                  {R && ctx
+                    ? (sample ? " · " + t.card.example : "") + " · " + R.scope(t, ctx.d)
+                    : ""}
                 </TextSwap>
               </div>
               {/* One sentence in two tenses, set word by word so the words can be told apart.
@@ -259,25 +280,13 @@ export function Page({
               `closed` held from outside for the length of the exit, so the departing one has
               somewhere to go. */}
           <Reveal key={face} className="cardslot" closed={leaving}>
-            {ctx ? <CardBody /> : <Intake onData={onData} sofar={sofar} />}
+            {R ? <R.Body /> : I ? <I.Body onData={onData} sofar={sofar} /> : null}
           </Reveal>
         </section>
         {/* What stands under the card: the breakdown and the footnotes, or the help for
             finding the transcripts in the first place. */}
         <Reveal key={face} className="below" closed={leaving}>
-          {ctx ? (
-            <>
-              <Breakdown />
-              {/* Where the card's three figures go on a narrow window: they are what the thesis
-                  argues *from*, and reading them costs a line each, so they wait until the
-                  reader has been through the picture and the line items rather than standing
-                  between the bill and the chart. */}
-              {narrow ? <Strip only="figures" /> : null}
-              <Footnotes />
-            </>
-          ) : (
-            <Where />
-          )}
+          {R ? <R.Below /> : I ? <I.Below /> : null}
         </Reveal>
         <Colophon />
       </div>

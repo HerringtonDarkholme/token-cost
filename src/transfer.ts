@@ -21,6 +21,14 @@ export function stripImport(hash: string): string {
   return kept.length ? "#" + kept.join("&") : ""
 }
 
+/** The root a `/open` address came in from, or nothing when this is the page itself. The CLI sends
+ *  its report to that door so the page fetches the report's own face and never the folder-reading
+ *  one; the door is then left behind rather than kept, since the address the reader ends up holding
+ *  has to be one that means something a second time. */
+export function landing(path: string): string | undefined {
+  return /\/open\/?$/.test(path) ? path.replace(/\/open\/?$/, "/") : undefined
+}
+
 let pending: string | null = null
 
 /** Lift the payload out of the address, and do it before the first render -- which is the whole
@@ -29,11 +37,15 @@ let pending: string | null = null
  *  out from the default state: an App that waited for its own effect would be handed a hash the
  *  component below it had already cleared. `main.tsx` reads the view settings a line later for
  *  exactly the same reason. */
-export function takeImport(): void {
+export function takeImport(land?: string): void {
   pending = readImport(location.hash)
-  if (!pending) return
+  if (!pending && !land) return
   try {
-    history.replaceState(null, "", location.pathname + location.search + stripImport(location.hash))
+    history.replaceState(
+      null,
+      "",
+      (land ?? location.pathname) + location.search + stripImport(location.hash),
+    )
   } catch {
     /* file:// can refuse */
   }

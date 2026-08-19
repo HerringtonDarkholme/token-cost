@@ -3,7 +3,7 @@
 
 import { gzipSync } from "node:zlib"
 import { analyze } from "../src/engine.ts"
-import { decodeImport, readImport, stripImport } from "../src/transfer.ts"
+import { decodeImport, landing, readImport, stripImport } from "../src/transfer.ts"
 import { synthetic } from "./fixture.ts"
 
 let fails = 0
@@ -23,6 +23,12 @@ ok(readImport(`#ttl=5m&d=${payload}`) === payload, "the payload rides the hash u
 ok(readImport("#ttl=5m") === null, "a hash with no payload reads as none")
 ok(stripImport(`#ttl=5m&d=${payload}`) === "#ttl=5m", "stripping it leaves the view settings")
 ok(stripImport(`#d=${payload}`) === "", "and leaves nothing when it was the only key")
+
+ok(landing("/open") === "/", "the door lands the reader on the root it opened")
+ok(landing("/open/") === "/", "with or without the slash")
+ok(landing("/held/open") === "/held/", "and on the root of a copy served one folder down")
+ok(landing("/") === undefined, "the page itself is not a door")
+ok(landing("/report/shell-commands") === undefined, "nor is anything under the report")
 
 const back = await decodeImport(payload)
 ok(

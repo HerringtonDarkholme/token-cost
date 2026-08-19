@@ -35,12 +35,13 @@ round trip to undo.
 
 ## Before you commit
 
-`pnpm check` — format, lint, typecheck, build, then all three suites. The build asserts the
-page is self-contained, so a change that reaches the network fails here rather than in
-someone's browser.
+`pnpm check` — format, lint, typecheck, both page builds, the CLI build, then all three suites.
+`build` is the deployed page, which is code-split; `build:standalone` is the double-clickable
+`cost-report.html`, and that one asserts the document is self-contained — so a change that
+reaches the network fails here rather than in someone's browser.
 
 The app lives in `src/` — the `.ts`, the `.tsx` and `style.css`. What stays at the root is
-the things that address it from outside: `index.html`, the two Vite configs, `tsconfig.json`,
+the things that address it from outside: `index.html`, the three Vite configs, `tsconfig.json`,
 `vercel.json`. The suites stay in `test/` as a peer of `src/` rather than inside it, because
 two of the three run as plain `node` scripts against a real transcript directory.
 

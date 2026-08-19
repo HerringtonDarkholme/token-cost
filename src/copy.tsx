@@ -1,6 +1,6 @@
 /* Every word on the page, six times over. */
 
-import { GROUPS } from "./engine.ts"
+import { GROUPS } from "./groups.ts"
 import { LANGS, type Lang } from "./i18n.ts"
 import type { CostNode } from "./model.ts"
 import { useViewState } from "./store.ts"

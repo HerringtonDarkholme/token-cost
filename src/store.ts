@@ -197,20 +197,36 @@ export function resetState(): void {
 /** Where this copy lives, and whether it can hold a path at all: a page served as a file -- the
  *  standalone `cost-report.html`, on `file://` or over http -- has no origin that would serve
  *  `/report/shell` back, so there the address stays where it opened. */
-const HERE = typeof location === "object" ? location.pathname : "/"
-const ROUTED = !/\.html?$/i.test(HERE)
-const ROOT = HERE.replace(/\/report(\/.*)?$/, "").replace(/\/+$/, "") + "/"
+function here(): string {
+  return typeof location === "object" ? location.pathname : "/"
+}
+
+function routed(): boolean {
+  return !/\.html?$/i.test(here())
+}
+
+/** Read on every call rather than taken once at import: `/open` moves the address to the root it
+ *  came in from before the first render, and a constant would have been fixed at `/open/` by then
+ *  -- this module is imported long before that line runs. */
+function root(): string {
+  return (
+    here()
+      .replace(/\/report(\/.*)?$/, "")
+      .replace(/\/+$/, "") + "/"
+  )
+}
 
 /** `/`, `/report`, `/report/shell-commands`, `/report/shell-commands/git`. */
 export function pathFor(report: boolean, path: string[]): string {
-  if (!ROUTED) return HERE
-  if (!report) return ROOT
-  return ROOT + ["report", ...path.map(slug)].join("/")
+  if (!routed()) return here()
+  if (!report) return root()
+  return root() + ["report", ...path.map(slug)].join("/")
 }
 
 export function readPath(pathname: string): { report: boolean; slugs: string[] } {
-  if (!ROUTED || !pathname.startsWith(ROOT)) return { report: false, slugs: [] }
-  const seg = pathname.slice(ROOT.length).split("/").filter(Boolean)
+  const base = root()
+  if (!routed() || !pathname.startsWith(base)) return { report: false, slugs: [] }
+  const seg = pathname.slice(base.length).split("/").filter(Boolean)
   if (seg[0] !== "report") return { report: false, slugs: [] }
   /* Two deep, the same bound the drill itself has. */
   return { report: true, slugs: seg.slice(1, 3).map((s) => decodeURIComponent(s).toLowerCase()) }

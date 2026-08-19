@@ -32,6 +32,7 @@
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "build": "vite build",
+    "build:standalone": "vite build --config vite.standalone.config.ts",
     "build:cli": "vite build --config vite.cli.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -41,7 +42,7 @@
     "test:transfer": "node test/transfer.test.ts",
     "test:analytics": "node test/analytics.test.ts",
     "test:render": "vitest run",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run build:cli && pnpm run test",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run build:standalone && pnpm run build:cli && pnpm run test",
     "prepack": "pnpm run build:cli"
   },
   "devDependencies": {

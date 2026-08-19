@@ -6,6 +6,7 @@ import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { analyze } from "../src/engine.ts"
 import { pathOf, slug } from "../src/model.ts"
+import { loadFace } from "../src/faces.ts"
 import { Page } from "../src/Page.tsx"
 import { applyUrl, getState, pathFor, readPath, resetState, setState } from "../src/store.ts"
 import { corpus } from "./fixture.ts"
@@ -23,8 +24,11 @@ let replaced = 0
 const push = history.pushState.bind(history)
 const replace = history.replaceState.bind(history)
 
-beforeEach(() => {
+beforeEach(async () => {
   ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+  /* Both faces are chunks of their own now, and this suite renders the page rather than booting
+     it -- so nothing else here would fetch them. */
+  await Promise.all([loadFace("report"), loadFace("intake")])
   history.replaceState = (s: unknown, t: string, u?: string | null): void => {
     replaced++
     replace(s, t, u)
@@ -57,6 +61,7 @@ function render(report: boolean, leaving = false): void {
       leaving={leaving}
       dir="fwd"
       sample={false}
+      importing={false}
       onData={noop}
       onReset={noop}
     />,

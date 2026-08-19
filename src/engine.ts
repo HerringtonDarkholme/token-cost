@@ -1,5 +1,7 @@
 /* Cost attribution engine for Claude Code transcripts. */
 
+import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
+
 /* data in -- What the caller hands us, and the transcript shapes we read out of it. */
 
 /** One uploaded transcript: a filename and its raw JSONL text. */
@@ -1385,35 +1387,9 @@ export function price(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"): P
 /* the report -- Groups are defined by ROLE IN THE REQUEST CYCLE -- a structural property every
  * transcript has. */
 
-/** The nine stable group identities. */
-export type GroupId =
-  | "shell"
-  | "ingest"
-  | "emit"
-  | "twoway"
-  | "output"
-  | "preamble"
-  | "harness"
-  | "media"
-  | "typed"
-
-export interface GroupDef {
-  id: GroupId
-  name: string
-  short: string
-}
-
-export const GROUPS: GroupDef[] = [
-  { id: "shell", name: "Shell commands", short: "Shell" },
-  { id: "ingest", name: "Tools · content read in", short: "Read in" },
-  { id: "emit", name: "Tools · content written out", short: "Written out" },
-  { id: "twoway", name: "Tools · two-way", short: "Two-way" },
-  { id: "output", name: "Model output", short: "Output" },
-  { id: "preamble", name: "System prompt & tool schemas", short: "System prompt" },
-  { id: "harness", name: "Harness & reminders", short: "Harness" },
-  { id: "media", name: "Images & attachments", short: "Media" },
-  { id: "typed", name: "My typing", short: "My typing" },
-]
+/* Re-exported so the nine stay one import away from everything that reads a report, whether or
+   not it also reads a transcript. */
+export { GROUPS, type GroupDef, type GroupId }
 
 /** A tool is shown as one row, or split into call/result rows, depending on whether BOTH
  *  directions carry real money. */

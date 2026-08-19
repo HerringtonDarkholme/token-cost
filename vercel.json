@@ -5,6 +5,8 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/open", "destination": "/index.html" },
+    { "source": "/open/", "destination": "/index.html" },
     { "source": "/report", "destination": "/index.html" },
     { "source": "/report/", "destination": "/index.html" },
     { "source": "/report/:drill*", "destination": "/index.html" }

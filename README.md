@@ -52,7 +52,8 @@ npx token-billing --print                          # print the URL instead of op
 Nothing to install and no dependencies — it is one bundled file that imports only Node builtins.
 
 It prices everything on your machine and puts the *answer* — not your transcripts — in the
-URL's fragment, which browsers never send to a server. `--print` is for a machine reached over
+URL's fragment, which browsers never send to a server. The link points at `/open`, which draws the
+report without fetching the half of the page that reads folders. `--print` is for a machine reached over
 SSH: the URL goes to stdout and the totals to stderr, so it pipes.
 
 ## Nothing is uploaded
@@ -61,8 +62,8 @@ Your transcripts are read and priced inside the page. There is no server to send
 the build fails if the document references anything it does not carry inline. The hosted copy
 uses Vercel Analytics to track pageviews.
 
-Want it fully offline? `pnpm build` writes `cost-report.html` — one double-clickable file that
-works from disk and counts nothing.
+Want it fully offline? `pnpm build:standalone` writes `cost-report.html` — one double-clickable
+file that works from disk and counts nothing.
 
 ## Why it isn't just token counts
 

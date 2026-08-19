@@ -13,6 +13,7 @@ report_data.json
 # sync. Build it locally when you want the double-clickable file.
 node_modules/
 dist/
+dist-standalone/
 cost-report.html
 bin/cli.js
 .vite/

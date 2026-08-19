@@ -72,6 +72,15 @@ function handOff(url: string): void {
   open(file)
 }
 
+/** Where a report is handed over: `/open` fetches the charts and none of the folder-reading half
+ *  of the page, so the door is worth naming rather than landing on the front. A URL that names a
+ *  file is somebody's standalone copy, which has no routes to send anything to. */
+function importUrl(base: string, payload: string): string {
+  const at = base.replace(/#.*$/, "")
+  const door = /\.html?$/i.test(at) ? at : at.replace(/\/*$/, "/") + "open"
+  return `${door}#d=${payload}`
+}
+
 function main(): void {
   const argv = process.argv.slice(2)
   /* Printing rather than opening is what a machine you reached over SSH needs, and it is how the
@@ -140,7 +149,7 @@ function main(): void {
   }
 
   const payload = gzipSync(Buffer.from(JSON.stringify(data), "utf8")).toString("base64url")
-  const url = `${REPORT_URL.replace(/\/*$/, "/")}#d=${payload}`
+  const url = importUrl(REPORT_URL, payload)
   if (print) {
     /* The URL alone on stdout, so it can be piped. What it cost goes to stderr with the rest of
        the narration. */

@@ -8,6 +8,7 @@ import { createRoot, type Root } from "react-dom/client"
 import { dict } from "../src/copy.tsx"
 import { analyze, type Analysis } from "../src/engine.ts"
 import { LANGS } from "../src/i18n.ts"
+import { loadFace } from "../src/faces.ts"
 import { Page, type Dir } from "../src/Page.tsx"
 import { originOf, type Origin } from "../src/Upload.tsx"
 import { getHover, getState, resetState, setHover, setState, type ViewState } from "../src/store.ts"
@@ -22,14 +23,25 @@ const noop = (): void => {}
 let container: HTMLElement
 let root: Root
 
-beforeAll(() => {
+beforeAll(async () => {
   ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
+  /* Both faces are chunks of their own now, and nothing here goes through the entry point that
+     would have asked for them. */
+  await Promise.all([loadFace("report"), loadFace("intake")])
   container = document.createElement("div")
   document.body.appendChild(container)
   root = createRoot(container)
   act(() => {
     root.render(
-      <Page data={data} leaving={false} dir="fwd" sample={false} onData={noop} onReset={noop} />,
+      <Page
+        data={data}
+        leaving={false}
+        dir="fwd"
+        sample={false}
+        importing={false}
+        onData={noop}
+        onReset={noop}
+      />,
     )
   })
 })
@@ -646,6 +658,7 @@ describe("the card's two faces", () => {
           leaving={leaving}
           dir={dir}
           sample={false}
+          importing={false}
           onData={noop}
           onReset={noop}
         />,
@@ -987,6 +1000,7 @@ describe("the TTL lens, where there is one to offer", () => {
           leaving={false}
           dir="fwd"
           sample={false}
+          importing={false}
           onData={noop}
           onReset={noop}
         />,

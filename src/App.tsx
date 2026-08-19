@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Analytics, type BeforeSendEvent } from "@vercel/analytics/react"
 import type { Analysis } from "./engine.ts"
 import { hosted, scrub } from "./analytics.ts"
+import { loadFace } from "./faces.ts"
 import { applyUrl, readPath, resetState, useViewState } from "./store.ts"
 import { useT } from "./copy.tsx"
 import { tagOf } from "./i18n.ts"
@@ -67,6 +68,10 @@ export function App(): React.JSX.Element {
     dir: "fwd",
     sample: false,
   })
+  /* A report is on its way out of the address bar, so the empty card is not what belongs on
+     screen -- and the folder-reading face is not what belongs on the network either. Held until
+     the bill lands, or until the decode comes back with nothing. */
+  const [importing, setImporting] = useState(() => !!pendingImport())
   useTheme()
   useLangAttr()
 
@@ -117,10 +122,14 @@ export function App(): React.JSX.Element {
      page never gets to open twice. */
   const last = useRef<{ data: Analysis; sample: boolean } | null>(null)
 
+  /* The face is awaited before the card turns rather than inside the turn: a view transition
+     photographs the tree it is handed, and a face still on the network would be photographed
+     empty. The wait is a microtask wherever the prefetch got there first, which is everywhere the
+     reader had time to drop a folder. */
   const onData = useCallback(
     (data: Analysis, sample: boolean) => {
       last.current = { data, sample }
-      turnTo(data, "fwd", sample)
+      void loadFace("report").then(() => turnTo(data, "fwd", sample))
     },
     [turnTo],
   )
@@ -135,15 +144,24 @@ export function App(): React.JSX.Element {
     if (!raw || imported.current) return
     imported.current = true
     void (async () => {
-      const data = await decodeImport(raw)
+      /* Together rather than in turn: the decode is a gzip stream and the face is a fetch, and
+         neither is waiting on the other. */
+      const [data] = await Promise.all([decodeImport(raw), loadFace("report")])
       if (data) onData(data, false)
+      else setImporting(false)
     })()
   }, [onData])
 
   /* Start over is a move home rather than an undo, so it goes forward to `/` and leaves the
      report where it was: `history.back()` would have risen one drill level instead, since going
      into a group is an entry of its own. */
-  const onReset = useCallback(() => turnTo(null, "back", false, true), [turnTo])
+  const onReset = useCallback(() => {
+    void (async () => {
+      await loadFace("intake")
+      setImporting(false)
+      turnTo(null, "back", false, true)
+    })()
+  }, [turnTo])
 
   /* Re-bound on every turn rather than once, because what a pop means depends on which face is
      showing. */
@@ -170,6 +188,7 @@ export function App(): React.JSX.Element {
         leaving={turn.leaving}
         dir={turn.dir}
         sample={turn.sample}
+        importing={importing}
         onData={onData}
         onReset={onReset}
       />
