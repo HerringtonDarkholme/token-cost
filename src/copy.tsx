@@ -348,8 +348,9 @@ const EN = {
     terminal: "Prefer the terminal?",
     terminalBody: (
       <>
-        Open the folder in your file manager, then drag it onto the card above:{" "}
-        <code>open ~/.claude/projects</code>
+        <code>npx token-billing</code> prices <code>~/.claude/projects</code> where it sits and
+        opens the report here — nothing to install, Node 22.18+. Or drag the folder onto the card
+        above: <code>open ~/.claude/projects</code>
       </>
     ),
     noUpload: "Nothing is uploaded",
@@ -675,7 +676,9 @@ const ZH: Dict = {
     terminal: "更习惯用终端？",
     terminalBody: (
       <>
-        在文件管理器里打开这个文件夹，然后拖到上面的卡片上：<code>open ~/.claude/projects</code>
+        <code>npx token-billing</code> 会在本机算好 <code>~/.claude/projects</code> 的账单，
+        并直接打开报告——无需安装，需要 Node 22.18+。也可以把文件夹拖到上面的卡片上：
+        <code>open ~/.claude/projects</code>
       </>
     ),
     noUpload: "不上传任何内容",
@@ -998,8 +1001,9 @@ const JA: Dict = {
     terminal: "ターミナルのほうが好み？",
     terminalBody: (
       <>
-        ファイルマネージャでフォルダを開き、上のカードにドラッグしてください：
-        <code>open ~/.claude/projects</code>
+        <code>npx token-billing</code> は <code>~/.claude/projects</code> をその場で集計し、
+        レポートを開きます。インストール不要、Node 22.18+ が必要です。上のカードにフォルダを
+        ドラッグしても構いません：<code>open ~/.claude/projects</code>
       </>
     ),
     noUpload: "何もアップロードされません",
@@ -1332,8 +1336,9 @@ const ES: Dict = {
     terminal: "¿Prefieres la terminal?",
     terminalBody: (
       <>
-        Abre la carpeta en tu gestor de archivos y arrástrala sobre la tarjeta de arriba:{" "}
-        <code>open ~/.claude/projects</code>
+        <code>npx token-billing</code> calcula <code>~/.claude/projects</code> en tu máquina y abre
+        el informe aquí: nada que instalar, Node 22.18+. O arrastra la carpeta sobre la tarjeta de
+        arriba: <code>open ~/.claude/projects</code>
       </>
     ),
     noUpload: "No se sube nada",
@@ -1669,7 +1674,8 @@ const FR: Dict = {
     terminal: "Vous préférez le terminal ?",
     terminalBody: (
       <>
-        Ouvrez le dossier dans votre gestionnaire de fichiers, puis glissez-le sur la carte
+        <code>npx token-billing</code> chiffre <code>~/.claude/projects</code> sur votre machine et
+        ouvre le rapport ici : rien à installer, Node 22.18+. Ou glissez le dossier sur la carte
         ci-dessus : <code>open ~/.claude/projects</code>
       </>
     ),
@@ -2004,8 +2010,9 @@ const DE: Dict = {
     terminal: "Lieber im Terminal?",
     terminalBody: (
       <>
-        Öffne den Ordner im Dateimanager und ziehe ihn auf die Karte oben:{" "}
-        <code>open ~/.claude/projects</code>
+        <code>npx token-billing</code> rechnet <code>~/.claude/projects</code> auf deinem Rechner ab
+        und öffnet den Bericht hier — nichts zu installieren, Node 22.18+. Oder ziehe den Ordner auf
+        die Karte oben: <code>open ~/.claude/projects</code>
       </>
     ),
     noUpload: "Nichts wird hochgeladen",
