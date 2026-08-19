@@ -346,13 +346,10 @@ const EN = {
       </>
     ),
     terminal: "Prefer the terminal?",
-    terminalBody: (
-      <>
-        <code>npx token-billing</code> prices <code>~/.claude/projects</code> where it sits and
-        opens the report here — nothing to install, Node 22.18+. Or drag the folder onto the card
-        above: <code>open ~/.claude/projects</code>
-      </>
-    ),
+    terminalBody: "Opens the report. Node 22.18+.",
+    /** On the button beside the command, and after it has been pressed. */
+    copyCmd: "Copy",
+    cmdCopied: "Copied",
     noUpload: "Nothing is uploaded",
     noUploadBody:
       "The files are read and the bill worked out in this page: there is no server to send a " +
@@ -674,13 +671,9 @@ const ZH: Dict = {
       </>
     ),
     terminal: "更习惯用终端？",
-    terminalBody: (
-      <>
-        <code>npx token-billing</code> 会在本机算好 <code>~/.claude/projects</code> 的账单，
-        并直接打开报告——无需安装，需要 Node 22.18+。也可以把文件夹拖到上面的卡片上：
-        <code>open ~/.claude/projects</code>
-      </>
-    ),
+    terminalBody: "直接打开报告。需要 Node 22.18+。",
+    copyCmd: "复制",
+    cmdCopied: "已复制",
     noUpload: "不上传任何内容",
     noUploadBody:
       "文件的读取和账单的计算都在这个页面里完成：没有服务器可以把转录发过去，" +
@@ -999,13 +992,9 @@ const JA: Dict = {
       </>
     ),
     terminal: "ターミナルのほうが好み？",
-    terminalBody: (
-      <>
-        <code>npx token-billing</code> は <code>~/.claude/projects</code> をその場で集計し、
-        レポートを開きます。インストール不要、Node 22.18+ が必要です。上のカードにフォルダを
-        ドラッグしても構いません：<code>open ~/.claude/projects</code>
-      </>
-    ),
+    terminalBody: "レポートを開きます。Node 22.18+ が必要。",
+    copyCmd: "コピー",
+    cmdCopied: "コピーしました",
     noUpload: "何もアップロードされません",
     noUploadBody:
       "ファイルの読み込みも請求の計算もこのページの中で行われます。トランスクリプトを送る先のサーバーはなく、" +
@@ -1334,13 +1323,9 @@ const ES: Dict = {
       </>
     ),
     terminal: "¿Prefieres la terminal?",
-    terminalBody: (
-      <>
-        <code>npx token-billing</code> calcula <code>~/.claude/projects</code> en tu máquina y abre
-        el informe aquí: nada que instalar, Node 22.18+. O arrastra la carpeta sobre la tarjeta de
-        arriba: <code>open ~/.claude/projects</code>
-      </>
-    ),
+    terminalBody: "Abre el informe. Node 22.18+.",
+    copyCmd: "Copiar",
+    cmdCopied: "Copiado",
     noUpload: "No se sube nada",
     noUploadBody:
       "Los archivos se leen y la factura se calcula en esta página: no hay servidor al que enviar " +
@@ -1672,13 +1657,9 @@ const FR: Dict = {
       </>
     ),
     terminal: "Vous préférez le terminal ?",
-    terminalBody: (
-      <>
-        <code>npx token-billing</code> chiffre <code>~/.claude/projects</code> sur votre machine et
-        ouvre le rapport ici : rien à installer, Node 22.18+. Ou glissez le dossier sur la carte
-        ci-dessus : <code>open ~/.claude/projects</code>
-      </>
-    ),
+    terminalBody: "Ouvre le rapport. Node 22.18+.",
+    copyCmd: "Copier",
+    cmdCopied: "Copié",
     noUpload: "Rien n’est envoyé",
     noUploadBody:
       "Les fichiers sont lus et la facture calculée dans cette page : il n’y a aucun serveur à qui " +
@@ -2008,13 +1989,9 @@ const DE: Dict = {
       </>
     ),
     terminal: "Lieber im Terminal?",
-    terminalBody: (
-      <>
-        <code>npx token-billing</code> rechnet <code>~/.claude/projects</code> auf deinem Rechner ab
-        und öffnet den Bericht hier — nichts zu installieren, Node 22.18+. Oder ziehe den Ordner auf
-        die Karte oben: <code>open ~/.claude/projects</code>
-      </>
-    ),
+    terminalBody: "Öffnet den Bericht. Node 22.18+.",
+    copyCmd: "Kopieren",
+    cmdCopied: "Kopiert",
     noUpload: "Nichts wird hochgeladen",
     noUploadBody:
       "Die Dateien werden in dieser Seite gelesen und die Rechnung hier berechnet: Es gibt keinen " +

@@ -2233,6 +2233,14 @@ tfoot .n {
   padding: 2px 6px;
   user-select: all;
 }
+/* The command and its button on one line: `user-select: all` on the code means a stray click
+   selects the whole thing, so the button has to sit outside it. */
+.cmdline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .where .whead {
   margin-top: 8px;
   color: var(--ink);
