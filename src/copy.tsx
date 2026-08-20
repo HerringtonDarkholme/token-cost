@@ -933,7 +933,7 @@ const JA: Dict = {
     example: "サンプルを見る",
     orTerminal: "ターミナルからでも",
     copyCmd: "コピー",
-    cmdCopied: "コピーしました",
+    cmdCopied: "コピー済み",
     hidden: "このフォルダは隠されています",
     yours: "自分の請求を見るには",
     yoursBody: (

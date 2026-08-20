@@ -1804,6 +1804,17 @@ tfoot .n {
   padding: 3px 9px;
   user-select: all;
 }
+.cmdcopy {
+  display: grid;
+  justify-items: start;
+}
+.cmdcopy > * {
+  grid-area: 1 / 1;
+}
+/* The two that are only there to hold the width. */
+.cmdcopy > [aria-hidden] {
+  visibility: hidden;
+}
 /* The box under the button, and the two faces it takes: the way into the hidden folder before a
    pick, the transcripts that came back after one. */
 .swap {

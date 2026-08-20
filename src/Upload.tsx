@@ -420,9 +420,16 @@ function CopyCmd(): React.JSX.Element {
         })()
       }}
     >
-      <TextSwap token={done ? "done" : "idle"}>
-        {done ? t.intake.cmdCopied : t.intake.copyCmd}
-      </TextSwap>
+      {/* Both words stacked in one grid cell, so the button is always as wide as the longer of
+          them: it sits at the end of a centred row, and a label that grew on press would shove
+          the command and its label sideways. */}
+      <span className="cmdcopy">
+        <span aria-hidden="true">{t.intake.copyCmd}</span>
+        <span aria-hidden="true">{t.intake.cmdCopied}</span>
+        <TextSwap token={done ? "done" : "idle"}>
+          {done ? t.intake.cmdCopied : t.intake.copyCmd}
+        </TextSwap>
+      </span>
     </button>
   )
 }
