@@ -385,6 +385,26 @@ export async function readEach(
   return { skipped, firstErr }
 }
 
+/** Two sheets, the back one drawn only where the front does not cover it: `fill: none` means
+ *  a second full rectangle would show its lines straight through the first. */
+function CopyMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <rect x="1.8" y="5.4" width="8.8" height="8.8" rx="1.3" />
+      <path d="M5.4 5.4V3.1a1.3 1.3 0 0 1 1.3-1.3h6.2a1.3 1.3 0 0 1 1.3 1.3v6.2a1.3 1.3 0 0 1-1.3 1.3h-2.3" />
+    </svg>
+  )
+}
+
+/** What the button becomes for the two seconds after it is pressed. */
+function TickMark(): React.JSX.Element {
+  return (
+    <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="m2.9 8.3 3.4 3.4 6.8-7.4" />
+    </svg>
+  )
+}
+
 /** What the terminal reader runs, in one place because the button copies the same string the
  *  paragraph prints. */
 const CMD = "npx token-billing"
@@ -404,8 +424,9 @@ function CopyCmd(): React.JSX.Element {
   return (
     <button
       type="button"
-      className="linkish"
+      className="copybtn"
       data-on={done ? 1 : 0}
+      aria-label={done ? t.intake.cmdCopied : t.intake.copyCmd}
       onClick={() => {
         void (async () => {
           try {
@@ -420,16 +441,9 @@ function CopyCmd(): React.JSX.Element {
         })()
       }}
     >
-      {/* Both words stacked in one grid cell, so the button is always as wide as the longer of
-          them: it sits at the end of a centred row, and a label that grew on press would shove
-          the command and its label sideways. */}
-      <span className="cmdcopy">
-        <span aria-hidden="true">{t.intake.copyCmd}</span>
-        <span aria-hidden="true">{t.intake.cmdCopied}</span>
-        <TextSwap token={done ? "done" : "idle"}>
-          {done ? t.intake.cmdCopied : t.intake.copyCmd}
-        </TextSwap>
-      </span>
+      {/* A mark rather than a word: the row is centred, and the three languages that spell
+          "copied" long enough to be a sentence were the ones moving the command about. */}
+      <TextSwap token={done ? "done" : "idle"}>{done ? <TickMark /> : <CopyMark />}</TextSwap>
     </button>
   )
 }

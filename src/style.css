@@ -231,7 +231,8 @@ button {
   align-items: center;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cycbtn {
+  .cycbtn,
+  .copybtn {
     transition: none;
   }
 }
@@ -1804,16 +1805,27 @@ tfoot .n {
   padding: 3px 9px;
   user-select: all;
 }
-.cmdcopy {
-  display: grid;
-  justify-items: start;
+/* A mark on its own, so it takes the ink of a control rather than the underline of a word. */
+.copybtn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: 0;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--ink3);
+  transition: color var(--duration-fast) var(--ease-smooth-out);
 }
-.cmdcopy > * {
-  grid-area: 1 / 1;
+.copybtn:hover,
+.copybtn:focus-visible {
+  color: var(--ink);
 }
-/* The two that are only there to hold the width. */
-.cmdcopy > [aria-hidden] {
-  visibility: hidden;
+.copybtn[data-on="1"] {
+  color: var(--accent);
+}
+/* The swap wrapper is `inline-block` by default, which would sit the glyph on a text baseline. */
+.copybtn .t-text-swap {
+  display: flex;
 }
 /* The box under the button, and the two faces it takes: the way into the hidden folder before a
    pick, the transcripts that came back after one. */
