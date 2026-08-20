@@ -244,6 +244,9 @@ button {
 }
 .langsel {
   appearance: none;
+  /* A `<select>` is as wide as its widest option, so picking a short name left the box padded
+     out to the width of the longest one. Unsupported elsewhere, which just leaves it as it was. */
+  field-sizing: content;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -1015,13 +1018,18 @@ button {
   gap: 1px;
   max-height: 100%;
   overflow-y: auto;
+  /* Room for the highlighted row to reach past the swatch, taken back off the outside so the
+     column keeps its place. */
+  padding-left: 7px;
+  margin-left: -7px;
 }
 .legrow {
   display: grid;
   grid-template-columns: 9px minmax(72px, auto) 1fr auto;
   gap: 10px;
   align-items: baseline;
-  padding: 5px 7px 5px 0;
+  padding: 5px 7px;
+  margin-left: -7px;
   border-bottom: 1px solid var(--hair);
   transition: opacity 0.13s;
 }
@@ -1074,8 +1082,12 @@ button {
   font-size: 13px;
   color: var(--ink3);
 }
+/* The padding is what the highlighted row bleeds into: it is inside the scroll box, so painting
+   into it costs no scrollbar, and the negative margin puts the table back on the card's edges. */
 .tblwrap {
   overflow-x: auto;
+  margin-inline: -8px;
+  padding-inline: 8px;
 }
 table {
   width: 100%;
@@ -1110,6 +1122,15 @@ tbody tr {
 }
 tbody tr[data-on="1"] {
   background: var(--sunk);
+}
+/* The first and last columns sit flush with the card's edges, so a highlight that stopped at the
+   text would close on the chip and the per-request figure. The end cells paint 8px past
+   themselves instead, which is the padding the other columns already have. */
+tbody tr[data-on="1"] td:first-child {
+  box-shadow: -8px 0 0 var(--sunk);
+}
+tbody tr[data-on="1"] td:last-child {
+  box-shadow: 8px 0 0 var(--sunk);
 }
 td {
   padding: 7px 8px;
@@ -2224,6 +2245,9 @@ tfoot .n {
 }
 .where p {
   margin: 0;
+  /* Tall enough to clear the inline `<code>`, which carries a border and its own padding: at the
+     default the boxes on two stacked lines meet. */
+  line-height: 1.7;
 }
 .where code {
   font-family: var(--mono);
