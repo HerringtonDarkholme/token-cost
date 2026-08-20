@@ -263,6 +263,11 @@ const EN = {
     /** The other way in, for a reader with no `~/.claude` to point at -- a phone, or a machine
      *  Claude Code has never run on. */
     example: "Try an example",
+    /** Over the command in the card, for the reader who never wanted a file dialog. */
+    orTerminal: "Or from a terminal",
+    /** On the button beside the command, and after it has been pressed. */
+    copyCmd: "Copy",
+    cmdCopied: "Copied",
     hidden: "The folder is hidden",
     /** The help a phone gets in place of the keystrokes: the one step that gets this reader their
      *  own numbers, and then the thing they can do without leaving the phone, because a note that
@@ -346,10 +351,12 @@ const EN = {
       </>
     ),
     terminal: "Prefer the terminal?",
-    terminalBody: "Opens the report. Node 22.18+.",
-    /** On the button beside the command, and after it has been pressed. */
-    copyCmd: "Copy",
-    cmdCopied: "Copied",
+    terminalBody: (
+      <>
+        The command above runs where the transcripts are, which is what an SSH session needs.{" "}
+        <code>--print</code> writes the URL instead of opening it. Node 22.18+.
+      </>
+    ),
     noUpload: "Nothing is uploaded",
     noUploadBody:
       "The files are read and the bill worked out in this page: there is no server to send a " +
@@ -596,6 +603,9 @@ const ZH: Dict = {
     ledeTouch: "每个工具、每条子命令、每一块钱，都从你的 Claude Code 会话记录里读出来。",
     choose: "选择文件夹",
     example: "查看示例",
+    orTerminal: "或者在终端里",
+    copyCmd: "复制",
+    cmdCopied: "已复制",
     hidden: "这个文件夹是隐藏的",
     yours: "想看自己的账单",
     yoursBody: (
@@ -671,9 +681,12 @@ const ZH: Dict = {
       </>
     ),
     terminal: "更习惯用终端？",
-    terminalBody: "直接打开报告。需要 Node 22.18+。",
-    copyCmd: "复制",
-    cmdCopied: "已复制",
+    terminalBody: (
+      <>
+        上面这条命令在转录所在的机器上运行，SSH 场景正需要这样。<code>--print</code>{" "}
+        只打印链接而不打开。需要 Node 22.18+。
+      </>
+    ),
     noUpload: "不上传任何内容",
     noUploadBody:
       "文件的读取和账单的计算都在这个页面里完成：没有服务器可以把转录发过去，" +
@@ -918,6 +931,9 @@ const JA: Dict = {
       "すべてのツール、すべてのサブコマンド、すべてのドルを、Claude Code のセッション記録から読み取ります。",
     choose: "フォルダを選ぶ",
     example: "サンプルを見る",
+    orTerminal: "ターミナルからでも",
+    copyCmd: "コピー",
+    cmdCopied: "コピーしました",
     hidden: "このフォルダは隠されています",
     yours: "自分の請求を見るには",
     yoursBody: (
@@ -992,9 +1008,12 @@ const JA: Dict = {
       </>
     ),
     terminal: "ターミナルのほうが好み？",
-    terminalBody: "レポートを開きます。Node 22.18+ が必要。",
-    copyCmd: "コピー",
-    cmdCopied: "コピーしました",
+    terminalBody: (
+      <>
+        上のコマンドは転記のある場所で動くので、SSH 越しでも使えます。<code>--print</code>{" "}
+        を付けると開かずに URL を出力します。Node 22.18+ が必要。
+      </>
+    ),
     noUpload: "何もアップロードされません",
     noUploadBody:
       "ファイルの読み込みも請求の計算もこのページの中で行われます。トランスクリプトを送る先のサーバーはなく、" +
@@ -1250,6 +1269,9 @@ const ES: Dict = {
       "Cada herramienta, cada subcomando, cada dólar, leídos de tus sesiones de Claude Code.",
     choose: "Elegir carpeta",
     example: "Ver un ejemplo",
+    orTerminal: "O desde la terminal",
+    copyCmd: "Copiar",
+    cmdCopied: "Copiado",
     hidden: "La carpeta está oculta",
     yours: "Para ver la tuya",
     yoursBody: (
@@ -1323,9 +1345,12 @@ const ES: Dict = {
       </>
     ),
     terminal: "¿Prefieres la terminal?",
-    terminalBody: "Abre el informe. Node 22.18+.",
-    copyCmd: "Copiar",
-    cmdCopied: "Copiado",
+    terminalBody: (
+      <>
+        El comando de arriba se ejecuta donde están las transcripciones, que es lo que hace falta
+        por SSH. <code>--print</code> escribe la URL en vez de abrirla. Node 22.18+.
+      </>
+    ),
     noUpload: "No se sube nada",
     noUploadBody:
       "Los archivos se leen y la factura se calcula en esta página: no hay servidor al que enviar " +
@@ -1583,6 +1608,9 @@ const FR: Dict = {
       "Chaque outil, chaque sous-commande, chaque dollar, lus dans vos sessions Claude Code.",
     choose: "Choisir un dossier",
     example: "Voir un exemple",
+    orTerminal: "Ou depuis le terminal",
+    copyCmd: "Copier",
+    cmdCopied: "Copié",
     hidden: "Le dossier est masqué",
     yours: "Pour voir la vôtre",
     yoursBody: (
@@ -1657,9 +1685,12 @@ const FR: Dict = {
       </>
     ),
     terminal: "Vous préférez le terminal ?",
-    terminalBody: "Ouvre le rapport. Node 22.18+.",
-    copyCmd: "Copier",
-    cmdCopied: "Copié",
+    terminalBody: (
+      <>
+        La commande ci-dessus s’exécute là où sont les transcriptions, ce qu’il faut en SSH.{" "}
+        <code>--print</code> écrit l’URL au lieu de l’ouvrir. Node 22.18+.
+      </>
+    ),
     noUpload: "Rien n’est envoyé",
     noUploadBody:
       "Les fichiers sont lus et la facture calculée dans cette page : il n’y a aucun serveur à qui " +
@@ -1916,6 +1947,9 @@ const DE: Dict = {
       "Jedes Tool, jedes Unterkommando, jeden Dollar — gelesen aus deinen Claude-Code-Sitzungen.",
     choose: "Ordner wählen",
     example: "Beispiel ansehen",
+    orTerminal: "Oder im Terminal",
+    copyCmd: "Kopieren",
+    cmdCopied: "Kopiert",
     hidden: "Der Ordner ist versteckt",
     yours: "Für deine eigene Rechnung",
     yoursBody: (
@@ -1989,9 +2023,12 @@ const DE: Dict = {
       </>
     ),
     terminal: "Lieber im Terminal?",
-    terminalBody: "Öffnet den Bericht. Node 22.18+.",
-    copyCmd: "Kopieren",
-    cmdCopied: "Kopiert",
+    terminalBody: (
+      <>
+        Der Befehl oben läuft dort, wo die Transkripte liegen — genau was per SSH nötig ist.{" "}
+        <code>--print</code> gibt die URL aus, statt sie zu öffnen. Node 22.18+.
+      </>
+    ),
     noUpload: "Nichts wird hochgeladen",
     noUploadBody:
       "Die Dateien werden in dieser Seite gelesen und die Rechnung hier berechnet: Es gibt keinen " +

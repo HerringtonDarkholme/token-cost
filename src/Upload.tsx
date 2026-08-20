@@ -385,6 +385,48 @@ export async function readEach(
   return { skipped, firstErr }
 }
 
+/** What the terminal reader runs, in one place because the button copies the same string the
+ *  paragraph prints. */
+const CMD = "npx token-billing"
+
+/** Copies the command, and says so for a moment. Falls back to nothing on a browser with no
+ *  clipboard: the command is right there to select by hand. */
+function CopyCmd(): React.JSX.Element {
+  const t = useT()
+  const [done, setDone] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
+  return (
+    <button
+      type="button"
+      className="linkish"
+      data-on={done ? 1 : 0}
+      onClick={() => {
+        void (async () => {
+          try {
+            await navigator.clipboard?.writeText(CMD)
+          } catch {
+            /* No clipboard, or no permission: the command stays there to select by hand. */
+            return
+          }
+          setDone(true)
+          if (timer.current) clearTimeout(timer.current)
+          timer.current = setTimeout(() => setDone(false), 2000)
+        })()
+      }}
+    >
+      <TextSwap token={done ? "done" : "idle"}>
+        {done ? t.intake.cmdCopied : t.intake.copyCmd}
+      </TextSwap>
+    </button>
+  )
+}
+
 export function Intake({
   onData,
   sofar,
@@ -673,6 +715,15 @@ export function Intake({
             there is no `~/.claude` to point at, and the page as it stood had nothing to show
             them at all. The example is the same report drawn from invented transcripts. */}
         <div className="picks">{HANDHELD ? [exampleBtn, folderBtn] : [folderBtn, exampleBtn]}</div>
+        {/* The third way in, for a reader who is already at a prompt: the same engine, run where
+            the transcripts are. Not on a handheld, which has no terminal to run it from. */}
+        {HANDHELD ? null : (
+          <div className="cmdrow">
+            <span className="howlbl">{t.intake.orTerminal}</span>
+            <code>{CMD}</code>
+            <CopyCmd />
+          </div>
+        )}
         {/* And the way in, in the card rather than under it. This used to stand in the help below
             the fold, which assumed the reader would go looking: `.claude` is a dotfile, so the
             picker they are about to open hides the folder this page just asked for, and a reader
@@ -757,48 +808,6 @@ export function Intake({
   )
 }
 
-/** What the terminal reader runs, in one place because the button copies the same string the
- *  paragraph prints. */
-const CMD = "npx token-billing"
-
-/** Copies the command, and says so for a moment. Falls back to nothing on a browser with no
- *  clipboard: the command is right there to select by hand. */
-function CopyCmd(): React.JSX.Element {
-  const t = useT()
-  const [done, setDone] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current)
-    },
-    [],
-  )
-  return (
-    <button
-      type="button"
-      className="linkish"
-      data-on={done ? 1 : 0}
-      onClick={() => {
-        void (async () => {
-          try {
-            await navigator.clipboard?.writeText(CMD)
-          } catch {
-            /* No clipboard, or no permission: the command stays there to select by hand. */
-            return
-          }
-          setDone(true)
-          if (timer.current) clearTimeout(timer.current)
-          timer.current = setTimeout(() => setDone(false), 2000)
-        })()
-      }}
-    >
-      <TextSwap token={done ? "done" : "idle"}>
-        {done ? t.where.cmdCopied : t.where.copyCmd}
-      </TextSwap>
-    </button>
-  )
-}
-
 /** The help that stands under the empty card, where the breakdown and the footnotes stand under
  *  a full one -- so it holds the same ground: two columns on the same rule, across the width of
  *  the shell. */
@@ -813,10 +822,6 @@ export function Where(): React.JSX.Element {
         <p>{t.where.handingOverBody}</p>
         <p className="whead">
           <strong>{t.where.terminal}</strong>
-        </p>
-        <p className="cmdline">
-          <code>{CMD}</code>
-          <CopyCmd />
         </p>
         <p>{t.where.terminalBody}</p>
       </div>
