@@ -16,16 +16,22 @@ const ok = (c: boolean, m: string): void => {
 console.log("\n== what a pageview may say ==")
 
 const B = "https://token-billing.vercel.app"
-ok(scrub(`${B}/`) === "/", "the empty card is the empty card")
-ok(scrub(`${B}/report`) === "/report", "the report is the report")
-ok(scrub(`${B}/report/shell-commands`) === "/report", "a group drill collapses to /report")
+ok(scrub(`${B}/`) === `${B}/`, "the empty card is the empty card")
+ok(scrub(`${B}/report`) === `${B}/report`, "the report is the report")
+ok(scrub(`${B}/report/shell-commands`) === `${B}/report`, "a group drill collapses to /report")
 ok(
-  scrub(`${B}/report/tools-content-read-in/acmeinternal-fetch-ledger`) === "/report",
+  scrub(`${B}/report/tools-content-read-in/acmeinternal-fetch-ledger`) === `${B}/report`,
   "and so does the item under it, which is where the employer's name would have been",
 )
-ok(scrub(`${B}/report/?q=acme#t=dark`) === "/report", "the query and the hash are dropped")
-ok(!scrub(`${B}/#d=H4sIAAAA`).includes("d="), "a report handed over by the CLI never rides along")
-ok(scrub("not a url at all") === "/", "an address that will not parse reports nothing")
+ok(scrub(`${B}/report/?q=acme#t=dark`) === `${B}/report`, "the query and the hash are dropped")
+ok(!scrub(`${B}/#d=H4sIAAAA`)?.includes("d="), "a report handed over by the CLI never rides along")
+ok(scrub("not a url at all") === null, "an address that will not parse reports nothing at all")
+
+/* The shape Vercel's ingest will take: anything short of a whole address comes back a 400 and the
+   view is dropped on the floor, so the two faces are checked for the front of one and not just the
+   back. */
+ok(/^https?:\/\//.test(scrub(`${B}/`) || ""), "the empty card goes out as a whole address")
+ok(/^https?:\/\//.test(scrub(`${B}/report/git`) || ""), "and so does the report")
 
 /* The real thing rather than a hand-written path: every name the tree can produce, run through
    the address the page would put it in, and asserted to come back saying nothing. */
@@ -38,7 +44,7 @@ for (const g of d.groups) {
 }
 const leaked = names.filter((n) => {
   const out = scrub(B + pathFor(true, [n]))
-  return out !== "/report"
+  return out !== `${B}/report`
 })
 ok(
   leaked.length === 0,
@@ -46,12 +52,12 @@ ok(
 )
 
 /* The second level too, since that is the one that names a subcommand or an extension. */
-const deep: string[] = []
+const deep: (string | null)[] = []
 for (const g of d.groups)
   for (const it of g.items)
     for (const c of it.children || []) deep.push(scrub(B + pathFor(true, [it.name, c.name])))
 ok(
-  deep.length > 0 && deep.every((p) => p === "/report"),
+  deep.length > 0 && deep.every((p) => p === `${B}/report`),
   `and all ${deep.length} second-level drills with it`,
 )
 

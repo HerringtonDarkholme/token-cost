@@ -16,7 +16,10 @@ import { decodeImport, pendingImport } from "./transfer.ts"
  *  `scrub`, which is where the reader's own line items are kept out of it. The `PROD` half of the
  *  guard beside it is what keeps the dev server and the suites off the network: unbuilt, the
  *  component fetches its debug script from a Vercel domain, and this page reaches nobody. */
-const rename = (event: BeforeSendEvent): BeforeSendEvent => ({ ...event, url: scrub(event.url) })
+const rename = (event: BeforeSendEvent): BeforeSendEvent | null => {
+  const url = scrub(event.url)
+  return url === null ? null : { ...event, url }
+}
 
 /** How long the departing face is held on the fallback path. */
 function exitMs(): number {

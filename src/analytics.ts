@@ -12,15 +12,20 @@
  *
  *  So a view is reported as the face it is -- the empty card, or the report -- and the drill
  *  below it is dropped. */
-/** It answers with one of exactly two strings, and that is the point: a filter that rewrites what
+/** It answers with one of exactly two addresses, and that is the point: a filter that rewrites what
  *  it recognises still ships whatever it failed to recognise, while a whitelist of the two faces
- *  the page actually has cannot emit a name it was never given. */
-export function scrub(url: string): string {
+ *  the page actually has cannot emit a name it was never given.
+ *
+ *  The origin stays on the front because Vercel's ingest takes a whole address and nothing less --
+ *  a bare `/report` comes back `body/o must match pattern "^https?://"`, a 400, and the view is
+ *  never counted. An address that will not parse has no origin to keep, so it reports nothing. */
+export function scrub(url: string): string | null {
   try {
-    return /(^|\/)report(\/|$)/.test(new URL(url).pathname) ? "/report" : "/"
+    const at = new URL(url)
+    return at.origin + (/(^|\/)report(\/|$)/.test(at.pathname) ? "/report" : "/")
   } catch {
     /* Not parseable as an address is not something to guess at. */
-    return "/"
+    return null
   }
 }
 
