@@ -994,6 +994,19 @@ describe("where a pick came from", () => {
     expect(at("Downloads/rollout-2026-08-20T11-18-30-abc.jsonl").store).toBe("codex")
   })
 
+  it("knows a Grok store, by its folder or by updates.jsonl", () => {
+    expect(
+      at(
+        ".grok/sessions/%2FUsers%2Fme%2Fcode%2Fthing/01a01489-da00-7653-a7b0-3135cb46de9f/updates.jsonl",
+      ),
+    ).toEqual({ root: ".grok", store: "grok" })
+    expect(
+      at("sessions/%2FUsers%2Fme%2Fcode%2Fthing/01a01489-da00-7653-a7b0-3135cb46de9f/updates.jsonl")
+        .store,
+    ).toBe("grok")
+    expect(at("Downloads/updates.jsonl").store).toBe("grok")
+  })
+
   it("does not mistake a folder that merely shares the name", () => {
     // Someone's own `~/projects`, with a `.jsonl` in it.
     expect(at("projects/site/notes.jsonl")).toEqual({ root: "projects", store: null })
@@ -1007,6 +1020,9 @@ describe("where a pick came from", () => {
   it("names one store for a pick that holds both", () => {
     expect(at("projects/-Users-me-x/a.jsonl", ".codex/sessions/rollout-x.jsonl").store).toBe(
       "claude",
+    )
+    expect(at(".codex/sessions/rollout-x.jsonl", ".grok/sessions/x/updates.jsonl").store).toBe(
+      "codex",
     )
   })
 

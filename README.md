@@ -1,7 +1,7 @@
-# Where did your Claude Code and Codex money go?
+# Where did your Claude Code, Codex and Grok money go?
 
 Every dollar traced to whatever put the tokens in context — per tool, per shell command, per
-subcommand. Reads Claude Code transcripts and Codex rollouts, in one report.
+subcommand. Reads Claude Code transcripts, Codex rollouts and Grok sessions, in one report.
 
 ### **→ [token-billing.vercel.app](https://token-billing.vercel.app/)**
 
@@ -11,7 +11,8 @@ subcommand. Reads Claude Code transcripts and Codex rollouts, in one report.
 
 1. Open [token-billing.vercel.app](https://token-billing.vercel.app/).
 2. Drop your `~/.claude/projects` folder on the page (or one project inside it). For Codex, drop
-   `~/.codex/sessions` — both at once is fine, and so is one folder out of either.
+   `~/.codex/sessions`. For Grok, drop `~/.grok/sessions`. Any mix at once is fine, and so is one
+   folder out of any of them.
 3. Read the bill.
 
 No account, no upload, no install. In a hurry? Press **Try an example** to see a full report
@@ -23,8 +24,8 @@ built from invented sessions.
 
 | | |
 |---|---|
-| macOS | In the dialog press <kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>, paste `~/.claude/projects` or `~/.codex/sessions` |
-| Windows | Type `%USERPROFILE%\.claude\projects` or `%USERPROFILE%\.codex\sessions` into the *Folder* box |
+| macOS | In the dialog press <kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>, paste `~/.claude/projects`, `~/.codex/sessions` or `~/.grok/sessions` |
+| Windows | Type `%USERPROFILE%\.claude\projects`, `%USERPROFILE%\.codex\sessions` or `%USERPROFILE%\.grok\sessions` into the *Folder* box |
 | Linux | Press <kbd>Ctrl</kbd>+<kbd>L</kbd>, type the path |
 
 Or run `open ~/.claude/projects` and drag the folder onto the page.
@@ -48,12 +49,13 @@ Same engine, no browser needed to do the work. Needs **Node 22.18+**.
 npx token-billing                                  # both stores, then opens the report
 npx token-billing ~/.claude/projects/some-project  # just one project
 npx token-billing ~/.codex/sessions/2026/08        # just one month of Codex
+npx token-billing ~/.grok/sessions                 # Grok
 npx token-billing --print                          # print the URL instead of opening it
 ```
 
-With nothing named it reads `~/.claude/projects`, `~/.codex/sessions` and
-`~/.codex/archived_sessions`, and a store that is not there is not an error. `CODEX_HOME` moves the
-second one.
+With nothing named it reads `~/.claude/projects`, `~/.codex/sessions`,
+`~/.codex/archived_sessions` and `~/.grok/sessions`, and a store that is not there is not an error.
+`CODEX_HOME` moves the Codex store; `GROK_HOME` moves the Grok one.
 
 Nothing to install and no dependencies — it is one bundled file that imports only Node builtins.
 
@@ -92,6 +94,11 @@ context by token share. **Totals are exact; the per-row split is estimated.**
 - Codex encrypts its reasoning but still counts it, so that carry is sized by the count rather
   than by text there is none of.
 - OpenAI has no cache-write TTL to choose, so the TTL switch cannot move a Codex bill.
+- Grok records usage once per user prompt, summed across every model call in that prompt. The walk
+  splits that total across the calls by each call's context size.
+- Grok's cached-input price is not a tenth of input, and the TTL switch cannot move a Grok bill.
+- A Grok session directory holds several `.jsonl` files; only `updates.jsonl` is the billed
+  conversation. The others are ignored.
 
 ## Contributing
 

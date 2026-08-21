@@ -425,6 +425,17 @@ export const PUBLIC_TOOLS = new Set([
   "WebFetch",
   "WebSearch",
   "Write",
+  "read_file",
+  "run_terminal_command",
+  "search_replace",
+  "grep",
+  "list_dir",
+  "write",
+  "todo_write",
+  "web_fetch",
+  "spawn_subagent",
+  "search_tool",
+  "get_command_or_subagent_output",
 ])
 
 /** What a leaf is vouched for by, ignoring the direction suffix the engine adds when a tool

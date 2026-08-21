@@ -719,7 +719,174 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
   )
 }
 
-/* ================= 5. */
+/* ================= 5. A Grok session. Usage is one total per user prompt, split across the
+   model calls by the context size each one recorded. grok-4.5 bills $2.00 per 1M in, $0.30
+   cached, $6.00 per 1M out. */
+console.log("\n== a Grok session ==")
+{
+  const G: string[] = []
+  const gLine = (
+    sessionUpdate: string,
+    update: Record<string, unknown> = {},
+    meta: Record<string, unknown> = {},
+  ): number =>
+    G.push(
+      JSON.stringify({
+        timestamp: 1780000000,
+        method: "session/update",
+        params: {
+          sessionId: "sess-g",
+          update: { sessionUpdate, ...update },
+          _meta: meta,
+        },
+      }),
+    )
+  const tool = (name: string, kind: string): Record<string, unknown> => ({
+    "x.ai/tool": { name, kind, namespace: "grok_build" },
+  })
+
+  gLine("hook_execution", { event_name: "session_start", runs: [] })
+  gLine("user_message_chunk", {
+    content: { type: "text", text: "T".repeat(8000) },
+    _meta: { modelId: "grok-4.5-build" },
+  })
+  gLine(
+    "agent_thought_chunk",
+    { content: { type: "text", text: "looking" } },
+    { totalTokens: 5000 },
+  )
+  gLine(
+    "agent_message_chunk",
+    { content: { type: "text", text: "P".repeat(400) } },
+    { totalTokens: 5000 },
+  )
+  gLine(
+    "tool_call",
+    {
+      toolCallId: "c1",
+      title: "run_terminal_command",
+      rawInput: { command: "git status --short" },
+      _meta: tool("run_terminal_command", "execute"),
+    },
+    { totalTokens: 5000 },
+  )
+  gLine("tool_call_update", {
+    toolCallId: "c1",
+    rawOutput: { output_for_prompt: "O".repeat(12000) },
+  })
+  gLine("agent_thought_chunk", { content: { type: "text", text: "edit" } }, { totalTokens: 7000 })
+  gLine(
+    "tool_call",
+    {
+      toolCallId: "c2",
+      rawInput: { file_path: "src/thing.ts", old_string: "a", new_string: "b".repeat(4000) },
+      _meta: tool("search_replace", "edit"),
+    },
+    { totalTokens: 7000 },
+  )
+  gLine(
+    "tool_call",
+    {
+      toolCallId: "c3",
+      rawInput: { file_path: "docs/note.md", old_string: "a", new_string: "c".repeat(4000) },
+      _meta: tool("search_replace", "edit"),
+    },
+    { totalTokens: 7000 },
+  )
+  gLine("tool_call_update", {
+    toolCallId: "c2",
+    rawOutput: { output_for_prompt: "updated" },
+  })
+  gLine("tool_call_update", {
+    toolCallId: "c3",
+    rawOutput: { output_for_prompt: "updated" },
+  })
+  gLine(
+    "agent_message_chunk",
+    { content: { type: "text", text: "P".repeat(400) } },
+    { totalTokens: 8000 },
+  )
+  gLine("turn_completed", {
+    usage: {
+      inputTokens: 200000,
+      cachedReadTokens: 0,
+      cacheCreationTokens: 0,
+      outputTokens: 50000,
+      reasoningTokens: 8000,
+      modelCalls: 3,
+      modelUsage: {
+        "grok-4.5-build": {
+          inputTokens: 200000,
+          cachedReadTokens: 0,
+          outputTokens: 50000,
+          reasoningTokens: 8000,
+        },
+      },
+    },
+  })
+
+  const grokFile: RawFile = { name: "updates.jsonl", text: G.join("\n") }
+  const chat: RawFile = {
+    name: "chat_history.jsonl",
+    text: JSON.stringify({ type: "system", content: "S".repeat(4000) }),
+  }
+  const events: RawFile = {
+    name: "events.jsonl",
+    text: JSON.stringify({
+      ts: "2026-08-01T00:00:00Z",
+      type: "turn_started",
+      session_id: "sess-g",
+    }),
+  }
+
+  ok(E.isGrokSession(grokFile.text), "it is read as a Grok session rather than as a transcript")
+  ok(!E.isGrokSession(lines[0]), "and a transcript is not")
+  ok(!E.isCodexRollout(grokFile.text), "and it is not a Codex rollout")
+  ok(E.isGrokSidecar(chat.text), "chat_history is a sidecar")
+  ok(E.isGrokSidecar(events.text), "and so is events.jsonl")
+  ok(!E.isGrokSidecar(grokFile.text), "the conversation log is not")
+
+  const C = E.analyze([grokFile, chat, events])
+  const D = C.datasets["1h"]
+  ok(C.filesUsed === 1, `the sidecars are not counted as transcripts (${C.filesUsed})`)
+  ok(C.requests === 3 && C.sessions === 1, `${C.requests} requests over ${C.sessions} session(s)`)
+  ok(+D.total.toFixed(2) === 0.7, `it prices to the cent: ${money(D.total)}`)
+  ok(
+    +D.input.toFixed(2) === 0.4 && +D.output.toFixed(2) === 0.3,
+    `input ${money(D.input)}, output ${money(D.output)}`,
+  )
+  ok(Object.keys(C.unpriced).length === 0, "nothing goes unpriced")
+  ok(
+    C.models.length === 1 && C.models[0].basis === "exact",
+    `the model resolves: ${C.models.map((m) => `${m.id} [${m.basis}]`).join(", ")}`,
+  )
+  ok(C.datasets["5m"].total === D.total, "the TTL lens cannot move a Grok bill")
+
+  const rowOf = (id: string, name: string): { cost: number; kids: string[] } | null => {
+    const g = D.groups.find((x) => x.id === id)
+    const it = g?.items.find((x) => x.name === name)
+    return it ? { cost: it.cost, kids: (it.children || []).map((c) => c.name) } : null
+  }
+  const all = D.groups.flatMap((g) =>
+    g.items.flatMap((it) => [it.name, ...(it.children || []).map((c) => c.name)]),
+  )
+  ok((rowOf("shell", "git")?.cost ?? 0) > 0, "the shell command is read out of `command`: git")
+  ok(!all.includes("(unmatched tool result)"), "every tool result finds the call it answers")
+  const p = rowOf("emit", "search_replace")
+  ok(!!p, "the patch is a written-out tool")
+  ok(
+    !!p && p.kids.includes("*.ts") && p.kids.includes("*.md"),
+    `and the files it touches name its rows: ${p ? p.kids.join(",") : "(absent)"}`,
+  )
+  ok((rowOf("typed", "your typed messages")?.cost ?? 0) > 0, "what the reader typed is theirs")
+  ok(
+    (rowOf("output", "thinking blocks (re-billed as input)")?.cost ?? 0) > 0,
+    "the reasoning still carries",
+  )
+  ok(recon(D).length === 0, "it reconciles: " + (recon(D).join(" | ") || "clean"))
+}
+
+/* ================= 6. */
 const dir = process.argv[2]
 if (dir) {
   console.log(`\n== real transcripts: ${dir} ==`)
