@@ -149,12 +149,20 @@ interface Picked {
  *  on Windows. */
 const PROJECT_DIR = /^-|^[A-Za-z]--/
 
+/** Codex names a session file for the roll it is, and keeps them in dated folders under
+ *  `~/.codex/sessions` -- so either the folder above or the file's own name identifies the store. */
+const CODEX_DIR = /^(sessions|archived_sessions)$/
+const ROLLOUT = /^rollout-/
+
+/** Which store a pick came out of. */
+export type Store = "claude" | "codex" | null
+
 /** Where a pick came from, as far as its paths can say. */
 export interface Origin {
   /** The chosen folder's own name, or `null` for loose files and for several folders at once. */
   root: string | null
-  /** Whether it is `~/.claude/projects`, or one project's folder out of it. */
-  claude: boolean
+  /** `~/.claude/projects` or one project's folder out of it, `~/.codex/sessions`, or neither. */
+  store: Store
 }
 
 /** Judge the pick from the paths alone, so the page never has to ask the reader where they just
@@ -167,7 +175,16 @@ export function originOf(paths: readonly string[]): Origin {
       (s, i) => (s === ".claude" && segs[i + 1] === "projects") || PROJECT_DIR.test(s),
     )
   })
-  return { root: roots.size === 1 && !roots.has("") ? [...roots][0] : null, claude }
+  const codex = paths.some((p) => {
+    const segs = p.split("/")
+    if (ROLLOUT.test(segs[segs.length - 1])) return true
+    const dirs = segs.slice(0, -1)
+    return dirs.some((s, i) => s === ".codex" && CODEX_DIR.test(dirs[i + 1] || ""))
+  })
+  /* One name for a pick that turned out to hold both, and the page's own store is the one to
+     give: the message it feeds only has to name somewhere the reader has heard of. */
+  const store: Store = claude ? "claude" : codex ? "codex" : null
+  return { root: roots.size === 1 && !roots.has("") ? [...roots][0] : null, store }
 }
 
 /** Walk a folder handed over by `showDirectoryPicker`. Depth-first, the whole tree, because a
@@ -516,7 +533,7 @@ export function Intake({
   async function example(): Promise<void> {
     await walkFiles(
       sampleFiles().map((f) => ({ name: f.name, read: () => Promise.resolve(f.build()) })),
-      { root: null, claude: true },
+      { root: null, store: "claude" },
       true,
     )
   }
@@ -602,9 +619,9 @@ export function Intake({
       /* Two different failures wearing the same face. */
       const root = where.root ? <b>{where.root}</b> : null
       stop(
-        where.claude
+        where.store
           ? t.intake.errNoneBilled(scanned.filesUsed, root)
-          : t.intake.errNotClaude(scanned.filesUsed, root),
+          : t.intake.errNotStore(scanned.filesUsed, root),
       )
       return
     }
@@ -716,9 +733,7 @@ export function Intake({
             for something the reader cannot hand over -- being sent to a desktop is only worth
             reading once you know what is waiting there, and that note is at the foot of the
             card. */}
-        <h2>
-          {HANDHELD ? t.intake.headingTouch : t.intake.heading(<code>~/.claude/projects</code>)}
-        </h2>
+        <h2>{HANDHELD ? t.intake.headingTouch : t.intake.heading("Claude Code", "Codex")}</h2>
         {/* What pressing the button gets you, in one line, and it took five tries to get down to
             one. It was the method first -- per-request billing, re-billed context, the definition
             of carry cost -- which is the right paragraph in the wrong place: it argued for numbers

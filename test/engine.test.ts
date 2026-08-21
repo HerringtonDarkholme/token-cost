@@ -218,7 +218,140 @@ console.log("\n== the example corpus ==")
   ok(E.analyze(sampleCorpus()).datasets["1h"].total === D.total, "and it is the same every time")
 }
 
-/* ================= 3. */
+/* ================= 3. A Codex rollout, which is the other store's format and the same bill. The
+   figures are chosen so the total can be worked out by hand: gpt-5.4 bills $2.50 per 1M in, a
+   tenth of that for a cache read, and $15.00 per 1M out. */
+console.log("\n== a Codex rollout ==")
+{
+  const R: string[] = []
+  let n = 0
+  const line = (type: string, payload: Record<string, unknown>): number =>
+    R.push(JSON.stringify({ timestamp: `2026-06-0${(++n % 9) + 1}T00:00:00Z`, type, payload }))
+  const item = (payload: Record<string, unknown>): number => line("response_item", payload)
+  const msg = (role: string, text: string): number =>
+    item({ type: "message", role, content: [{ type: "input_text", text }] })
+  const said = (text: string): number =>
+    item({ type: "message", role: "assistant", content: [{ type: "output_text", text }] })
+  const thought = (): number =>
+    item({ type: "reasoning", summary: [], content: null, encrypted_content: "opaque" })
+  const edit = (id: string, file: string, body: string): void => {
+    item({
+      type: "custom_tool_call",
+      call_id: id,
+      name: "apply_patch",
+      input: `*** Begin Patch\n*** Update File: ${file}\n@@\n+${body}\n*** End Patch`,
+    })
+    item({ type: "custom_tool_call_output", call_id: id, output: "Success. Updated 1 file." })
+  }
+  /* Two figures per event, because a rollout may report either: what the last call spent, or only
+     the running total the walk then has to difference. */
+  const count = (cum: number[], last: number[] | null): number => {
+    const of = (v: number[]): Record<string, number> => ({
+      input_tokens: v[0],
+      cached_input_tokens: v[1],
+      cache_write_input_tokens: 0,
+      output_tokens: v[2],
+      reasoning_output_tokens: v[3],
+      total_tokens: v[0] + v[2],
+    })
+    return line("event_msg", {
+      type: "token_count",
+      info: {
+        total_token_usage: of(cum),
+        ...(last ? { last_token_usage: of(last) } : {}),
+        model_context_window: 400000,
+      },
+    })
+  }
+
+  line("session_meta", { session_id: "roll-1", cwd: "/somewhere/thing", originator: "codex-tui" })
+  line("turn_context", { cwd: "/somewhere/thing", model: "gpt-5.4", effort: "high" })
+  msg("developer", "R".repeat(6000))
+  msg("user", "T".repeat(4000))
+
+  // Turn one: 4k fresh in, 2k out. $0.01 + $0.03.
+  thought()
+  said("P".repeat(500))
+  item({
+    type: "function_call",
+    call_id: "c1",
+    name: "exec_command",
+    arguments: JSON.stringify({ cmd: "git status --short", workdir: "/somewhere/thing" }),
+  })
+  item({ type: "function_call_output", call_id: "c1", output: "O".repeat(3000) })
+  count([4000, 0, 2000, 400], [4000, 0, 2000, 400])
+
+  // Turn two: 4k fresh, 40k cached, 2k out. $0.01 + $0.01 + $0.03.
+  thought()
+  edit("c2", "src/thing.ts", "x".repeat(700))
+  edit("c3", "docs/note.md", "y".repeat(700))
+  line("event_msg", {
+    type: "mcp_tool_call_end",
+    call_id: "c4",
+    invocation: { server: "srv", tool: "lookup", arguments: { q: "Q".repeat(300) } },
+    result: { Ok: { content: [{ type: "text", text: "A".repeat(900) }] } },
+  })
+  count([48000, 40000, 4000, 800], [44000, 40000, 2000, 400])
+  // The same running total again, which is a line written twice rather than a request made twice.
+  count([48000, 40000, 4000, 800], null)
+
+  // Turn three reports no per-call figures, so the walk differences: 4k fresh, 80k cached, 2k out.
+  thought()
+  said("P".repeat(500))
+  count([132000, 120000, 6000, 1200], null)
+
+  const roll: RawFile = { name: "rollout-2026-06-01T00-00-00-roll-1.jsonl", text: R.join("\n") }
+  ok(E.isCodexRollout(roll.text), "it is read as a rollout rather than as a transcript")
+  ok(!E.isCodexRollout(lines[0]), "and a transcript is not")
+
+  const C = E.analyze([roll])
+  const D = C.datasets["1h"]
+  ok(C.requests === 3 && C.sessions === 1, `${C.requests} requests over ${C.sessions} session(s)`)
+  ok(D.total === 0.15, `it prices to the cent: ${money(D.total)}`)
+  ok(D.input === 0.06 && D.output === 0.09, `input ${money(D.input)}, output ${money(D.output)}`)
+  ok(Object.keys(C.unpriced).length === 0, "nothing goes unpriced")
+  ok(
+    C.models.length === 1 && C.models[0].id === "gpt-5.4" && C.models[0].basis === "exact",
+    `the model resolves: ${C.models.map((m) => `${m.id} [${m.basis}]`).join(", ")}`,
+  )
+  /* OpenAI has no cache TTL to choose, so there is nothing for the lens to reprice. */
+  ok(C.datasets["5m"].total === D.total, "the TTL lens cannot move an OpenAI bill")
+  ok(C.ttlTokens.unknown === 0, "and no write is left with its TTL unrecorded")
+
+  const rowOf = (id: string, name: string): { cost: number; kids: string[] } | null => {
+    const g = D.groups.find((x) => x.id === id)
+    const it = g?.items.find((x) => x.name === name)
+    return it ? { cost: it.cost, kids: (it.children || []).map((c) => c.name) } : null
+  }
+  const all = D.groups.flatMap((g) =>
+    g.items.flatMap((it) => [it.name, ...(it.children || []).map((c) => c.name)]),
+  )
+  ok((rowOf("shell", "git")?.cost ?? 0) > 0, "the shell command is read out of `cmd`: git")
+  ok(!all.includes("(unmatched tool result)"), "every tool result finds the call it answers")
+  const p = rowOf("emit", "apply_patch")
+  ok(!!p, "the patch is a written-out tool")
+  ok(
+    !!p && p.kids.includes("*.ts") && p.kids.includes("*.md"),
+    `and the files it touches name its rows: ${p ? p.kids.join(",") : "(absent)"}`,
+  )
+  ok(
+    all.some((x) => x.startsWith("srv · lookup")),
+    `the MCP call is its own row: ${all.join(" | ")}`,
+  )
+  ok((rowOf("typed", "your typed messages")?.cost ?? 0) > 0, "what the reader typed is theirs")
+  ok(
+    (rowOf("harness", "harness metadata")?.cost ?? 0) > 0,
+    "the developer message is the harness's",
+  )
+  /* Codex encrypts its reasoning and counts it anyway, so the carry is sized by the count. */
+  ok(
+    (rowOf("output", "thinking blocks (re-billed as input)")?.cost ?? 0) > 0,
+    "the reasoning it will not show still carries",
+  )
+  ok(recon(D).length === 0, "it reconciles: " + (recon(D).join(" | ") || "clean"))
+}
+
+/* ================= 4. */
 const dir = process.argv[2]
 if (dir) {
   console.log(`\n== real transcripts: ${dir} ==`)

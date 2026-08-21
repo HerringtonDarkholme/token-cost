@@ -951,35 +951,63 @@ describe("where a pick came from", () => {
     // The ask itself: `~/.claude/projects`, whose children are dash-encoded project folders.
     expect(at("projects/-Users-me-code-thing/a.jsonl", "projects/-Users-me-x/b.jsonl")).toEqual({
       root: "projects",
-      claude: true,
+      store: "claude",
     })
     // A drawer up: `.claude` holds more than transcripts, and the pick still works.
     expect(at(".claude/projects/-Users-me-x/a.jsonl", ".claude/todos/x.json")).toEqual({
       root: ".claude",
-      claude: true,
+      store: "claude",
     })
     /* One project's folder, which the help below the card recommends for one project's bill. */
     expect(at("-Users-me-code-thing/a.jsonl")).toEqual({
       root: "-Users-me-code-thing",
-      claude: true,
+      store: "claude",
     })
     // Same name, made on Windows, where the drive letter survives the flattening.
-    expect(at("C--Users-me-code-thing/a.jsonl").claude).toBe(true)
+    expect(at("C--Users-me-code-thing/a.jsonl").store).toBe("claude")
+  })
+
+  it("knows the other store, by its folder or by the file's own name", () => {
+    // `~/.codex/sessions`, whose children are the dated folders a rollout lands in.
+    expect(at("sessions/2026/08/20/rollout-2026-08-20T11-18-30-abc.jsonl")).toEqual({
+      root: "sessions",
+      store: "codex",
+    })
+    // A drawer up, where `sessions` and `archived_sessions` sit side by side under `.codex`.
+    expect(at(".codex/archived_sessions/rollout-x.jsonl", ".codex/config.toml")).toEqual({
+      root: ".codex",
+      store: "codex",
+    })
+    /* The folder alone, for a pick whose files were never named `rollout-`. */
+    expect(at(".codex/sessions/2026/08/20/a.jsonl").store).toBe("codex")
+    // And the name alone, for a rollout dragged out of its folder.
+    expect(at("Downloads/rollout-2026-08-20T11-18-30-abc.jsonl").store).toBe("codex")
   })
 
   it("does not mistake a folder that merely shares the name", () => {
     // Someone's own `~/projects`, with a `.jsonl` in it.
-    expect(at("projects/site/notes.jsonl")).toEqual({ root: "projects", claude: false })
-    expect(at("Downloads/a.jsonl")).toEqual({ root: "Downloads", claude: false })
+    expect(at("projects/site/notes.jsonl")).toEqual({ root: "projects", store: null })
+    expect(at("Downloads/a.jsonl")).toEqual({ root: "Downloads", store: null })
     // A session id is a session id: the file's own name is not evidence of anything.
-    expect(at("Downloads/-Users-me-x.jsonl").claude).toBe(false)
+    expect(at("Downloads/-Users-me-x.jsonl").store).toBe(null)
+    // `sessions` without `.codex` over it is just a word.
+    expect(at("notes/sessions/a.jsonl").store).toBe(null)
+  })
+
+  it("names one store for a pick that holds both", () => {
+    expect(at("projects/-Users-me-x/a.jsonl", ".codex/sessions/rollout-x.jsonl").store).toBe(
+      "claude",
+    )
   })
 
   it("names no folder when there was none to name", () => {
     // Loose files dropped in, and two folders at once: neither has one root to report.
-    expect(at("a.jsonl", "b.jsonl")).toEqual({ root: null, claude: false })
-    expect(at("-Users-me-x/a.jsonl", "-Users-me-y/b.jsonl")).toEqual({ root: null, claude: true })
-    expect(at()).toEqual({ root: null, claude: false })
+    expect(at("a.jsonl", "b.jsonl")).toEqual({ root: null, store: null })
+    expect(at("-Users-me-x/a.jsonl", "-Users-me-y/b.jsonl")).toEqual({
+      root: null,
+      store: "claude",
+    })
+    expect(at()).toEqual({ root: null, store: null })
   })
 })
 

@@ -15,6 +15,15 @@ import { closeWalk, openWalk, report, skipFile, walkOne } from "../src/engine.ts
  *  against the working tree rather than against whatever is currently in production. */
 const REPORT_URL = process.env.TOKEN_BILLING_URL || "https://token-billing.vercel.app/"
 
+/** The two stores, and where each agent keeps its sessions. `CODEX_HOME` is Codex's own override
+ *  for the second one. */
+const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), ".codex")
+const STORES = [
+  join(homedir(), ".claude", "projects"),
+  join(CODEX_HOME, "sessions"),
+  join(CODEX_HOME, "archived_sessions"),
+]
+
 /** Windows caps a `cmd` command line at 8191 characters, which a corpus with enough distinct
  *  tools in it can exceed on its own. Past this the address goes through a file instead of
  *  through the shell -- see `handOff`. */
@@ -86,17 +95,23 @@ function main(): void {
   /* Printing rather than opening is what a machine you reached over SSH needs, and it is how the
      hand-off is tested without a browser being taken over to do it. */
   const print = argv.includes("--print") || argv.includes("-p")
-  const dir = argv.find((a) => !a.startsWith("-")) ?? join(homedir(), ".claude", "projects")
+  const named = argv.filter((a) => !a.startsWith("-"))
+  /* With nothing named, both stores are read and a missing one is not a failure: most machines run
+     one of the two agents rather than both. */
+  const dirs = named.length ? named : STORES
+  const where = dirs.join(", ")
   const paths: string[] = []
-  try {
-    walk(dir, paths)
-  } catch (e) {
-    console.error(`could not read ${dir}: ${(e as Error).message}`)
-    process.exitCode = 1
-    return
+  const failed: string[] = []
+  for (const d of dirs) {
+    try {
+      walk(d, paths)
+    } catch (e) {
+      failed.push(`could not read ${d}: ${(e as Error).message}`)
+    }
   }
   if (!paths.length) {
-    console.error(`no .jsonl transcripts under ${dir}`)
+    if (failed.length) for (const f of failed) console.error(f)
+    else console.error(`no .jsonl sessions under ${where}`)
     process.exitCode = 1
     return
   }
@@ -129,7 +144,7 @@ function main(): void {
   try {
     const closed = closeWalk(w)
     if (!closed.scanned.filesUsed) {
-      console.error(`nothing readable under ${dir}`)
+      console.error(`nothing readable under ${where}`)
       process.exitCode = 1
       return
     }
@@ -141,8 +156,8 @@ function main(): void {
   }
   if (!data.requests) {
     console.error(
-      `${paths.length} transcript(s) read, but nothing in them was billed -- ` +
-        `is ${dir} really a Claude Code projects folder?`,
+      `${paths.length} session(s) read, but nothing in them was billed -- is ${where} really ` +
+        `a Claude Code projects folder or a Codex sessions folder?`,
     )
     process.exitCode = 1
     return

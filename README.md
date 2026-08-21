@@ -1,7 +1,7 @@
-# Where did your Claude Code money go?
+# Where did your Claude Code and Codex money go?
 
 Every dollar traced to whatever put the tokens in context — per tool, per shell command, per
-subcommand.
+subcommand. Reads Claude Code transcripts and Codex rollouts, in one report.
 
 ### **→ [token-billing.vercel.app](https://token-billing.vercel.app/)**
 
@@ -10,7 +10,8 @@ subcommand.
 ## Use it
 
 1. Open [token-billing.vercel.app](https://token-billing.vercel.app/).
-2. Drop your `~/.claude/projects` folder on the page (or one project inside it).
+2. Drop your `~/.claude/projects` folder on the page (or one project inside it). For Codex, drop
+   `~/.codex/sessions` — both at once is fine, and so is one folder out of either.
 3. Read the bill.
 
 No account, no upload, no install. In a hurry? Press **Try an example** to see a full report
@@ -22,8 +23,8 @@ built from invented sessions.
 
 | | |
 |---|---|
-| macOS | In the dialog press <kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>, paste `~/.claude/projects` |
-| Windows | Type `%USERPROFILE%\.claude\projects` into the *Folder* box |
+| macOS | In the dialog press <kbd>⇧</kbd><kbd>⌘</kbd><kbd>G</kbd>, paste `~/.claude/projects` or `~/.codex/sessions` |
+| Windows | Type `%USERPROFILE%\.claude\projects` or `%USERPROFILE%\.codex\sessions` into the *Folder* box |
 | Linux | Press <kbd>Ctrl</kbd>+<kbd>L</kbd>, type the path |
 
 Or run `open ~/.claude/projects` and drag the folder onto the page.
@@ -44,10 +45,15 @@ changes language — English, 简体中文, 日本語, Español, Français, Deut
 Same engine, no browser needed to do the work. Needs **Node 22.18+**.
 
 ```sh
-npx token-billing                                  # ~/.claude/projects, then opens the report
+npx token-billing                                  # both stores, then opens the report
 npx token-billing ~/.claude/projects/some-project  # just one project
+npx token-billing ~/.codex/sessions/2026/08        # just one month of Codex
 npx token-billing --print                          # print the URL instead of opening it
 ```
+
+With nothing named it reads `~/.claude/projects`, `~/.codex/sessions` and
+`~/.codex/archived_sessions`, and a store that is not there is not an error. `CODEX_HOME` moves the
+second one.
 
 Nothing to install and no dependencies — it is one bundled file that imports only Node builtins.
 
@@ -81,6 +87,11 @@ context by token share. **Totals are exact; the per-row split is estimated.**
   can give different totals days apart.
 - Thinking is a residual — `output_tokens` includes it even when no thinking block is saved.
 - Unknown models are reported as unpriced, never dropped.
+- Codex rollouts write the token count *after* the tool output rather than with the turn that
+  spent it, so the two are put back in transcript order before anything is priced.
+- Codex encrypts its reasoning but still counts it, so that carry is sized by the count rather
+  than by text there is none of.
+- OpenAI has no cache-write TTL to choose, so the TTL switch cannot move a Codex bill.
 
 ## Contributing
 
@@ -89,7 +100,7 @@ git clone https://github.com/HerringtonDarkholme/token-cost && cd token-cost
 pnpm install
 pnpm dev        # the page, on http://127.0.0.1:8000
 pnpm cli        # the command, straight from source
-pnpm check      # format, lint, typecheck, both builds, all five test suites
+pnpm check      # format, lint, typecheck, all three builds, all five test suites
 ```
 
 See [CLAUDE.md](CLAUDE.md) for repo conventions and [DESIGN_BRIEF.md](DESIGN_BRIEF.md) for the

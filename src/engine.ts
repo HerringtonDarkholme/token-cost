@@ -1,6 +1,11 @@
-/* Cost attribution engine for Claude Code transcripts. */
+/* Cost attribution engine for Claude Code transcripts and Codex rollouts. */
 
+import { codexRecords, isCodexRollout } from "./codex.ts"
 import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
+
+/* The engine is the one door onto both formats, so the detector is re-exported rather than left
+   for a caller to reach past it for. */
+export { isCodexRollout } from "./codex.ts"
 
 /* data in -- What the caller hands us, and the transcript shapes we read out of it. */
 
@@ -28,6 +33,9 @@ export interface ContentBlock {
   content?: unknown
   tool_use_id?: string
   source?: ImageSource
+  /** What the block is worth where the transcript counted it instead of leaving it to be
+   *  measured: Codex records its reasoning tokens without recording the reasoning. */
+  tokens?: number
 }
 
 export interface CacheCreation {
@@ -79,6 +87,32 @@ export const RATES: Record<string, Rate> = {
   "claude-3-5-haiku": [0.8, 4],
   "claude-3-haiku": [0.25, 1.25],
   "claude-2": [8, 24],
+  /* OpenAI, for Codex rollouts. Cached input is a tenth of input on every card OpenAI publishes,
+     which is the multiplier below, so only the two ends are listed. */
+  "gpt-5": [1.25, 10],
+  "gpt-5-mini": [0.25, 2],
+  "gpt-5-nano": [0.05, 0.4],
+  "gpt-5-pro": [15, 120],
+  "gpt-5.1": [1.25, 10],
+  "gpt-5.2": [1.75, 14],
+  "gpt-5.2-pro": [21, 168],
+  "gpt-5.3": [1.75, 14],
+  "gpt-5.4": [2.5, 15],
+  "gpt-5.4-mini": [0.75, 4.5],
+  "gpt-5.4-nano": [0.2, 1.25],
+  "gpt-5.4-pro": [30, 180],
+  "gpt-5.5": [5, 30],
+  "gpt-5.5-pro": [30, 180],
+  "gpt-5.6": [5, 30],
+  "gpt-5.6-luna": [0.2, 1.2],
+  "gpt-5.6-luna-pro": [30, 180],
+  "gpt-5.6-sol": [5, 30],
+  "gpt-5.6-sol-pro": [30, 180],
+  "gpt-5.6-terra": [2, 12],
+  "gpt-5.6-terra-pro": [30, 180],
+  "codex-mini": [1.5, 6],
+  /* The reviewer Codex runs by itself, on the card it shares with gpt-5.4. */
+  "codex-auto-review": [2.5, 15],
 }
 /* Last resort before giving up: the tier word implies the current rate for that tier. */
 const TIERS: Array<[RegExp, Rate]> = [
@@ -908,25 +942,9 @@ export function walkOne(st: Walk, f: RawFile): boolean {
     { tool: string; sub: string | null; verb: string | null; shell: boolean }
   >()
 
-  /* Walked by index rather than `split("\n")`: a store is hundreds of megabytes, and the split
-     builds an array of every line in the file before the first one is read. Leading blanks are
-     skipped by hand for the same reason -- `JSON.parse` tolerates the whitespace either side, so
-     the only thing a `trim()` would settle is whether the line is empty. */
-  const text = f.text
-  for (let i = 0, n = text.length; i < n;) {
-    let end = text.indexOf("\n", i)
-    if (end === -1) end = n
-    let from = i
-    i = end + 1
-    while (from < end && text.charCodeAt(from) <= 32) from++
-    if (from === end) continue
-    let rec: TranscriptRecord
-    try {
-      rec = JSON.parse(text.slice(from, end)) as TranscriptRecord
-    } catch {
-      st.badLines++
-      continue
-    }
+  /* One record, whichever kind of file it came out of: the two formats meet here rather than in
+     two copies of the walk. */
+  const feed = (rec: TranscriptRecord): void => {
     if (typeof rec.timestamp === "string") {
       const t = Date.parse(rec.timestamp)
       if (!isNaN(t)) {
@@ -935,7 +953,7 @@ export function walkOne(st: Walk, f: RawFile): boolean {
       }
     }
     const msg = rec.message
-    if (!msg || typeof msg !== "object") continue
+    if (!msg || typeof msg !== "object") return
     let content: ContentBlock[]
     if (typeof msg.content === "string") content = [{ type: "text", text: msg.content }]
     else if (Array.isArray(msg.content)) content = msg.content as ContentBlock[]
@@ -1072,7 +1090,12 @@ export function walkOne(st: Walk, f: RawFile): boolean {
             "text",
           )
         } else if (b.type === "thinking" || b.type === "redacted_thinking") {
-          hold(st, h, { role: "assistant", kind: "thinking-carried" }, null, charsOf(b), "text")
+          /* A block that counted itself is taken at its word; only text has to be sized. */
+          const own = b.tokens
+          if (typeof own === "number" && own > 0)
+            hold(st, h, { role: "assistant", kind: "thinking-carried" }, null, own, "tokens")
+          else
+            hold(st, h, { role: "assistant", kind: "thinking-carried" }, null, charsOf(b), "text")
         } else if (b.type === "tool_use") {
           const tool = b.name || "(unnamed tool)"
           const t = readTool(b.input)
@@ -1139,6 +1162,35 @@ export function walkOne(st: Walk, f: RawFile): boolean {
         }
       }
     }
+  }
+
+  const text = f.text
+  /* A Codex rollout tells the same story in another hand, so it is turned into the records this
+     walk already reads rather than given a second walk of its own. */
+  if (isCodexRollout(text)) {
+    for (const rec of codexRecords(text)) feed(rec)
+    return true
+  }
+
+  /* Walked by index rather than `split("\n")`: a store is hundreds of megabytes, and the split
+     builds an array of every line in the file before the first one is read. Leading blanks are
+     skipped by hand for the same reason -- `JSON.parse` tolerates the whitespace either side, so
+     the only thing a `trim()` would settle is whether the line is empty. */
+  for (let i = 0, n = text.length; i < n;) {
+    let end = text.indexOf("\n", i)
+    if (end === -1) end = n
+    let from = i
+    i = end + 1
+    while (from < end && text.charCodeAt(from) <= 32) from++
+    if (from === end) continue
+    let rec: TranscriptRecord
+    try {
+      rec = JSON.parse(text.slice(from, end)) as TranscriptRecord
+    } catch {
+      st.badLines++
+      continue
+    }
+    feed(rec)
   }
   return true
 }

@@ -64,10 +64,10 @@ const EN = {
 
   /* the card's header */
   card: {
-    eyebrow: "Cost attribution · Claude Code",
+    eyebrow: "Cost attribution · Claude Code & Codex",
     /** The browser tab, which the shell ships in English because the markup is written before
      *  anyone has guessed anything. */
-    title: "Where the money went — Claude Code cost attribution",
+    title: "Where the money went — Claude Code & Codex cost attribution",
     /** Read rather than dropped: this line stands over the figure on every device, and a phone
      *  has nothing to drop. Reading is what the page does with either way in. */
     nothingYet: "Nothing read yet",
@@ -75,8 +75,8 @@ const EN = {
     example: "Example data",
     /** What goes between the heading's words: a space, or nothing in the scripts that set none. */
     gap: " ",
-    billed: (ttl: string, masked: boolean): string =>
-      `Billed · ${masked ? "amount hidden · " : ""}${ttl} cache TTL`,
+    billed: (ttl: string | null, masked: boolean): string =>
+      `Billed · ${masked ? "amount hidden · " : ""}${ttl ? `${ttl} cache TTL` : "exact"}`,
     /** The question, before a folder has been dropped. */
     ask: [
       { w: "where", text: "Where" },
@@ -249,7 +249,11 @@ const EN = {
 
   /* the empty card */
   intake: {
-    heading: (folder: React.ReactNode): React.ReactNode => <>Drop your {folder} folder here</>,
+    heading: (a: React.ReactNode, b: React.ReactNode): React.ReactNode => (
+      <>
+        Drop your {a} or {b} folder here
+      </>
+    ),
     /** The heading on a device that probably cannot reach the folder. It says what the page does
      *  rather than what to do next: a reader who has not been told what this is cannot be sent
      *  anywhere. Where to go is the note at the foot of the card. */
@@ -258,7 +262,8 @@ const EN = {
     /** The same line with the heading's words taken out of it, since the heading above now says
      *  them -- and with where the numbers come from put in, which is the other half of what this
      *  page is. */
-    ledeTouch: "Every tool, every subcommand, every dollar, read out of your Claude Code sessions.",
+    ledeTouch:
+      "Every tool, every subcommand, every dollar, read out of your Claude Code or Codex sessions.",
     choose: "Choose folder",
     /** The other way in, for a reader with no `~/.claude` to point at -- a phone, or a machine
      *  Claude Code has never run on. */
@@ -277,8 +282,9 @@ const EN = {
     yours: "To chart your own",
     yoursBody: (
       <>
-        Open this page on the machine you run Claude Code on, and point it at{" "}
-        <code>~/.claude/projects</code>. Or preview the example bill above.
+        Open this page on the machine you run Claude Code or Codex on, and point it at{" "}
+        <code>~/.claude/projects</code> or <code>~/.codex/sessions</code>. Or preview the example
+        bill above.
       </>
     ),
     osTip: (current: string, next: string): string =>
@@ -294,27 +300,30 @@ const EN = {
           <kbd>⌘</kbd>
           <kbd>.</kbd> to reveal hidden folders. Or <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> and paste <code>~/.claude/projects</code>.
+          <kbd>G</kbd> and paste <code>~/.claude/projects</code>, or <code>~/.codex/sessions</code>{" "}
+          for Codex.
         </>
       ),
       win: (
         <>
-          Type <code>%USERPROFILE%\.claude\projects</code> into the dialog’s <em>Folder</em> box,
-          press <kbd>Enter</kbd>.
+          Type <code>%USERPROFILE%\.claude\projects</code> — or{" "}
+          <code>%USERPROFILE%\.codex\sessions</code> for Codex — into the dialog’s <em>Folder</em>{" "}
+          box, press <kbd>Enter</kbd>.
         </>
       ),
       linux: (
         <>
           In the dialog press <kbd>Ctrl</kbd>
-          <kbd>L</kbd>, type <code>~/.claude/projects</code>, press <kbd>Enter</kbd>.
+          <kbd>L</kbd>, type <code>~/.claude/projects</code> or <code>~/.codex/sessions</code>,
+          press <kbd>Enter</kbd>.
         </>
       ),
     } as Record<Os, React.ReactNode>,
     errNothing: "No files selected.",
     errNoJsonl: (root: React.ReactNode): React.ReactNode => (
       <>
-        {root} holds no <code>.jsonl</code> transcripts. Claude Code writes one per session, under{" "}
-        <code>~/.claude/projects</code>.
+        {root} holds no <code>.jsonl</code> sessions. Claude Code writes one per session under{" "}
+        <code>~/.claude/projects</code>, Codex under <code>~/.codex/sessions</code>.
       </>
     ),
     errLoose: (n: number): React.ReactNode => (
@@ -330,11 +339,12 @@ const EN = {
         priced API request — nothing here has been billed.
       </>
     ),
-    errNotClaude: (n: number, root: React.ReactNode | null): React.ReactNode => (
+    errNotStore: (n: number, root: React.ReactNode | null): React.ReactNode => (
       <>
         Those {n} <code>.jsonl</code> file{n > 1 ? "s" : ""} hold no priced API request.{" "}
-        {root ? <>{root} is not</> : "They did not come from"} <code>~/.claude/projects</code>,
-        which is where Claude Code keeps its transcripts.
+        {root ? <>{root} is neither</> : "They came from neither"} <code>~/.claude/projects</code>{" "}
+        nor <code>~/.codex/sessions</code>, which is where Claude Code and Codex keep their
+        sessions.
       </>
     ),
   },
@@ -346,8 +356,9 @@ const EN = {
       <>
         One <code>.jsonl</code> file per session, in one folder per project, under{" "}
         <code>~/.claude/projects/</code> — a dotfile, which is why every file picker hides it until
-        you ask for it by name. Everything you pick is combined into a single report, so pick one
-        project’s folder if that is the bill you want.
+        you ask for it by name. Codex keeps its own the same way: one <code>rollout-….jsonl</code>{" "}
+        per session, in dated folders under <code>~/.codex/sessions/</code>. Everything you pick is
+        combined into a single report, so pick one project’s folder if that is the bill you want.
       </>
     ),
     terminal: "Prefer the terminal?",
@@ -457,12 +468,13 @@ const ZH: Dict = {
     failed: "无法渲染图片",
   },
   card: {
-    eyebrow: "成本归因 · Claude Code",
-    title: "钱花到哪儿去了 — Claude Code 成本归因",
+    eyebrow: "成本归因 · Claude Code & Codex",
+    title: "钱花到哪儿去了 — Claude Code 与 Codex 成本归因",
     nothingYet: "还没有读取任何记录",
     example: "示例数据",
     gap: "",
-    billed: (ttl, masked) => `已计费 · ${masked ? "金额已隐藏 · " : ""}${ttl} 缓存 TTL`,
+    billed: (ttl, masked) =>
+      `已计费 · ${masked ? "金额已隐藏 · " : ""}${ttl ? `${ttl} 缓存 TTL` : "精确"}`,
     ask: [
       { w: "your", text: "你的" },
       { w: "money", text: "钱", em: true },
@@ -597,10 +609,14 @@ const ZH: Dict = {
       `有 ${n} 个会话记录读取失败，未计入总额；正在运行的会话会在读取过程中改动文件。`,
   },
   intake: {
-    heading: (folder) => <>把你的 {folder} 文件夹拖到这里</>,
+    heading: (a, b) => (
+      <>
+        把你的 {a} 或 {b} 文件夹拖到这里
+      </>
+    ),
     headingTouch: "把你的 AI 账单画出来",
     lede: "把 AI 账单画出来：每个工具、每条子命令、每一块钱。",
-    ledeTouch: "每个工具、每条子命令、每一块钱，都从你的 Claude Code 会话记录里读出来。",
+    ledeTouch: "每个工具、每条子命令、每一块钱，都从你的 Claude Code 或 Codex 会话记录里读出来。",
     choose: "选择文件夹",
     example: "查看示例",
     orTerminal: "或者在终端里",
@@ -612,7 +628,8 @@ const ZH: Dict = {
       <>
         {/* The break goes before the path, never after it: a line that starts with 。 puts a
             space in front of a full stop. */}
-        在你运行 Claude Code 的那台机器上打开本页，然后选择 <code>~/.claude/projects</code>
+        在你运行 Claude Code 或 Codex 的那台机器上打开本页，然后选择 <code>~/.claude/projects</code>{" "}
+        或 <code>~/.codex/sessions</code>
         。或者先看看上面的示例账单。
       </>
     ),
@@ -626,27 +643,29 @@ const ZH: Dict = {
           <kbd>⌘</kbd>
           <kbd>.</kbd> 显示隐藏文件夹。或者按 <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> 粘贴 <code>~/.claude/projects</code>。
+          <kbd>G</kbd> 粘贴 <code>~/.claude/projects</code>，Codex 则是{" "}
+          <code>~/.codex/sessions</code>。
         </>
       ),
       win: (
         <>
-          在对话框的<em>文件夹</em>框里输入 <code>%USERPROFILE%\.claude\projects</code>，按{" "}
-          <kbd>Enter</kbd>。
+          在对话框的<em>文件夹</em>框里输入 <code>%USERPROFILE%\.claude\projects</code>（Codex 则是{" "}
+          <code>%USERPROFILE%\.codex\sessions</code>），按 <kbd>Enter</kbd>。
         </>
       ),
       linux: (
         <>
           在对话框里按 <kbd>Ctrl</kbd>
-          <kbd>L</kbd>，输入 <code>~/.claude/projects</code>，按 <kbd>Enter</kbd>。
+          <kbd>L</kbd>，输入 <code>~/.claude/projects</code> 或 <code>~/.codex/sessions</code>，按{" "}
+          <kbd>Enter</kbd>。
         </>
       ),
     },
     errNothing: "没有选中任何文件。",
     errNoJsonl: (root) => (
       <>
-        {root} 里没有 <code>.jsonl</code> 转录文件。Claude Code 每个会话写一个，放在{" "}
-        <code>~/.claude/projects</code> 下面。
+        {root} 里没有 <code>.jsonl</code> 会话记录。Claude Code 每个会话写一个，放在{" "}
+        <code>~/.claude/projects</code> 下面；Codex 放在 <code>~/.codex/sessions</code> 下面。
       </>
     ),
     errLoose: (n) => (
@@ -662,11 +681,11 @@ const ZH: Dict = {
         这里没有任何东西被计过费。
       </>
     ),
-    errNotClaude: (n, root) => (
+    errNotStore: (n, root) => (
       <>
         这 {n} 个 <code>.jsonl</code> 文件里没有计费的 API 请求。
-        {root ? <>{root} 不是</> : "它们不是来自"} <code>~/.claude/projects</code>，而 Claude Code
-        的转录文件就放在那里。
+        {root ? <>{root} 既不是</> : "它们既不是来自"} <code>~/.claude/projects</code>，也不是{" "}
+        <code>~/.codex/sessions</code>，而 Claude Code 和 Codex 的会话记录就放在那两处。
       </>
     ),
   },
@@ -676,8 +695,10 @@ const ZH: Dict = {
       <>
         每个会话一个 <code>.jsonl</code> 文件，每个项目一个文件夹，都在{" "}
         <code>~/.claude/projects/</code> 下面 ——
-        这是个点开头的隐藏目录，所以每个文件选择器都会藏起它，
-        除非你指名要。你选的所有内容会合并成一份报告，所以如果你只想看某一个项目的账单，就只选那个项目的文件夹。
+        这是个点开头的隐藏目录，所以每个文件选择器都会藏起它，除非你指名要。Codex
+        也一样：每个会话一个 <code>rollout-….jsonl</code>，按日期分文件夹放在{" "}
+        <code>~/.codex/sessions/</code>{" "}
+        下面。你选的所有内容会合并成一份报告，所以如果你只想看某一个项目的账单，就只选那个项目的文件夹。
       </>
     ),
     terminal: "更习惯用终端？",
@@ -777,12 +798,13 @@ const JA: Dict = {
     failed: "画像を描画できませんでした",
   },
   card: {
-    eyebrow: "コスト配分 · Claude Code",
-    title: "お金はどこへ — Claude Code コスト配分",
+    eyebrow: "コスト配分 · Claude Code & Codex",
+    title: "お金はどこへ — Claude Code と Codex のコスト配分",
     nothingYet: "まだ何も読み込んでいません",
     example: "サンプルデータ",
     gap: "",
-    billed: (ttl, masked) => `課金済み · ${masked ? "金額は非表示 · " : ""}${ttl} キャッシュ TTL`,
+    billed: (ttl, masked) =>
+      `課金済み · ${masked ? "金額は非表示 · " : ""}${ttl ? `${ttl} キャッシュ TTL` : "正確"}`,
     ask: [
       { w: "your", text: "あなたの" },
       { w: "money", text: "お金", em: true },
@@ -924,11 +946,15 @@ const JA: Dict = {
       `${n} 件のトランスクリプトを読み取れず、合計に含まれていません。実行中のセッションがあるフォルダーは読み取り中に変化します。`,
   },
   intake: {
-    heading: (folder) => <>{folder} フォルダをここにドロップ</>,
+    heading: (a, b) => (
+      <>
+        {a} か {b} のフォルダをここにドロップ
+      </>
+    ),
     headingTouch: "AI の請求を図にする",
     lede: "AI の請求を図にする：すべてのツール、すべてのサブコマンド、すべてのドル。",
     ledeTouch:
-      "すべてのツール、すべてのサブコマンド、すべてのドルを、Claude Code のセッション記録から読み取ります。",
+      "すべてのツール、すべてのサブコマンド、すべてのドルを、Claude Code や Codex のセッション記録から読み取ります。",
     choose: "フォルダを選ぶ",
     example: "サンプルを見る",
     orTerminal: "ターミナルからでも",
@@ -938,7 +964,8 @@ const JA: Dict = {
     yours: "自分の請求を見るには",
     yoursBody: (
       <>
-        Claude Code を動かしているマシンでこのページを開き、<code>~/.claude/projects</code>{" "}
+        Claude Code や Codex を動かしているマシンでこのページを開き、
+        <code>~/.claude/projects</code> か <code>~/.codex/sessions</code>{" "}
         を選んでください。または、上のサンプル請求を見てみてください。
       </>
     ),
@@ -952,27 +979,30 @@ const JA: Dict = {
           <kbd>⌘</kbd>
           <kbd>.</kbd> を押すと隠しフォルダが表示されます。または <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> で <code>~/.claude/projects</code> を貼り付け。
+          <kbd>G</kbd> で <code>~/.claude/projects</code> を貼り付け。Codex なら{" "}
+          <code>~/.codex/sessions</code>。
         </>
       ),
       win: (
         <>
-          ダイアログの<em>フォルダー</em>欄に <code>%USERPROFILE%\.claude\projects</code> と入力し、
-          <kbd>Enter</kbd> を押します。
+          ダイアログの<em>フォルダー</em>欄に <code>%USERPROFILE%\.claude\projects</code>（Codex
+          なら <code>%USERPROFILE%\.codex\sessions</code>）と入力し、<kbd>Enter</kbd> を押します。
         </>
       ),
       linux: (
         <>
           ダイアログで <kbd>Ctrl</kbd>
-          <kbd>L</kbd> を押し、<code>~/.claude/projects</code> と入力して <kbd>Enter</kbd>。
+          <kbd>L</kbd> を押し、<code>~/.claude/projects</code> か <code>~/.codex/sessions</code>{" "}
+          と入力して <kbd>Enter</kbd>。
         </>
       ),
     },
     errNothing: "ファイルが選択されていません。",
     errNoJsonl: (root) => (
       <>
-        {root} に <code>.jsonl</code> トランスクリプトはありません。Claude Code はセッションごとに 1
-        つを <code>~/.claude/projects</code> の下に書き出します。
+        {root} に <code>.jsonl</code> のセッション記録はありません。Claude Code はセッションごとに 1
+        つを <code>~/.claude/projects</code> の下に、Codex は <code>~/.codex/sessions</code>{" "}
+        の下に書き出します。
       </>
     ),
     errLoose: (n) => (
@@ -988,11 +1018,12 @@ const JA: Dict = {
         リクエストは一つもありません — ここには請求されたものがありません。
       </>
     ),
-    errNotClaude: (n, root) => (
+    errNotStore: (n, root) => (
       <>
         その {n} 個の <code>.jsonl</code> ファイルに課金された API リクエストはありません。
-        {root ? <>{root} は</> : "これらの出どころは"} <code>~/.claude/projects</code>{" "}
-        ではありません。Claude Code はそこにトランスクリプトを置きます。
+        {root ? <>{root} は</> : "これらの出どころは"} <code>~/.claude/projects</code> でも{" "}
+        <code>~/.codex/sessions</code> でもありません。Claude Code と Codex
+        はそこにセッション記録を置きます。
       </>
     ),
   },
@@ -1002,7 +1033,9 @@ const JA: Dict = {
       <>
         セッションごとに <code>.jsonl</code> ファイルが 1 つ、プロジェクトごとにフォルダが 1 つ、
         <code>~/.claude/projects/</code> の下にあります — ドットファイルなので、名前で指定しない限り
-        どのファイル選択画面でも隠されています。選んだものはすべて 1
+        どのファイル選択画面でも隠されています。Codex も同じで、セッションごとに{" "}
+        <code>rollout-….jsonl</code> が 1 つ、日付ごとのフォルダに分かれて{" "}
+        <code>~/.codex/sessions/</code> の下にあります。選んだものはすべて 1
         つのレポートにまとめられるので、
         特定のプロジェクトの請求が見たいなら、そのプロジェクトのフォルダだけを選んでください。
       </>
@@ -1105,13 +1138,13 @@ const ES: Dict = {
     failed: "No se pudo generar la imagen",
   },
   card: {
-    eyebrow: "Atribución de costes · Claude Code",
-    title: "En qué se fue el dinero — Atribución de costes de Claude Code",
+    eyebrow: "Atribución de costes · Claude Code & Codex",
+    title: "En qué se fue el dinero — Atribución de costes de Claude Code y Codex",
     nothingYet: "Todavía no se ha leído nada",
     example: "Datos de ejemplo",
     gap: " ",
     billed: (ttl, masked) =>
-      `Facturado · ${masked ? "importe oculto · " : ""}TTL de caché de ${ttl}`,
+      `Facturado · ${masked ? "importe oculto · " : ""}${ttl ? `TTL de caché de ${ttl}` : "exacto"}`,
     ask: [
       { w: "where", text: "¿En qué" },
       { w: "went", text: "se fue" },
@@ -1262,11 +1295,15 @@ const ES: Dict = {
       "sesión activa cambia durante la lectura.",
   },
   intake: {
-    heading: (folder) => <>Suelta aquí tu carpeta {folder}</>,
+    heading: (a, b) => (
+      <>
+        Suelta aquí tu carpeta de {a} o {b}
+      </>
+    ),
     headingTouch: "Visualiza tu factura de IA",
     lede: "Grafica tu factura de IA: cada herramienta, cada subcomando, cada dólar.",
     ledeTouch:
-      "Cada herramienta, cada subcomando, cada dólar, leídos de tus sesiones de Claude Code.",
+      "Cada herramienta, cada subcomando, cada dólar, leídos de tus sesiones de Claude Code o Codex.",
     choose: "Elegir carpeta",
     example: "Ver un ejemplo",
     orTerminal: "O desde la terminal",
@@ -1276,8 +1313,9 @@ const ES: Dict = {
     yours: "Para ver la tuya",
     yoursBody: (
       <>
-        Abre esta página en la máquina donde ejecutas Claude Code y elige la carpeta{" "}
-        <code>~/.claude/projects</code>. O mira antes la factura de ejemplo de arriba.
+        Abre esta página en la máquina donde ejecutas Claude Code o Codex y elige la carpeta{" "}
+        <code>~/.claude/projects</code> o <code>~/.codex/sessions</code>. O mira antes la factura de
+        ejemplo de arriba.
       </>
     ),
     osTip: (current, next) => `¿No usas ${current}? Pulsa para la ruta de ${next}.`,
@@ -1290,27 +1328,30 @@ const ES: Dict = {
           <kbd>⌘</kbd>
           <kbd>.</kbd> para mostrar las carpetas ocultas. O <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> y pega <code>~/.claude/projects</code>.
+          <kbd>G</kbd> y pega <code>~/.claude/projects</code>, o <code>~/.codex/sessions</code> para
+          Codex.
         </>
       ),
       win: (
         <>
-          Escribe <code>%USERPROFILE%\.claude\projects</code> en el campo <em>Carpeta</em> del
+          Escribe <code>%USERPROFILE%\.claude\projects</code> —o{" "}
+          <code>%USERPROFILE%\.codex\sessions</code> para Codex— en el campo <em>Carpeta</em> del
           diálogo y pulsa <kbd>Enter</kbd>.
         </>
       ),
       linux: (
         <>
           En el diálogo pulsa <kbd>Ctrl</kbd>
-          <kbd>L</kbd>, escribe <code>~/.claude/projects</code> y pulsa <kbd>Enter</kbd>.
+          <kbd>L</kbd>, escribe <code>~/.claude/projects</code> o <code>~/.codex/sessions</code> y
+          pulsa <kbd>Enter</kbd>.
         </>
       ),
     },
     errNothing: "No se seleccionó ningún archivo.",
     errNoJsonl: (root) => (
       <>
-        {root} no contiene transcripciones <code>.jsonl</code>. Claude Code escribe una por sesión,
-        bajo <code>~/.claude/projects</code>.
+        {root} no contiene sesiones <code>.jsonl</code>. Claude Code escribe una por sesión bajo{" "}
+        <code>~/.claude/projects</code>; Codex, bajo <code>~/.codex/sessions</code>.
       </>
     ),
     errLoose: (n) => (
@@ -1326,11 +1367,11 @@ const ES: Dict = {
         contiene una petición de API con precio — aquí no se ha facturado nada.
       </>
     ),
-    errNotClaude: (n, root) => (
+    errNotStore: (n, root) => (
       <>
         Esos {n} archivo{n > 1 ? "s" : ""} <code>.jsonl</code> no contienen ninguna petición de API
-        con precio. {root ? <>{root} no es</> : "No vienen de"} <code>~/.claude/projects</code>, que
-        es donde Claude Code guarda sus transcripciones.
+        con precio. {root ? <>{root} no es</> : "No vienen de"} <code>~/.claude/projects</code> ni{" "}
+        <code>~/.codex/sessions</code>, que es donde Claude Code y Codex guardan sus sesiones.
       </>
     ),
   },
@@ -1340,7 +1381,9 @@ const ES: Dict = {
       <>
         Un archivo <code>.jsonl</code> por sesión, en una carpeta por proyecto, bajo{" "}
         <code>~/.claude/projects/</code> — un dotfile, y por eso todo selector de archivos lo oculta
-        hasta que lo pides por su nombre. Todo lo que elijas se combina en un único informe, así que
+        hasta que lo pides por su nombre. Codex guarda las suyas igual: un{" "}
+        <code>rollout-….jsonl</code> por sesión, en carpetas por fecha bajo{" "}
+        <code>~/.codex/sessions/</code>. Todo lo que elijas se combina en un único informe, así que
         elige la carpeta de un solo proyecto si esa es la factura que quieres.
       </>
     ),
@@ -1443,12 +1486,13 @@ const FR: Dict = {
     failed: "Impossible de rendre l’image",
   },
   card: {
-    eyebrow: "Attribution des coûts · Claude Code",
-    title: "Où est passé l’argent — Attribution des coûts Claude Code",
+    eyebrow: "Attribution des coûts · Claude Code & Codex",
+    title: "Où est passé l’argent — Attribution des coûts Claude Code et Codex",
     nothingYet: "Rien n’a encore été lu",
     example: "Données d’exemple",
     gap: " ",
-    billed: (ttl, masked) => `Facturé · ${masked ? "montant masqué · " : ""}TTL de cache ${ttl}`,
+    billed: (ttl, masked) =>
+      `Facturé · ${masked ? "montant masqué · " : ""}${ttl ? `TTL de cache ${ttl}` : "exact"}`,
     ask: [
       { w: "where", text: "Où" },
       /* The same two words the answer ends on, so they carry the same slot and travel across the
@@ -1601,11 +1645,15 @@ const FR: Dict = {
       "où une session tourne change pendant la lecture.",
   },
   intake: {
-    heading: (folder) => <>Déposez ici votre dossier {folder}</>,
+    heading: (a, b) => (
+      <>
+        Déposez ici votre dossier {a} ou {b}
+      </>
+    ),
     headingTouch: "Visualisez votre facture d’IA",
     lede: "Cartographiez votre facture d’IA : chaque outil, chaque sous-commande, chaque dollar.",
     ledeTouch:
-      "Chaque outil, chaque sous-commande, chaque dollar, lus dans vos sessions Claude Code.",
+      "Chaque outil, chaque sous-commande, chaque dollar, lus dans vos sessions Claude Code ou Codex.",
     choose: "Choisir un dossier",
     example: "Voir un exemple",
     orTerminal: "Ou depuis le terminal",
@@ -1615,8 +1663,9 @@ const FR: Dict = {
     yours: "Pour voir la vôtre",
     yoursBody: (
       <>
-        Ouvrez cette page sur la machine où vous lancez Claude Code, puis choisissez le dossier{" "}
-        <code>~/.claude/projects</code>. Ou prévisualisez la facture d’exemple ci-dessus.
+        Ouvrez cette page sur la machine où vous lancez Claude Code ou Codex, puis choisissez le
+        dossier <code>~/.claude/projects</code> ou <code>~/.codex/sessions</code>. Ou prévisualisez
+        la facture d’exemple ci-dessus.
       </>
     ),
     osTip: (current, next) => `Pas ${current} ? Appuyez pour la marche à suivre ${next}.`,
@@ -1629,27 +1678,30 @@ const FR: Dict = {
           <kbd>⌘</kbd>
           <kbd>.</kbd> pour révéler les dossiers masqués. Ou <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> puis collez <code>~/.claude/projects</code>.
+          <kbd>G</kbd> puis collez <code>~/.claude/projects</code>, ou{" "}
+          <code>~/.codex/sessions</code> pour Codex.
         </>
       ),
       win: (
         <>
-          Tapez <code>%USERPROFILE%\.claude\projects</code> dans le champ <em>Dossier</em> de la
-          boîte de dialogue, puis <kbd>Entrée</kbd>.
+          Tapez <code>%USERPROFILE%\.claude\projects</code> — ou{" "}
+          <code>%USERPROFILE%\.codex\sessions</code> pour Codex — dans le champ <em>Dossier</em> de
+          la boîte de dialogue, puis <kbd>Entrée</kbd>.
         </>
       ),
       linux: (
         <>
           Dans la boîte de dialogue, faites <kbd>Ctrl</kbd>
-          <kbd>L</kbd>, tapez <code>~/.claude/projects</code>, puis <kbd>Entrée</kbd>.
+          <kbd>L</kbd>, tapez <code>~/.claude/projects</code> ou <code>~/.codex/sessions</code>,
+          puis <kbd>Entrée</kbd>.
         </>
       ),
     },
     errNothing: "Aucun fichier sélectionné.",
     errNoJsonl: (root) => (
       <>
-        {root} ne contient aucune transcription <code>.jsonl</code>. Claude Code en écrit une par
-        session, sous <code>~/.claude/projects</code>.
+        {root} ne contient aucune session <code>.jsonl</code>. Claude Code en écrit une par session
+        sous <code>~/.claude/projects</code>, Codex sous <code>~/.codex/sessions</code>.
       </>
     ),
     errLoose: (n) => (
@@ -1665,11 +1717,12 @@ const FR: Dict = {
         aucune ne contient de requête d’API tarifée — rien ici n’a été facturé.
       </>
     ),
-    errNotClaude: (n, root) => (
+    errNotStore: (n, root) => (
       <>
         Ces {n} fichier{n > 1 ? "s" : ""} <code>.jsonl</code> ne contiennent aucune requête d’API
-        tarifée. {root ? <>{root} n’est pas</> : "Ils ne viennent pas de"}{" "}
-        <code>~/.claude/projects</code>, où Claude Code range ses transcriptions.
+        tarifée. {root ? <>{root} n’est ni</> : "Ils ne viennent ni de"}{" "}
+        <code>~/.claude/projects</code> ni de <code>~/.codex/sessions</code>, où Claude Code et
+        Codex rangent leurs sessions.
       </>
     ),
   },
@@ -1679,9 +1732,10 @@ const FR: Dict = {
       <>
         Un fichier <code>.jsonl</code> par session, un dossier par projet, sous{" "}
         <code>~/.claude/projects/</code> — un dotfile, et c’est pourquoi tout sélecteur de fichiers
-        le masque tant que vous ne le demandez pas par son nom. Tout ce que vous choisissez est
-        réuni en un seul rapport, donc choisissez le dossier d’un seul projet si c’est cette facture
-        que vous voulez.
+        le masque tant que vous ne le demandez pas par son nom. Codex range les siennes de même : un{" "}
+        <code>rollout-….jsonl</code> par session, dans des dossiers datés sous{" "}
+        <code>~/.codex/sessions/</code>. Tout ce que vous choisissez est réuni en un seul rapport,
+        donc choisissez le dossier d’un seul projet si c’est cette facture que vous voulez.
       </>
     ),
     terminal: "Vous préférez le terminal ?",
@@ -1782,13 +1836,13 @@ const DE: Dict = {
     failed: "Bild konnte nicht gerendert werden",
   },
   card: {
-    eyebrow: "Kostenzuordnung · Claude Code",
-    title: "Wohin das Geld geflossen ist — Claude-Code-Kostenzuordnung",
+    eyebrow: "Kostenzuordnung · Claude Code & Codex",
+    title: "Wohin das Geld geflossen ist — Claude-Code- und Codex-Kostenzuordnung",
     nothingYet: "Noch nichts gelesen",
     example: "Beispieldaten",
     gap: " ",
     billed: (ttl, masked) =>
-      `Abgerechnet · ${masked ? "Betrag ausgeblendet · " : ""}${ttl} Cache-TTL`,
+      `Abgerechnet · ${masked ? "Betrag ausgeblendet · " : ""}${ttl ? `${ttl} Cache-TTL` : "exakt"}`,
     ask: [
       { w: "where", text: "Wohin" },
       { w: "did", text: "ist" },
@@ -1940,11 +1994,16 @@ const DE: Dict = {
       "einer laufenden Sitzung ändert sich während des Lesens.",
   },
   intake: {
-    heading: (folder) => <>Lege deinen Ordner {folder} hier ab</>,
+    heading: (a, b) => (
+      <>
+        Lege deinen {a}- oder {b}-Ordner hier ab
+      </>
+    ),
     headingTouch: "Visualisiere deine KI-Rechnung",
     lede: "Zeichne deine KI-Rechnung: jedes Tool, jedes Unterkommando, jeden Dollar.",
     ledeTouch:
-      "Jedes Tool, jedes Unterkommando, jeden Dollar — gelesen aus deinen Claude-Code-Sitzungen.",
+      "Jedes Tool, jedes Unterkommando, jeden Dollar — gelesen aus deinen Claude-Code- oder " +
+      "Codex-Sitzungen.",
     choose: "Ordner wählen",
     example: "Beispiel ansehen",
     orTerminal: "Oder im Terminal",
@@ -1954,8 +2013,9 @@ const DE: Dict = {
     yours: "Für deine eigene Rechnung",
     yoursBody: (
       <>
-        Öffne diese Seite auf dem Rechner, auf dem du Claude Code ausführst, und wähle den Ordner{" "}
-        <code>~/.claude/projects</code>. Oder sieh dir oben die Beispielrechnung an.
+        Öffne diese Seite auf dem Rechner, auf dem du Claude Code oder Codex ausführst, und wähle
+        den Ordner <code>~/.claude/projects</code> oder <code>~/.codex/sessions</code>. Oder sieh
+        dir oben die Beispielrechnung an.
       </>
     ),
     osTip: (current, next) => `Nicht ${current}? Drücken für den Weg unter ${next}.`,
@@ -1968,27 +2028,30 @@ const DE: Dict = {
           <kbd>⌘</kbd>
           <kbd>.</kbd> drücken, um versteckte Ordner zu zeigen. Oder <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> und <code>~/.claude/projects</code> einfügen.
+          <kbd>G</kbd> und <code>~/.claude/projects</code> einfügen — für Codex{" "}
+          <code>~/.codex/sessions</code>.
         </>
       ),
       win: (
         <>
-          Tippe <code>%USERPROFILE%\.claude\projects</code> in das Feld <em>Ordner</em> des Dialogs
-          und drücke <kbd>Enter</kbd>.
+          Tippe <code>%USERPROFILE%\.claude\projects</code> — für Codex{" "}
+          <code>%USERPROFILE%\.codex\sessions</code> — in das Feld <em>Ordner</em> des Dialogs und
+          drücke <kbd>Enter</kbd>.
         </>
       ),
       linux: (
         <>
           Im Dialog <kbd>Strg</kbd>
-          <kbd>L</kbd> drücken, <code>~/.claude/projects</code> tippen, <kbd>Enter</kbd>.
+          <kbd>L</kbd> drücken, <code>~/.claude/projects</code> oder <code>~/.codex/sessions</code>{" "}
+          tippen, <kbd>Enter</kbd>.
         </>
       ),
     },
     errNothing: "Keine Dateien ausgewählt.",
     errNoJsonl: (root) => (
       <>
-        {root} enthält keine <code>.jsonl</code>-Transkripte. Claude Code schreibt eines pro
-        Sitzung, unter <code>~/.claude/projects</code>.
+        {root} enthält keine <code>.jsonl</code>-Sitzungen. Claude Code schreibt eine pro Sitzung
+        unter <code>~/.claude/projects</code>, Codex unter <code>~/.codex/sessions</code>.
       </>
     ),
     errLoose: (n) => (
@@ -2004,11 +2067,12 @@ const DE: Dict = {
         enthält eine bepreiste API-Anfrage — hier wurde nichts abgerechnet.
       </>
     ),
-    errNotClaude: (n, root) => (
+    errNotStore: (n, root) => (
       <>
         Diese {n} <code>.jsonl</code>-Datei{n > 1 ? "en" : ""} enthalten keine bepreiste
-        API-Anfrage. {root ? <>{root} ist nicht</> : "Sie stammen nicht aus"}{" "}
-        <code>~/.claude/projects</code>, wo Claude Code seine Transkripte ablegt.
+        API-Anfrage. {root ? <>{root} ist weder</> : "Sie stammen weder aus"}{" "}
+        <code>~/.claude/projects</code> noch aus <code>~/.codex/sessions</code>, wo Claude Code und
+        Codex ihre Sitzungen ablegen.
       </>
     ),
   },
@@ -2018,8 +2082,10 @@ const DE: Dict = {
       <>
         Eine <code>.jsonl</code>-Datei pro Sitzung, ein Ordner pro Projekt, unter{" "}
         <code>~/.claude/projects/</code> — ein Dotfile, weshalb jeder Dateidialog ihn versteckt, bis
-        du ihn beim Namen verlangst. Alles, was du wählst, wird zu einem Bericht zusammengeführt —
-        wähle also den Ordner eines einzelnen Projekts, wenn du dessen Rechnung willst.
+        du ihn beim Namen verlangst. Codex legt seine genauso ab: eine <code>rollout-….jsonl</code>{" "}
+        pro Sitzung, in Datumsordnern unter <code>~/.codex/sessions/</code>. Alles, was du wählst,
+        wird zu einem Bericht zusammengeführt — wähle also den Ordner eines einzelnen Projekts, wenn
+        du dessen Rechnung willst.
       </>
     ),
     terminal: "Lieber im Terminal?",

@@ -184,7 +184,10 @@ export function Page({
     prefetchFace(wants === "report" ? "intake" : "report")
   }, [wants])
 
-  const billed = ctx ? t.card.billed(state.ttl, state.pctOnly) : t.card.nothingYet
+  /* The TTL is named only where one was assumed. A bill with no cache writes to guess at -- an
+     OpenAI one, where there is no TTL to choose -- would otherwise quote a rate it never used. */
+  const assumed = !!data && data.ttlTokens.unknown > 0
+  const billed = ctx ? t.card.billed(assumed ? state.ttl : null, state.pctOnly) : t.card.nothingYet
   /* What the empty card's figure counts from, and what it counts through: the walk writes its
      running total into this box as it reads, so the slot holds $0.00 before a folder is picked
      and then climbs towards the bill from the first transcript to the last. */
