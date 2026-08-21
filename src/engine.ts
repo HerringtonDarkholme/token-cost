@@ -1,6 +1,13 @@
 /* Cost attribution engine for Claude Code transcripts and Codex rollouts. */
 
-import { codexEnd, codexLine, codexOpen, isCodexRollout, type CodexState } from "./codex.ts"
+import {
+  codexEnd,
+  codexFront,
+  codexLine,
+  codexOpen,
+  isCodexRollout,
+  type CodexState,
+} from "./codex.ts"
 import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
 
 /* The engine is the one door onto both formats, so the detector is re-exported rather than left
@@ -944,6 +951,9 @@ export interface FileWalk {
    *  when the line ends -- a rollout has single lines of twenty megabytes, and growing one buffer
    *  a chunk at a time copies the whole of it every time. */
   carry: string[]
+  /** Set where the front of a line was all the reader wanted: the rest of it is then read past
+   *  rather than collected, which on a real store leaves three and a half gigabytes unjoined. */
+  skipping: boolean
   codex: CodexState | null
   /** When the walk next offers the thread back. */
   due: number
@@ -964,6 +974,7 @@ export function openFile(st: Walk, name: string, size: number): FileWalk {
     buf: "",
     at: 0,
     carry: [],
+    skipping: false,
     codex: null,
     due: performance.now() + SLICE,
     feed: null,
@@ -1248,7 +1259,16 @@ export function pushText(fw: FileWalk, chunk: string): void {
   }
   /* Whatever is left of the last chunk is the front of a line this one finishes, so it is set
      aside rather than grown into: the join happens once, when the line ends. */
-  if (fw.at < fw.buf.length) fw.carry.push(fw.at ? fw.buf.slice(fw.at) : fw.buf)
+  if (fw.at < fw.buf.length && !fw.skipping) {
+    const part = fw.at ? fw.buf.slice(fw.at) : fw.buf
+    /* Offered from its front before it is collected: the biggest records a rollout writes are the
+       ones the reader takes a few hundred bytes off, and putting those back together first was
+       four gigabytes of string built and thrown away. Only ever asked of the first piece -- a
+       marker found in the middle of a line is a marker inside somebody's text. */
+    if (!fw.carry.length && fw.codex && fw.feed && codexFront(fw.codex, part, fw.feed))
+      fw.skipping = true
+    else fw.carry.push(part)
+  }
   fw.buf = chunk
   fw.at = 0
 }
@@ -1282,7 +1302,11 @@ export function* stepFile(fw: FileWalk): Generator<void, void, void> {
        whitespace either side, so the only thing a `trim()` would settle is whether the line is
        empty. */
     let line: string | null = null
-    if (fw.carry.length) {
+    if (fw.skipping) {
+      // The front of this one was all the reader wanted, so the rest of it goes unread.
+      fw.skipping = false
+      fw.at = end + 1
+    } else if (fw.carry.length) {
       fw.carry.push(fw.buf.slice(fw.at, end))
       const whole = fw.carry.join("")
       fw.carry = []

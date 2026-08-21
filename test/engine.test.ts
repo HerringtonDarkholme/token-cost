@@ -602,6 +602,78 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
     `and a bigger picture is dearer than a smaller one: ${money(large.images)} against ${money(small.images)}`,
   )
 
+  /* Both shortcuts read a line off its front rather than out of the whole of it, so where a chunk
+     boundary falls decides whether the shortcut is available at all -- and it must not decide the
+     bill. */
+  const mixed = [
+    ...top,
+    billed(2000),
+    compacted("carrying on", ["message", "replacement_history"]),
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "response_item",
+      payload: { type: "function_call", call_id: "c9", name: "view_image", arguments: "{}" },
+    }),
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "response_item",
+      payload: {
+        type: "function_call_output",
+        call_id: "c9",
+        output: [{ type: "input_image", image_url: shotUrl(1568, 1568, 40000) }],
+      },
+    }),
+    billed(60000),
+    billed(120000),
+  ].join("\n")
+  const mixedWhole = ((): number => {
+    const w = E.openWalk()
+    E.walkOne(w, { name: "rollout-mixed.jsonl", text: mixed })
+    return E.billedSoFar(w)
+  })()
+  const mixedCuts = [1, 97, 4096, 65536]
+  const mixedSame = mixedCuts.filter((n) => inPieces(mixed, n) === mixedWhole)
+  ok(
+    mixedSame.length === mixedCuts.length && mixedWhole > 0,
+    `a compaction and a picture bill the same wherever the joins fall: ` +
+      `${mixedSame.length}/${mixedCuts.length} of ${mixedCuts.join(", ")}`,
+  )
+
+  /* == the records nothing asks for == Nearly a third of what a real store still parsed was
+     records the reader has no case for. The list of payloads it handles is now the list it
+     consults before parsing, so the two cannot drift -- and a payload absent from it has to leave
+     the bill exactly where it was. */
+  const noise = [
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "response_item",
+      payload: { type: "reasoning", summary: [], encrypted_content: "Z".repeat(30000) },
+    }),
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "event_msg",
+      payload: { type: "item_completed", item: { text: "Q".repeat(30000) } },
+    }),
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "event_msg",
+      payload: { type: "agent_message", message: "M".repeat(30000) },
+    }),
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "event_msg",
+      payload: { type: "a_type_from_a_later_version", body: "N".repeat(30000) },
+    }),
+  ]
+  const quiet = [...top, billed(2000), billed(60000)].join("\n")
+  const noisy = [...top, billed(2000), ...noise, billed(60000)].join("\n")
+  const totalOf = (text: string): number =>
+    E.analyze([{ name: "rollout-noise.jsonl", text }]).datasets["1h"].total
+  ok(
+    totalOf(quiet) === totalOf(noisy) && totalOf(quiet) > 0,
+    `records nothing asks for leave the bill alone: ${money(totalOf(noisy))} either way`,
+  )
+
   /* == the model that arrives late == A rollout can bill requests before it says which model made
      them, and two of a real store's thousand say so tens of megabytes in -- far past anything the
      reader can hold the front of the file for. Those requests wait for the name rather than going

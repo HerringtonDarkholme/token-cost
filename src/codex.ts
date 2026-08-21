@@ -362,6 +362,137 @@ function flush(s: CodexState, u: CodexUsage, out: Out): void {
     give(s, { timestamp: s.stamp, message: { role: "user", content: results } }, out)
 }
 
+/** The payload's own type, where the payload names it first -- which is how a rollout writes an
+ *  event and a response item. Empty where it does not, and then the parse decides. */
+const TYPE = '"type":"'
+function payloadType(head: string, at: number): string {
+  const from = at + PAYLOAD.length
+  if (!head.startsWith(TYPE, from)) return ""
+  const open = from + TYPE.length
+  const shut = head.indexOf('"', open)
+  return shut === -1 ? "" : head.slice(open, shut)
+}
+
+/** The two payloads that carry tool output, which is where a screenshot arrives. */
+const OUTPUTS = new Set(["function_call_output", "custom_tool_call_output"])
+
+/** What the reader does with one payload. */
+type Handler = (s: CodexState, p: CodexPayload, out: Out) => void
+
+/** A billed request, which is the one event the bill cannot do without. */
+const onCount: Handler = (s, _p, out) => {
+  const info = _p.info
+  if (!info) return
+  const total = info.total_token_usage
+  /* A rollout can write the same event twice, and the running total is what tells a repeat from a
+     request. Without one there is nothing to compare, and counting a rare repeat is the better
+     error: the alternative drops every request after the first. */
+  if (total) {
+    const cum = num(total.total_tokens)
+    if (s.prevTotal !== null && cum === s.prevTotal) return
+    s.prevTotal = cum
+  }
+  let u = info.last_token_usage
+  if (!u && total) {
+    u = {
+      input_tokens: num(total.input_tokens) - s.prevIn,
+      cached_input_tokens: num(total.cached_input_tokens) - s.prevCached,
+      cache_write_input_tokens: num(total.cache_write_input_tokens) - s.prevWrite,
+      output_tokens: num(total.output_tokens) - s.prevOut,
+      reasoning_output_tokens: num(total.reasoning_output_tokens) - s.prevReason,
+    }
+  }
+  if (total) {
+    s.prevIn = num(total.input_tokens)
+    s.prevCached = num(total.cached_input_tokens)
+    s.prevOut = num(total.output_tokens)
+    s.prevWrite = num(total.cache_write_input_tokens)
+    s.prevReason = num(total.reasoning_output_tokens)
+  }
+  if (!u) return
+  flush(s, u, out)
+}
+
+/** An MCP call arrives as one event carrying both halves, so both are made here. */
+const onMcp: Handler = (s, p) => {
+  const inv = p.invocation
+  const server = str(inv?.server),
+    tool = str(inv?.tool)
+  if (!server || !tool) return
+  const id = str(p.call_id)
+  const args = inv?.arguments
+  s.blocks.push({
+    type: "tool_use",
+    id,
+    name: `mcp__${server}__${tool}`,
+    input: args && typeof args === "object" ? (args as Record<string, unknown>) : {},
+  })
+  s.results.push({ type: "tool_result", tool_use_id: id, content: JSON.stringify(p.result ?? "") })
+}
+
+const onMessage: Handler = (s, p, out) => {
+  const content = blocksOf(p.content)
+  if (!content.length) return
+  if (p.role === "assistant") s.blocks.push(...content)
+  // A developer message is the harness talking, not the reader.
+  else
+    give(
+      s,
+      { timestamp: s.stamp, isMeta: p.role !== "user", message: { role: "user", content } },
+      out,
+    )
+}
+
+/** Traffic between agents, which is neither of them talking to the reader. */
+const onAgentMessage: Handler = (s, p, out) => {
+  const content = blocksOf(p.content)
+  if (content.length)
+    give(s, { timestamp: s.stamp, isMeta: true, message: { role: "user", content } }, out)
+}
+
+const onCall: Handler = (s, p) => {
+  s.blocks.push({
+    type: "tool_use",
+    id: str(p.call_id),
+    name: str(p.name) || "(unnamed tool)",
+    input: argsOf(p),
+  })
+}
+
+const onOutput: Handler = (s, p) => {
+  s.results.push({
+    type: "tool_result",
+    tool_use_id: str(p.call_id),
+    content: str(p.output) || JSON.stringify(p.output ?? ""),
+  })
+}
+
+const onWebSearch: Handler = (s, p) => {
+  s.blocks.push({
+    type: "tool_use",
+    id: str(p.call_id),
+    name: "web_search",
+    input: { query: str(p.action?.query) },
+  })
+}
+
+/* One list rather than two: these keys are what `read` consults to decide whether a line is worth
+   parsing at all, so a payload handled here is read and one that is absent is put down where it
+   lies. Nearly a third of what a real store still parses is records nothing below asks for. */
+const EVENTS = new Map<string, Handler>([
+  ["token_count", onCount],
+  ["mcp_tool_call_end", onMcp],
+])
+const ITEMS = new Map<string, Handler>([
+  ["message", onMessage],
+  ["agent_message", onAgentMessage],
+  ["function_call", onCall],
+  ["custom_tool_call", onCall],
+  ["function_call_output", onOutput],
+  ["custom_tool_call_output", onOutput],
+  ["web_search_call", onWebSearch],
+])
+
 /** One line of a rollout, as the transcript records it would have been. */
 export function codexLine(s: CodexState, line: string, out: Out): void {
   read(s, line, out)
@@ -369,12 +500,21 @@ export function codexLine(s: CodexState, line: string, out: Out): void {
   if (s.held && s.model) release(s, out)
 }
 
-function read(s: CodexState, line: string, out: Out): void {
-  /* Compaction rewrites the prefix, which the walk has to be told about or it will read the
-     rewrite as content that arrived. The rewrite itself is a quarter of a big rollout's bytes
-     and nothing here reads it, so the message is lifted out and the rest is never parsed. */
-  const cut = compaction(line)
-  if (cut) {
+/** The records the reader needs only the front of, which are also the two biggest a rollout
+ *  writes: a compaction, whose rewritten prefix is a third of a real store's bytes and which
+ *  nothing here reads, and a screenshot, of which only the header saying how big the picture is
+ *  matters. `true` when the front was enough and the rest of the line can go unread -- which is
+ *  what lets a line spanning chunks be read without being put back together. */
+export function codexFront(s: CodexState, front: string, out: Out): boolean {
+  const head = front.length > ENVELOPE ? front.slice(0, ENVELOPE) : front
+  const at = head.indexOf(PAYLOAD)
+  if (at <= 0) return false
+  const kind = envelopeValue(head.slice(0, at), "type")
+  if (kind === "compacted") {
+    /* The walk has to be told a compaction happened or it will read the rewrite as content that
+       arrived; what the rewrite says is nothing to do with the bill. */
+    const cut = compaction(front)
+    if (!cut) return false
     if (cut.stamp) s.stamp = cut.stamp
     give(
       s,
@@ -385,16 +525,34 @@ function read(s: CodexState, line: string, out: Out): void {
       },
       out,
     )
-    return
+    return true
   }
-  /* A screenshot is the biggest thing in a rollout by a long way -- two fifths of a real store --
-     and the only part of it worth reading is the header that says how big the picture is. Sizing
-     the rest as characters charged one screenshot as several million of them. */
-  const shot = screenshot(line)
-  if (shot) {
-    if (shot.stamp) s.stamp = shot.stamp
-    s.results.push({ type: "image", source: { data: shot.data } })
-    return
+  if (kind !== "response_item" && kind !== "event_msg") return false
+  if (!OUTPUTS.has(payloadType(head, at))) return false
+  const shot = screenshot(front)
+  if (!shot) return false
+  if (shot.stamp) s.stamp = shot.stamp
+  s.results.push({ type: "image", source: { data: shot.data } })
+  return true
+}
+
+function read(s: CodexState, line: string, out: Out): void {
+  if (codexFront(s, line, out)) return
+  const head = line.length > ENVELOPE ? line.slice(0, ENVELOPE) : line
+  const at = head.indexOf(PAYLOAD)
+  if (at > 0) {
+    const env = head.slice(0, at)
+    const kind = envelopeValue(env, "type")
+    if (kind === "event_msg" || kind === "response_item") {
+      const sub = payloadType(head, at)
+      /* Nothing below asks for this one, so it is put down where it lies -- `JSON.parse` builds
+         every string in a record before anything gets to ignore them. */
+      if (sub && !(kind === "event_msg" ? EVENTS : ITEMS).has(sub)) {
+        const ts = envelopeValue(env, "timestamp")
+        if (ts) s.stamp = ts
+        return
+      }
+    }
   }
   let rec: CodexLine
   try {
@@ -426,113 +584,9 @@ function read(s: CodexState, line: string, out: Out): void {
     return
   }
 
-  if (rec.type === "event_msg" && p.type === "token_count") {
-    const info = p.info
-    if (!info) return
-    const total = info.total_token_usage
-    /* A rollout can write the same event twice, and the running total is what tells a repeat
-       from a request. Without one there is nothing to compare, and counting a rare repeat is
-       the better error: the alternative drops every request after the first. */
-    if (total) {
-      const cum = num(total.total_tokens)
-      if (s.prevTotal !== null && cum === s.prevTotal) return
-      s.prevTotal = cum
-    }
-    let u = info.last_token_usage
-    if (!u && total) {
-      u = {
-        input_tokens: num(total.input_tokens) - s.prevIn,
-        cached_input_tokens: num(total.cached_input_tokens) - s.prevCached,
-        cache_write_input_tokens: num(total.cache_write_input_tokens) - s.prevWrite,
-        output_tokens: num(total.output_tokens) - s.prevOut,
-        reasoning_output_tokens: num(total.reasoning_output_tokens) - s.prevReason,
-      }
-    }
-    if (total) {
-      s.prevIn = num(total.input_tokens)
-      s.prevCached = num(total.cached_input_tokens)
-      s.prevOut = num(total.output_tokens)
-      s.prevWrite = num(total.cache_write_input_tokens)
-      s.prevReason = num(total.reasoning_output_tokens)
-    }
-    if (!u) return
-    flush(s, u, out)
-    return
-  }
-
-  /* An MCP call arrives as one event carrying both halves, so both are made here. */
-  if (rec.type === "event_msg" && p.type === "mcp_tool_call_end") {
-    const inv = p.invocation
-    const server = str(inv?.server),
-      tool = str(inv?.tool)
-    if (!server || !tool) return
-    const id = str(p.call_id)
-    const args = inv?.arguments
-    s.blocks.push({
-      type: "tool_use",
-      id,
-      name: `mcp__${server}__${tool}`,
-      input: args && typeof args === "object" ? (args as Record<string, unknown>) : {},
-    })
-    s.results.push({
-      type: "tool_result",
-      tool_use_id: id,
-      content: JSON.stringify(p.result ?? ""),
-    })
-    return
-  }
-
-  if (rec.type !== "response_item") return
-
-  switch (p.type) {
-    case "message": {
-      const content = blocksOf(p.content)
-      if (!content.length) break
-      if (p.role === "assistant") s.blocks.push(...content)
-      // A developer message is the harness talking, not the reader.
-      else
-        give(
-          s,
-          { timestamp: s.stamp, isMeta: p.role !== "user", message: { role: "user", content } },
-          out,
-        )
-      break
-    }
-    /* Traffic between agents, which is neither of them talking to the reader. */
-    case "agent_message": {
-      const content = blocksOf(p.content)
-      if (content.length)
-        give(s, { timestamp: s.stamp, isMeta: true, message: { role: "user", content } }, out)
-      break
-    }
-    case "function_call":
-    case "custom_tool_call":
-      s.blocks.push({
-        type: "tool_use",
-        id: str(p.call_id),
-        name: str(p.name) || "(unnamed tool)",
-        input: argsOf(p),
-      })
-      break
-    case "function_call_output":
-    case "custom_tool_call_output":
-      s.results.push({
-        type: "tool_result",
-        tool_use_id: str(p.call_id),
-        content: str(p.output) || JSON.stringify(p.output ?? ""),
-      })
-      break
-    case "web_search_call":
-      s.blocks.push({
-        type: "tool_use",
-        id: str(p.call_id),
-        name: "web_search",
-        input: { query: str(p.action?.query) },
-      })
-      break
-    default:
-      break
-  }
+  const table = rec.type === "event_msg" ? EVENTS : rec.type === "response_item" ? ITEMS : null
+  const handler = table?.get(str(p.type))
+  if (handler) handler(s, p, out)
 }
 
 /** A session read mid-flight ends with a turn nothing billed: it is still context, so it is still
