@@ -119,6 +119,30 @@ function quoted(line: string, at: number, key: string): string | null {
   return null
 }
 
+/* A rollout returns a screenshot inside the tool output, as a base64 data URL running to tens of
+   megabytes. This is the shape it writes, and anything else falls through to the parse. */
+const SHOT_AT = '"output":[{"type":"input_image","image_url":"'
+
+/** How far into such a line the reader looks: past the envelope, and far enough into the picture
+ *  for the header that gives its size -- a PNG says so in its first two dozen bytes, and what is
+ *  handed on gets scrubbed character by character, so a generous window is not a free one. */
+const SHOT_LOOK = 1 << 13
+
+/** A tool output that is a screenshot rather than text: the line's timestamp, and enough of the
+ *  front of the image to read its dimensions off. `null` for every other line and for one shaped
+ *  in a way this cannot read, both of which go on to be parsed whole. */
+function screenshot(line: string): { stamp: string; data: string } | null {
+  const look = line.length > SHOT_LOOK ? line.slice(0, SHOT_LOOK) : line
+  const at = look.indexOf(SHOT_AT)
+  if (at === -1) return null
+  const from = at + SHOT_AT.length
+  /* Base64 carries no quote, so the first one after the URL closes it -- and where the picture is
+     longer than the window there is none, which is what the prefix is for. */
+  let end = look.indexOf('"', from)
+  if (end === -1) end = look.length
+  return { stamp: envelopeValue(look.slice(0, at), "timestamp"), data: look.slice(from, end) }
+}
+
 /** A compaction's timestamp and message, taken off the front of the line. `null` for every other
  *  line and for a compaction shaped in a way this cannot read, both of which go on to be parsed
  *  whole. */
@@ -176,7 +200,15 @@ function blocksOf(content: unknown): ContentBlock[] {
   for (const b of content) {
     if (!b || typeof b !== "object") continue
     const c = b as { type?: string; text?: string }
-    if (c.type === "input_image") out.push({ type: "image" })
+    if (c.type === "input_image")
+      out.push({
+        type: "image",
+        /* Sized off its own header where it carries one, so a thumbnail is not charged as a
+           full-page capture. */
+        ...(typeof (b as { image_url?: string }).image_url === "string"
+          ? { source: { data: (b as { image_url?: string }).image_url } }
+          : {}),
+      })
     else if (typeof c.text === "string" && c.text) out.push({ type: "text", text: c.text })
   }
   return out
@@ -353,6 +385,15 @@ function read(s: CodexState, line: string, out: Out): void {
       },
       out,
     )
+    return
+  }
+  /* A screenshot is the biggest thing in a rollout by a long way -- two fifths of a real store --
+     and the only part of it worth reading is the header that says how big the picture is. Sizing
+     the rest as characters charged one screenshot as several million of them. */
+  const shot = screenshot(line)
+  if (shot) {
+    if (shot.stamp) s.stamp = shot.stamp
+    s.results.push({ type: "image", source: { data: shot.data } })
     return
   }
   let rec: CodexLine

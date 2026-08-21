@@ -524,6 +524,84 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
     `the same bill however the bytes are cut up: ${same.length}/${cuts.length} of ${cuts.join(", ")}`,
   )
 
+  /* == the screenshots == A rollout returns a picture as a base64 data URL inside the tool output,
+     and there are gigabytes of that in a real store. What it costs is what the picture is, not how
+     many characters it took to send. */
+  const shotUrl = (w: number, h: number, filler: number): string => {
+    const b = Buffer.alloc(24 + filler)
+    b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)
+    b.set([0, 0, 0, 0x0d], 8)
+    b.set([0x49, 0x48, 0x44, 0x52], 12)
+    b.writeUInt32BE(w, 16)
+    b.writeUInt32BE(h, 20)
+    return "data:image/png;base64," + b.toString("base64")
+  }
+  const shot = (url: string): string =>
+    [
+      ...top,
+      /* A small request first, because the preamble is whatever the first one cannot account for
+         -- start with a big one and there is nothing left for anything else to have a share of. */
+      billed(2000),
+      L({
+        timestamp: "2026-06-02T00:00:00Z",
+        type: "response_item",
+        payload: { type: "function_call", call_id: "c1", name: "view_image", arguments: "{}" },
+      }),
+      L({
+        timestamp: "2026-06-02T00:00:00Z",
+        type: "response_item",
+        payload: {
+          type: "function_call_output",
+          call_id: "c1",
+          output: [{ type: "input_image", image_url: url }],
+        },
+      }),
+      /* Something for the picture to be a share *of*: what a request bills is spread across
+         everything in its context, so a picture on its own takes all of it whatever its size. */
+      L({
+        timestamp: "2026-06-02T00:00:00Z",
+        type: "response_item",
+        payload: { type: "function_call", call_id: "c2", name: "shell", arguments: "{}" },
+      }),
+      L({
+        timestamp: "2026-06-02T00:00:00Z",
+        type: "response_item",
+        payload: { type: "function_call_output", call_id: "c2", output: "T".repeat(20000) },
+      }),
+      billed(60000),
+      /* And one more after it: what a request carries into context is spent by the requests that
+         come after, so a picture in the last turn is a picture nothing has paid for yet. */
+      billed(120000),
+    ].join("\n")
+  const shotBill = (url: string): { total: number; images: number; readIn: string[] } => {
+    const priced = E.analyze([{ name: "rollout-shot.jsonl", text: shot(url) }])
+    const D1 = priced.datasets["1h"]
+    const g = (id: string) => D1.groups.find((x) => x.id === id)
+    return {
+      total: D1.total,
+      images: g("media")?.cost ?? 0,
+      readIn: (g("ingest")?.items ?? []).map((row) => row.name),
+    }
+  }
+  const small = shotBill(shotUrl(64, 64, 40))
+  const large = shotBill(shotUrl(1568, 1568, 40))
+  /* Padded past the window the reader looks through, so the size has to come off the front of the
+     picture rather than from how much of it arrived. */
+  const padded = shotBill(shotUrl(1568, 1568, 900000))
+  ok(large.images > 0, `the picture is priced as a picture: ${money(large.images)}`)
+  ok(
+    !large.readIn.includes("view_image"),
+    `and not as tool output read in: ${large.readIn.join(", ") || "(nothing)"}`,
+  )
+  ok(
+    padded.total === large.total && padded.images === large.images,
+    `a picture sent in more characters is not a dearer picture: ${money(padded.total)} vs ${money(large.total)}`,
+  )
+  ok(
+    large.images > small.images,
+    `and a bigger picture is dearer than a smaller one: ${money(large.images)} against ${money(small.images)}`,
+  )
+
   /* == the model that arrives late == A rollout can bill requests before it says which model made
      them, and two of a real store's thousand say so tens of megabytes in -- far past anything the
      reader can hold the front of the file for. Those requests wait for the name rather than going
