@@ -15,6 +15,7 @@ import {
   type Analysis,
   type Scanned,
 } from "./engine.ts"
+import { GROK_SIDECARS } from "./grok.ts"
 import { useT, type Dict, type Os } from "./copy.tsx"
 import { TextSwap } from "./Motion.tsx"
 import { sampleFiles } from "./sample.ts"
@@ -158,13 +159,14 @@ const CODEX_DIR = /^(sessions|archived_sessions)$/
 const ROLLOUT = /^rollout-/
 
 /** Which store a pick came out of. */
-export type Store = "claude" | "codex" | null
+export type Store = "claude" | "codex" | "grok" | null
 
 /** Where a pick came from, as far as its paths can say. */
 export interface Origin {
   /** The chosen folder's own name, or `null` for loose files and for several folders at once. */
   root: string | null
-  /** `~/.claude/projects` or one project's folder out of it, `~/.codex/sessions`, or neither. */
+  /** `~/.claude/projects` or one project's folder out of it, `~/.codex/sessions`,
+   *  `~/.grok/sessions`, or none of those. */
   store: Store
 }
 
@@ -184,9 +186,15 @@ export function originOf(paths: readonly string[]): Origin {
     const dirs = segs.slice(0, -1)
     return dirs.some((s, i) => s === ".codex" && CODEX_DIR.test(dirs[i + 1] || ""))
   })
-  /* One name for a pick that turned out to hold both, and the page's own store is the one to
-     give: the message it feeds only has to name somewhere the reader has heard of. */
-  const store: Store = claude ? "claude" : codex ? "codex" : null
+  const grok = paths.some((p) => {
+    const segs = p.split("/")
+    if (segs[segs.length - 1] === "updates.jsonl") return true
+    const dirs = segs.slice(0, -1)
+    return dirs.some((s, i) => s === ".grok" && dirs[i + 1] === "sessions")
+  })
+  /* One name for a pick that turned out to hold more than one, and the page's own store is the
+     one to give: the message it feeds only has to name somewhere the reader has heard of. */
+  const store: Store = claude ? "claude" : codex ? "codex" : grok ? "grok" : null
   return { root: roots.size === 1 && !roots.has("") ? [...roots][0] : null, store }
 }
 
@@ -552,7 +560,9 @@ export function Intake({
   }
 
   async function handle(picked: Picked[]): Promise<void> {
-    const files = picked.filter((p) => p.file.name.endsWith(".jsonl"))
+    const files = picked.filter(
+      (p) => p.file.name.endsWith(".jsonl") && !GROK_SIDECARS.has(p.file.name),
+    )
     /* Judged before anything is read, and kept for whatever has to be said afterwards: the two
        ways this can come to nothing are both questions about the folder, and the folder is
        standing right here. */
@@ -848,7 +858,9 @@ export function Intake({
             for something the reader cannot hand over -- being sent to a desktop is only worth
             reading once you know what is waiting there, and that note is at the foot of the
             card. */}
-        <h2>{HANDHELD ? t.intake.headingTouch : t.intake.heading("Claude Code", "Codex")}</h2>
+        <h2>
+          {HANDHELD ? t.intake.headingTouch : t.intake.heading("Claude Code", "Codex", "Grok")}
+        </h2>
         {/* What pressing the button gets you, in one line, and it took five tries to get down to
             one. It was the method first -- per-request billing, re-billed context, the definition
             of carry cost -- which is the right paragraph in the wrong place: it argued for numbers

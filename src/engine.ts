@@ -1,4 +1,4 @@
-/* Cost attribution engine for Claude Code transcripts and Codex rollouts. */
+/* Cost attribution engine for Claude Code transcripts, Codex rollouts, and Grok sessions. */
 
 import {
   codexEnd,
@@ -9,10 +9,20 @@ import {
   type CodexState,
 } from "./codex.ts"
 import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
+import {
+  grokEnd,
+  grokFront,
+  grokLine,
+  grokOpen,
+  isGrokSession,
+  isGrokSidecar,
+  type GrokState,
+} from "./grok.ts"
 
-/* The engine is the one door onto both formats, so the detector is re-exported rather than left
+/* The engine is the one door onto every format, so the detectors are re-exported rather than left
    for a caller to reach past it for. */
 export { isCodexRollout } from "./codex.ts"
+export { isGrokSession, isGrokSidecar, GROK_SIDECARS } from "./grok.ts"
 
 /* data in -- What the caller hands us, and the transcript shapes we read out of it. */
 
@@ -77,8 +87,9 @@ export interface TranscriptRecord {
 
 /* pricing -- A rate card, not a model whitelist. */
 
-/** $ per 1M tokens, as [input, output]. */
-export type Rate = [input: number, output: number]
+/** $ per 1M tokens, as [input, output], with an optional cached-input price. Omitted cache uses
+ *  `CACHE_READ_MULT` times input, which is what Anthropic and OpenAI publish. */
+export type Rate = [input: number, output: number, cached?: number]
 
 export const RATES: Record<string, Rate> = {
   "claude-fable-5": [10, 50],
@@ -120,6 +131,18 @@ export const RATES: Record<string, Rate> = {
   "codex-mini": [1.5, 6],
   /* The reviewer Codex runs by itself, on the card it shares with gpt-5.4. */
   "codex-auto-review": [2.5, 15],
+  /* xAI, for Grok sessions. Cached input is not a fixed fraction of input, so the third figure is
+     the published cache-read price rather than a multiplier. */
+  "grok-4.6": [2, 6, 0.5],
+  "grok-4.5": [2, 6, 0.3],
+  "grok-4.3": [1.25, 2.5],
+  "grok-4": [3, 15],
+  "grok-3-mini": [0.3, 0.5],
+  "grok-3": [3, 15],
+  "grok-4.1-fast": [0.2, 0.5],
+  "grok-4-1-fast": [0.2, 0.5],
+  "grok-code-fast-1": [0.2, 1.5],
+  "grok-code-fast": [0.2, 1.5],
 }
 /* Last resort before giving up: the tier word implies the current rate for that tier. */
 const TIERS: Array<[RegExp, Rate]> = [
@@ -156,6 +179,7 @@ export function normalizeModel(id: unknown): string {
   m = m.replace(/-v\d+$/, "") // -v1
   m = m.replace(/[-@](\d{8}|\d{6})$/, "") // -20250219 / @250219
   m = m.replace(/-latest$/, "")
+  m = m.replace(/-build$/, "") // Grok's internal id for the same published card
   return m.replace(/-+$/, "")
 }
 
@@ -719,7 +743,16 @@ export function classifyUserBlock(text: string, rec?: TranscriptRecord): UserSpa
 }
 
 /** What a tool call says about itself. */
-const PATH_FIELDS = ["file_path", "filePath", "path", "notebook_path", "notebookPath", "file"]
+const PATH_FIELDS = [
+  "file_path",
+  "filePath",
+  "path",
+  "notebook_path",
+  "notebookPath",
+  "file",
+  "target_file",
+  "target_directory",
+]
 interface ToolKey {
   sub: string | null
   verb: string | null
@@ -955,6 +988,7 @@ export interface FileWalk {
    *  rather than collected, which on a real store leaves three and a half gigabytes unjoined. */
   skipping: boolean
   codex: CodexState | null
+  grok: GrokState | null
   /** When the walk next offers the thread back. */
   due: number
   feed: ((rec: TranscriptRecord) => void) | null
@@ -976,6 +1010,7 @@ export function openFile(st: Walk, name: string, size: number): FileWalk {
     carry: [],
     skipping: false,
     codex: null,
+    grok: null,
     due: performance.now() + SLICE,
     feed: null,
   }
@@ -999,11 +1034,19 @@ function settle(fw: FileWalk): void {
     fw.buf = ""
     return
   }
+  /* Grok writes several jsonl files per session; only `updates.jsonl` is the billed conversation,
+     and the others must not count as transcripts that then show up empty. */
+  if (isGrokSidecar(head)) {
+    fw.dropped = true
+    fw.buf = ""
+    return
+  }
   st.seen.add(id)
   st.filesUsed++
-  /* A Codex rollout tells the same story in another hand, so it is turned into the records this
-     walk already reads rather than given a second walk of its own. */
+  /* A Codex rollout or a Grok session tells the same story in another hand, so it is turned into
+     the records this walk already reads rather than given a second walk of its own. */
   fw.codex = isCodexRollout(head) ? codexOpen(head) : null
+  fw.grok = !fw.codex && isGrokSession(head) ? grokOpen(head) : null
 
   const { verbs, S, billed, models, unpriced, ttl, firstCtx } = st
   const h: Held = { adds: [], charges: [] }
@@ -1109,7 +1152,9 @@ function settle(fw: FileWalk): void {
           sawRequest = true
           firstCtx.push(ctxTokens)
         }
-        const [pIn, pOut] = rate
+        const pIn = rate[0],
+          pOut = rate[1],
+          pCache = rate[2] ?? pIn * CACHE_READ_MULT
 
         // The transcript records the cache-write TTL split per request.
         const cc =
@@ -1132,7 +1177,7 @@ function settle(fw: FileWalk): void {
 
         const fixedIn =
           (inp * pIn +
-            cr * pIn * CACHE_READ_MULT +
+            cr * pCache +
             w1 * pIn * CACHE_WRITE_MULT["1h"] +
             w5 * pIn * CACHE_WRITE_MULT["5m"]) /
           1e6
@@ -1267,6 +1312,8 @@ export function pushText(fw: FileWalk, chunk: string): void {
        marker found in the middle of a line is a marker inside somebody's text. */
     if (!fw.carry.length && fw.codex && fw.feed && codexFront(fw.codex, part, fw.feed))
       fw.skipping = true
+    else if (!fw.carry.length && fw.grok && fw.feed && grokFront(fw.grok, part, fw.feed))
+      fw.skipping = true
     else fw.carry.push(part)
   }
   fw.buf = chunk
@@ -1323,6 +1370,8 @@ export function* stepFile(fw: FileWalk): Generator<void, void, void> {
     if (line !== null) {
       if (fw.codex) {
         codexLine(fw.codex, line, feed)
+      } else if (fw.grok) {
+        grokLine(fw.grok, line, feed)
       } else {
         let rec: TranscriptRecord | null = null
         try {
@@ -1341,6 +1390,10 @@ export function* stepFile(fw: FileWalk): Generator<void, void, void> {
   if (fw.ended && fw.codex) {
     codexEnd(fw.codex, feed)
     fw.codex = null
+  }
+  if (fw.ended && fw.grok) {
+    grokEnd(fw.grok, feed)
+    fw.grok = null
   }
 }
 

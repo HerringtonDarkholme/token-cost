@@ -2,7 +2,7 @@
   "name": "token-billing",
   "version": "0.1.0",
   "type": "module",
-  "description": "Trace Claude Code and Codex session spend to whatever put the tokens in context",
+  "description": "Trace Claude Code, Codex and Grok session spend to whatever put the tokens in context",
   "license": "MIT",
   "homepage": "https://token-billing.vercel.app/",
   "repository": {
@@ -14,6 +14,8 @@
     "claude-code",
     "claude",
     "codex",
+    "grok",
+    "xai",
     "openai",
     "cost",
     "billing",
