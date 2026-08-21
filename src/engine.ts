@@ -1,6 +1,6 @@
 /* Cost attribution engine for Claude Code transcripts and Codex rollouts. */
 
-import { codexRecords, isCodexRollout } from "./codex.ts"
+import { codexEnd, codexLine, codexOpen, isCodexRollout, type CodexState } from "./codex.ts"
 import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
 
 /* The engine is the one door onto both formats, so the detector is re-exported rather than left
@@ -754,6 +754,11 @@ export function toolDisplay(tool: string): string {
 /* the walk -- One pass. */
 const SESSION_RE = /"sessionId"\s*:\s*"([^"]+)"/
 
+/** How far in the id is looked for. Every record of a transcript carries one, so this window has
+ *  either found it or there is none -- and a Codex rollout carries none at all, which unbounded
+ *  cost a full read of the file to discover. */
+const ID_WINDOW = 1 << 20
+
 /** A copy of `s` that no longer points at whatever it was cut out of. */
 const detach = (s: string): string => (" " + s).slice(1)
 
@@ -912,17 +917,82 @@ export function skipFile(st: Walk): void {
   st.filesSkipped++
 }
 
-/** Read one file into `st`. `false` means it was a duplicate of one already read -- the answer
- *  goes back to the caller because the caller is the one keeping count of what it handed over. */
-export function walkOne(st: Walk, f: RawFile): boolean {
-  const m = SESSION_RE.exec(f.text || "")
-  const id = detach((m ? m[1] : f.name) + "::" + (f.text || "").length)
+/** How long the walk may hold the thread before it offers it back, in milliseconds -- half a frame
+ *  at 60 Hz, so a 300 MB rollout is a run of frames rather than a stall and each of those frames
+ *  has time left in it to draw. */
+const SLICE = 8
+
+/** A file the walk is part way through: what of it has arrived, and where the walk had got to when
+ *  the bytes ran out. A store runs to gigabytes and a single rollout past what a string can hold,
+ *  so the file arrives a chunk at a time and none of it is ever held whole. */
+export interface FileWalk {
+  st: Walk
+  name: string
+  /** Anything that changes when the file does -- its bytes, or its characters. Half of what tells
+   *  one session's transcript from a longer copy of the same session. */
+  size: number
+  /** Held back until there is enough of the front to say what the file is. */
+  head: string
+  opened: boolean
+  /** A duplicate of one already read, which is taken no further. */
+  dropped: boolean
+  ended: boolean
+  /** The chunk being walked, and how far into it the walk has got. */
+  buf: string
+  at: number
+  /** The front of a line that began in earlier chunks, in the pieces it arrived in. Joined once,
+   *  when the line ends -- a rollout has single lines of twenty megabytes, and growing one buffer
+   *  a chunk at a time copies the whole of it every time. */
+  carry: string[]
+  codex: CodexState | null
+  /** When the walk next offers the thread back. */
+  due: number
+  feed: ((rec: TranscriptRecord) => void) | null
+}
+
+/** Begin a file. Nothing is settled here -- which store wrote it, and whether it has been read
+ *  already, are both questions about its front, which has not arrived yet. */
+export function openFile(st: Walk, name: string, size: number): FileWalk {
+  return {
+    st,
+    name,
+    size,
+    head: "",
+    opened: false,
+    dropped: false,
+    ended: false,
+    buf: "",
+    at: 0,
+    carry: [],
+    codex: null,
+    due: performance.now() + SLICE,
+    feed: null,
+  }
+}
+
+/** The front of the file has arrived: settle whether it has been read before, which store wrote
+ *  it, and open the accumulators the rest of it feeds. */
+function settle(fw: FileWalk): void {
+  const st = fw.st
+  /* Only the window, however much of the front is in hand: every record of a transcript carries
+     the id, and a rollout carries none at all. */
+  const head = fw.head.length > ID_WINDOW ? fw.head.slice(0, ID_WINDOW) : fw.head
+  fw.opened = true
+  fw.buf = fw.head
+  fw.head = ""
+  const m = SESSION_RE.exec(head)
+  const id = detach((m ? m[1] : fw.name) + "::" + fw.size)
   if (st.seen.has(id)) {
     st.duplicatesDropped++
-    return false
+    fw.dropped = true
+    fw.buf = ""
+    return
   }
   st.seen.add(id)
   st.filesUsed++
+  /* A Codex rollout tells the same story in another hand, so it is turned into the records this
+     walk already reads rather than given a second walk of its own. */
+  fw.codex = isCodexRollout(head) ? codexOpen(head) : null
 
   const { verbs, S, billed, models, unpriced, ttl, firstCtx } = st
   const h: Held = { adds: [], charges: [] }
@@ -1164,35 +1234,108 @@ export function walkOne(st: Walk, f: RawFile): boolean {
     }
   }
 
-  const text = f.text
-  /* A Codex rollout tells the same story in another hand, so it is turned into the records this
-     walk already reads rather than given a second walk of its own. */
-  if (isCodexRollout(text)) {
-    for (const rec of codexRecords(text)) feed(rec)
-    return true
-  }
+  fw.feed = feed
+}
 
-  /* Walked by index rather than `split("\n")`: a store is hundreds of megabytes, and the split
-     builds an array of every line in the file before the first one is read. Leading blanks are
-     skipped by hand for the same reason -- `JSON.parse` tolerates the whitespace either side, so
-     the only thing a `trim()` would settle is whether the line is empty. */
-  for (let i = 0, n = text.length; i < n;) {
-    let end = text.indexOf("\n", i)
-    if (end === -1) end = n
-    let from = i
-    i = end + 1
-    while (from < end && text.charCodeAt(from) <= 32) from++
-    if (from === end) continue
-    let rec: TranscriptRecord
-    try {
-      rec = JSON.parse(text.slice(from, end)) as TranscriptRecord
-    } catch {
-      st.badLines++
-      continue
-    }
-    feed(rec)
+/** More of the file. Only ever called with the walk caught up on what came before, so what is left
+ *  of the last chunk is the front of one line rather than a backlog. */
+export function pushText(fw: FileWalk, chunk: string): void {
+  if (fw.dropped || fw.ended) return
+  if (!fw.opened) {
+    fw.head += chunk
+    if (fw.head.length >= ID_WINDOW) settle(fw)
+    return
   }
-  return true
+  /* Whatever is left of the last chunk is the front of a line this one finishes, so it is set
+     aside rather than grown into: the join happens once, when the line ends. */
+  if (fw.at < fw.buf.length) fw.carry.push(fw.at ? fw.buf.slice(fw.at) : fw.buf)
+  fw.buf = chunk
+  fw.at = 0
+}
+
+/** No more of the file. A file shorter than the window is settled here rather than in `pushText`,
+ *  and what is left in hand is a whole line rather than the front of one. */
+export function endText(fw: FileWalk): void {
+  if (!fw.opened) settle(fw)
+  fw.ended = true
+}
+
+/** Walk what has arrived, offering the thread back on a clock rather than on a count of records --
+ *  because the two stores do not agree on what a record is, and a rollout can spend a whole slice
+ *  on one of them. Returns once the lines in hand are walked, which is the point a caller may push
+ *  more. */
+export function* stepFile(fw: FileWalk): Generator<void, void, void> {
+  const feed = fw.feed
+  if (!feed) return
+  const st = fw.st
+  for (;;) {
+    /* Walked by index rather than `split("\n")`: a store is hundreds of megabytes, and the split
+       builds an array of every line in the chunk before the first one is read. */
+    let end = fw.buf.indexOf("\n", fw.at)
+    if (end === -1) {
+      if (!fw.ended) break
+      if (fw.at >= fw.buf.length && !fw.carry.length) break
+      // Past the last newline with nothing more coming, so the rest of it is the last line.
+      end = fw.buf.length
+    }
+    /* Leading blanks are skipped by hand rather than trimmed: `JSON.parse` tolerates the
+       whitespace either side, so the only thing a `trim()` would settle is whether the line is
+       empty. */
+    let line: string | null = null
+    if (fw.carry.length) {
+      fw.carry.push(fw.buf.slice(fw.at, end))
+      const whole = fw.carry.join("")
+      fw.carry = []
+      fw.at = end + 1
+      let from = 0
+      while (from < whole.length && whole.charCodeAt(from) <= 32) from++
+      if (from < whole.length) line = from ? whole.slice(from) : whole
+    } else {
+      let from = fw.at
+      fw.at = end + 1
+      while (from < end && fw.buf.charCodeAt(from) <= 32) from++
+      if (from < end) line = fw.buf.slice(from, end)
+    }
+    if (line !== null) {
+      if (fw.codex) {
+        codexLine(fw.codex, line, feed)
+      } else {
+        let rec: TranscriptRecord | null = null
+        try {
+          rec = JSON.parse(line) as TranscriptRecord
+        } catch {
+          st.badLines++
+        }
+        if (rec && typeof rec === "object") feed(rec)
+      }
+    }
+    if (performance.now() >= fw.due) {
+      yield
+      fw.due = performance.now() + SLICE
+    }
+  }
+  if (fw.ended && fw.codex) {
+    codexEnd(fw.codex, feed)
+    fw.codex = null
+  }
+}
+
+/** Everything `stepFile` has to offer, for a caller with nothing else to do while it runs. */
+export function drainFile(fw: FileWalk): void {
+  const steps = stepFile(fw)
+  let step = steps.next()
+  while (!step.done) step = steps.next()
+}
+
+/** The whole of a file at once. `false` means it was a duplicate of one already read -- the answer
+ *  goes back to the caller because the caller is the one keeping count of what it handed over. */
+export function walkOne(st: Walk, f: RawFile): boolean {
+  const text = f.text || ""
+  const fw = openFile(st, f.name, text.length)
+  pushText(fw, text)
+  endText(fw)
+  drainFile(fw)
+  return !fw.dropped
 }
 
 /* the score -- Spend the two constants: allocate every request's exact billed cost across the

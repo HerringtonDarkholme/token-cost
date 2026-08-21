@@ -4,11 +4,20 @@
    fragment. Gzipped and base64url'd, since the analysis is JSON and an address bar is not. */
 
 import { execFile } from "node:child_process"
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import { createReadStream, readdirSync, statSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { gzipSync } from "node:zlib"
-import { closeWalk, openWalk, report, skipFile, walkOne } from "../src/engine.ts"
+import {
+  closeWalk,
+  drainFile,
+  endText,
+  openFile,
+  openWalk,
+  pushText,
+  report,
+  skipFile,
+} from "../src/engine.ts"
 
 /** Where the report is read. The override is what lets `pnpm dev`, or a copy of the page someone
  *  hosts themselves, stand in for the deployed one -- which is how the hand-off gets tested
@@ -90,7 +99,7 @@ function importUrl(base: string, payload: string): string {
   return `${door}#d=${payload}`
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const argv = process.argv.slice(2)
   /* Printing rather than opening is what a machine you reached over SSH needs, and it is how the
      hand-off is tested without a browser being taken over to do it. */
@@ -116,14 +125,23 @@ function main(): void {
     return
   }
 
-  /* One transcript held at a time, which is the whole reason this drives the walk itself rather
-     than calling `analyze` on a list of file contents. */
+  /* One chunk of one transcript held at a time, which is the whole reason this drives the walk
+     itself rather than calling `analyze` on a list of file contents -- and the reason it streams
+     rather than reads: a Codex rollout can run past what a JS string holds, and reading one of
+     those whole throws instead of returning it. */
   const progress = !!process.stderr.isTTY
   const w = openWalk()
   let read = 0
   for (const p of paths) {
+    const fw = openFile(w, basename(p), statSync(p).size)
     try {
-      walkOne(w, { name: basename(p), text: readFileSync(p, "utf8") })
+      /* oxlint-disable-next-line no-await-in-loop -- one chunk at a time is the point of it. */
+      for await (const chunk of createReadStream(p, { encoding: "utf8", highWaterMark: 1 << 20 })) {
+        pushText(fw, chunk as string)
+        drainFile(fw)
+      }
+      endText(fw)
+      drainFile(fw)
     } catch (e) {
       /* Counted, not just printed: the report rides into the page over a URL, and a total that is
          short has to say so there too. */
@@ -182,4 +200,4 @@ function main(): void {
   handOff(url)
 }
 
-main()
+await main()

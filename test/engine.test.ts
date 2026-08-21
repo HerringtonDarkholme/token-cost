@@ -351,7 +351,225 @@ console.log("\n== a Codex rollout ==")
   ok(recon(D).length === 0, "it reconciles: " + (recon(D).join(" | ") || "clean"))
 }
 
-/* ================= 4. */
+/* ================= 4. The two shortcuts the rollout reader takes, both of which have to agree
+   with the long way round: one reads a compaction off the front of the line rather than parsing
+   it, and one hands the thread back part way through a file. */
+console.log("\n== a rollout the reader takes shortcuts through ==")
+{
+  const L = (o: unknown): string => JSON.stringify(o)
+  const top = [
+    L({
+      timestamp: "2026-06-01T00:00:00Z",
+      type: "session_meta",
+      payload: { session_id: "s", cwd: "/w", originator: "codex-tui" },
+    }),
+    L({
+      timestamp: "2026-06-01T00:00:00Z",
+      type: "turn_context",
+      payload: { cwd: "/w", model: "gpt-5.4" },
+    }),
+  ]
+  const billed = (n: number, out = 2000): string =>
+    L({
+      timestamp: "2026-06-03T00:00:00Z",
+      type: "event_msg",
+      payload: {
+        type: "token_count",
+        info: {
+          total_token_usage: {
+            input_tokens: n,
+            cached_input_tokens: 0,
+            output_tokens: out,
+            total_tokens: n + out,
+          },
+        },
+      },
+    })
+
+  /* == the compaction shortcut == A compaction as Codex writes one: a summary, and the rewritten
+     prefix that replaces everything before it. The prefix is what the shortcut declines to read,
+     and `keys` is what decides whether it can -- the shortcut only takes a summary that is the
+     payload's first key, and hands the rest to the full parse. */
+  const compacted = (summary: string, keys: string[]): string =>
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "compacted",
+      payload: Object.fromEntries(
+        keys.map((k) =>
+          k === "message"
+            ? [k, summary]
+            : [k, [{ role: "user", content: [{ type: "input_text", text: "H".repeat(50000) }] }]],
+        ),
+      ),
+    })
+  const bill = (mid: string): { total: number; summary: number } => {
+    const one = E.analyze([
+      { name: "rollout-a.jsonl", text: [...top, mid, billed(60000)].join("\n") },
+    ])
+    const D1 = one.datasets["1h"]
+    const it = D1.groups
+      .find((g) => g.id === "harness")
+      ?.items.find((x) => x.name === "compaction summary")
+    return { total: D1.total, summary: it?.cost ?? 0 }
+  }
+  /* Both kinds of escape, because the shortcut hands the summary's own literal to `JSON.parse`
+     rather than reading the characters itself. */
+  const summary = 'kept:\n"a \\ b"\u2014' + "S".repeat(40000)
+  const fast = bill(compacted(summary, ["message", "replacement_history"]))
+  const slow = bill(compacted(summary, ["replacement_history", "message"]))
+  ok(fast.summary > 0, `the summary is priced as one: ${money(fast.summary)}`)
+  ok(
+    fast.total === slow.total && fast.summary === slow.summary,
+    `and the shortcut bills what the full parse does: ${money(fast.summary)} of ${money(fast.total)}`,
+  )
+  const shorter = bill(compacted("S".repeat(400), ["message", "replacement_history"]))
+  ok(shorter.summary < fast.summary, "a shorter summary costs less, so the text really arrives")
+
+  /* == the slices == A clock the test moves by hand, because where the slices fall is otherwise a
+     question about how fast this machine is rather than about the walk. */
+  const real = globalThis.performance
+  let tick = 0
+  const fake = { now: (): number => (tick += 8) } as Performance
+  const onClock = <T>(fn: () => T): T => {
+    Object.defineProperty(globalThis, "performance", { value: fake, configurable: true })
+    try {
+      return fn()
+    } finally {
+      Object.defineProperty(globalThis, "performance", { value: real, configurable: true })
+    }
+  }
+  const file: RawFile = {
+    name: "rollout-long.jsonl",
+    text: [
+      ...top,
+      ...Array.from({ length: 8 }, (_, k) => [
+        L({
+          timestamp: "2026-06-02T00:00:00Z",
+          type: "response_item",
+          payload: { type: "function_call_output", call_id: `c${k}`, output: "O".repeat(4000) },
+        }),
+        billed(20000 * (k + 1)),
+      ]).flat(),
+    ].join("\n"),
+  }
+
+  const whole = E.openWalk()
+  onClock(() => E.walkOne(whole, file))
+  const stepped = E.openWalk()
+  const figures: number[] = []
+  const slices = onClock(() => {
+    const fw = E.openFile(stepped, file.name, file.text.length)
+    E.pushText(fw, file.text)
+    E.endText(fw)
+    const steps = E.stepFile(fw)
+    let n = 0
+    for (;;) {
+      const done = steps.next().done
+      figures.push(E.billedSoFar(stepped))
+      if (done) break
+      n++
+    }
+    return n
+  })
+  ok(slices > 1, `it comes up for air ${slices} times inside one rollout`)
+  ok(
+    figures.every((v, k) => k === 0 || v >= figures[k - 1]) && figures.at(-1)! > figures[0],
+    "and the running figure climbs through them rather than jumping at the end",
+  )
+  ok(
+    E.billedSoFar(stepped) === E.billedSoFar(whole) && E.billedSoFar(whole) > 0,
+    `a file walked in slices bills what one walked whole does: ${money(E.billedSoFar(stepped))}`,
+  )
+  /* Interruptible, which is what the slices are for: an iterator put down part way leaves the walk
+     holding what it had read and nothing after it. */
+  const dropped = E.openWalk()
+  onClock(() => {
+    const fw = E.openFile(dropped, file.name, file.text.length)
+    E.pushText(fw, file.text)
+    E.endText(fw)
+    const half = E.stepFile(fw)
+    // Far enough in to have billed something, nowhere near the end of the file.
+    for (;;) {
+      if (half.next().done || E.billedSoFar(dropped) > 0) break
+    }
+    half.return()
+  })
+  const part = E.billedSoFar(dropped)
+  ok(
+    part > 0 && part < E.billedSoFar(whole),
+    `and one put down early is short rather than wrong: ${money(part)}`,
+  )
+
+  /* == the chunks == A store runs to gigabytes and a single rollout past what a string can hold,
+     so the file arrives in pieces. Where the pieces fall is the platform's business, and one of
+     them lands inside a line sooner or later. */
+  const inPieces = (text: string, every: number): number => {
+    const w = E.openWalk()
+    const fw = E.openFile(w, "rollout-long.jsonl", text.length)
+    for (let at = 0; at < text.length; at += every) {
+      E.pushText(fw, text.slice(at, at + every))
+      E.drainFile(fw)
+    }
+    E.endText(fw)
+    E.drainFile(fw)
+    return E.billedSoFar(w)
+  }
+  const one = E.billedSoFar(whole)
+  /* Sizes chosen to be coprime with nothing in particular, so the joins land mid-line, mid-number
+     and mid-key rather than politely between records. */
+  const cuts = [1, 7, 383, 4096, file.text.length * 2]
+  const same = cuts.filter((n) => inPieces(file.text, n) === one)
+  ok(
+    same.length === cuts.length,
+    `the same bill however the bytes are cut up: ${same.length}/${cuts.length} of ${cuts.join(", ")}`,
+  )
+
+  /* == the model that arrives late == A rollout can bill requests before it says which model made
+     them, and two of a real store's thousand say so tens of megabytes in -- far past anything the
+     reader can hold the front of the file for. Those requests wait for the name rather than going
+     out unpriced. */
+  const late = [
+    L({
+      timestamp: "2026-06-01T00:00:00Z",
+      type: "session_meta",
+      payload: { session_id: "s", cwd: "/w" },
+    }),
+    billed(30000),
+    billed(60000),
+    L({
+      timestamp: "2026-06-02T00:00:00Z",
+      type: "turn_context",
+      payload: { cwd: "/w", model: "gpt-5.4" },
+    }),
+    billed(90000),
+  ].join("\n")
+  const lateBill = E.analyze([{ name: "rollout-late.jsonl", text: late }])
+  ok(
+    lateBill.requests === 3 && Object.keys(lateBill.unpriced).length === 0,
+    `all ${lateBill.requests} of them are priced, none unpriced: ` +
+      (Object.keys(lateBill.unpriced).join(", ") || "clean"),
+  )
+  ok(
+    lateBill.models.length === 1 && lateBill.models[0].id === "gpt-5.4",
+    `and on the model named after them: ${lateBill.models.map((m) => m.id).join(", ")}`,
+  )
+  // Cut so the name lands chunks away from the requests that are waiting on it.
+  const w2 = E.openWalk()
+  const fw2 = E.openFile(w2, "rollout-late.jsonl", late.length)
+  for (let at = 0; at < late.length; at += 64) {
+    E.pushText(fw2, late.slice(at, at + 64))
+    E.drainFile(fw2)
+  }
+  E.endText(fw2)
+  E.drainFile(fw2)
+  const closedLate = E.closeWalk(w2)
+  ok(
+    E.report(closedLate.scanned, closedLate.alloc).requests === 3,
+    "and still all of them when the name arrives chunks after the requests",
+  )
+}
+
+/* ================= 5. */
 const dir = process.argv[2]
 if (dir) {
   console.log(`\n== real transcripts: ${dir} ==`)

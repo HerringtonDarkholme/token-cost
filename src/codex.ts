@@ -81,9 +81,62 @@ export function isCodexRollout(text: string): boolean {
 const num = (v: unknown): number => (typeof v === "number" && v > 0 ? v : 0)
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
 
+/** How far into a line the envelope's own keys can reach: a timestamp, an ordinal on the newer
+ *  versions, a type, then the payload. */
+const ENVELOPE = 320
+const PAYLOAD = '"payload":{'
+
+/** A string value out of the envelope of a line nothing has parsed. The envelope holds only the
+ *  keys a rollout puts before its payload, none of whose values carry an escape, so a plain search
+ *  cannot land inside something nested or stop short of the end of a value. */
+function envelopeValue(env: string, key: string): string {
+  const open = `"${key}":"`
+  const at = env.indexOf(open)
+  if (at === -1) return ""
+  const from = at + open.length
+  const end = env.indexOf('"', from)
+  return end === -1 ? "" : env.slice(from, end)
+}
+
+/** One string value out of an unparsed line: the span of its own literal, handed to `JSON.parse`
+ *  on its own. Only where `key` is the first key at `at`, because a search further in could find
+ *  the same name nested inside a value. */
+function quoted(line: string, at: number, key: string): string | null {
+  const open = `"${key}":"`
+  if (!line.startsWith(open, at)) return null
+  const from = at + open.length - 1
+  for (let i = from + 1, n = line.length; i < n; i++) {
+    const c = line.charCodeAt(i)
+    if (c === 92) i++
+    else if (c === 34) {
+      try {
+        return JSON.parse(line.slice(from, i + 1)) as string
+      } catch {
+        return null
+      }
+    }
+  }
+  return null
+}
+
+/** A compaction's timestamp and message, taken off the front of the line. `null` for every other
+ *  line and for a compaction shaped in a way this cannot read, both of which go on to be parsed
+ *  whole. */
+function compaction(line: string): { stamp: string; message: string } | null {
+  const head = line.length > ENVELOPE ? line.slice(0, ENVELOPE) : line
+  const at = head.indexOf(PAYLOAD)
+  if (at <= 0) return null
+  const env = head.slice(0, at)
+  if (!env.includes('"type":"compacted"')) return null
+  const message = quoted(line, at + PAYLOAD.length, "message")
+  return message === null ? null : { stamp: envelopeValue(env, "timestamp"), message }
+}
+
 /** What has to be known before the first line is priced: a rollout can bill a request before it
  *  writes down which model made it, and it says whose session it is only at the top. Stops at the
- *  first model, which a rollout names within its first few lines. */
+ *  first model, which a rollout names within its first few lines -- and where the head handed over
+ *  does not reach one, `codexLine` picks it up off the `turn_context` that opens the turn, which a
+ *  rollout writes before the count that bills it. */
 function ahead(text: string): { model: string; sidechain: boolean } {
   let model = "",
     sidechain = false
@@ -177,177 +230,281 @@ function argsOf(p: CodexPayload): Record<string, unknown> {
   return {}
 }
 
-/** Read one rollout as the transcript records it would have been. */
-export function* codexRecords(text: string): Generator<TranscriptRecord> {
-  const { model: named, sidechain } = ahead(text)
-  let model = named
-  /* The two halves of a request, held because a rollout writes the token count last: what the
-     assistant produced, and the tool output it drew. */
-  let blocks: ContentBlock[] = []
-  let results: ContentBlock[] = []
-  let stamp = ""
-  /* The cumulative counters, for the rollouts that report a running total and no per-call one. */
-  let prevTotal: number | null = null,
-    prevIn = 0,
-    prevCached = 0,
-    prevOut = 0,
-    prevWrite = 0,
-    prevReason = 0
+/** How many records the reader holds while it waits to be told which model made them. A rollout
+ *  usually names one in its first line or two, and where it does not this is what stops the wait
+ *  from becoming the whole file. */
+const HELD_MAX = 4096
 
-  /** The billed turn, then the output it drew -- the order a transcript writes them in, which is
-   *  what keeps a tool result out of the context of the request that called for it. */
-  const flush = (u: CodexUsage): TranscriptRecord[] => {
-    const out: TranscriptRecord[] = []
-    const reasoning = num(u.reasoning_output_tokens)
-    /* Codex encrypts its reasoning but still counts it, so the block is sized by the count rather
-       than by text there is none of. */
-    if (reasoning > 0) blocks.push({ type: "thinking", tokens: reasoning })
-    out.push({
-      timestamp: stamp,
-      isSidechain: sidechain,
-      message: { role: "assistant", model, usage: usageOf(u), content: blocks },
-    })
-    if (results.length) out.push({ timestamp: stamp, message: { role: "user", content: results } })
-    blocks = []
-    results = []
-    return out
+/** Where a rollout stands part way through: what it has said about the session, and the two halves
+ *  of a request it is holding until the line that bills them. */
+export interface CodexState {
+  model: string
+  sidechain: boolean
+  /* What the assistant produced, and the tool output it drew -- held because a rollout writes the
+     token count last. */
+  blocks: ContentBlock[]
+  results: ContentBlock[]
+  stamp: string
+  /* The cumulative counters, for the rollouts that report a running total and no per-call one. */
+  prevTotal: number | null
+  prevIn: number
+  prevCached: number
+  prevOut: number
+  prevWrite: number
+  prevReason: number
+  /** Records made before the rollout named the model that prices them, `null` once it has. Two of
+   *  a real store's thousand rollouts bill a request tens of megabytes before they name one, which
+   *  is far too deep to hold the file open for. */
+  held: TranscriptRecord[] | null
+}
+
+/** Open a rollout on as much of its front as the reader has been handed. */
+export function codexOpen(head: string): CodexState {
+  const { model, sidechain } = ahead(head)
+  return {
+    model,
+    sidechain,
+    blocks: [],
+    results: [],
+    stamp: "",
+    prevTotal: null,
+    prevIn: 0,
+    prevCached: 0,
+    prevOut: 0,
+    prevWrite: 0,
+    prevReason: 0,
+    held: model ? null : [],
+  }
+}
+
+/** What the walk reads. A rollout is read straight through into one of these rather than into a
+ *  generator per line, because a big one has a record every few hundred bytes. */
+type Out = (rec: TranscriptRecord) => void
+
+/** Let the backlog go, with the model it was waiting for written into it. */
+function release(s: CodexState, out: Out): void {
+  const held = s.held
+  s.held = null
+  if (!held) return
+  for (const rec of held) {
+    const m = rec.message
+    if (m && m.role === "assistant" && !m.model && s.model) m.model = s.model
+    out(rec)
+  }
+}
+
+/** One record on its way to the walk, or into the backlog if there is still no model to price it
+ *  with. */
+function give(s: CodexState, rec: TranscriptRecord, out: Out): void {
+  const held = s.held
+  if (!held) {
+    out(rec)
+    return
+  }
+  held.push(rec)
+  // Waited long enough: a rollout this far in without naming a model is not going to name one.
+  if (held.length > HELD_MAX) release(s, out)
+}
+
+/** The billed turn, then the output it drew -- the order a transcript writes them in, which is
+ *  what keeps a tool result out of the context of the request that called for it. */
+function flush(s: CodexState, u: CodexUsage, out: Out): void {
+  const reasoning = num(u.reasoning_output_tokens)
+  /* Codex encrypts its reasoning but still counts it, so the block is sized by the count rather
+     than by text there is none of. */
+  if (reasoning > 0) s.blocks.push({ type: "thinking", tokens: reasoning })
+  const blocks = s.blocks,
+    results = s.results
+  s.blocks = []
+  s.results = []
+  give(
+    s,
+    {
+      timestamp: s.stamp,
+      isSidechain: s.sidechain,
+      message: { role: "assistant", model: s.model, usage: usageOf(u), content: blocks },
+    },
+    out,
+  )
+  if (results.length)
+    give(s, { timestamp: s.stamp, message: { role: "user", content: results } }, out)
+}
+
+/** One line of a rollout, as the transcript records it would have been. */
+export function codexLine(s: CodexState, line: string, out: Out): void {
+  read(s, line, out)
+  /* The line that named the model is the line the backlog was waiting for. */
+  if (s.held && s.model) release(s, out)
+}
+
+function read(s: CodexState, line: string, out: Out): void {
+  /* Compaction rewrites the prefix, which the walk has to be told about or it will read the
+     rewrite as content that arrived. The rewrite itself is a quarter of a big rollout's bytes
+     and nothing here reads it, so the message is lifted out and the rest is never parsed. */
+  const cut = compaction(line)
+  if (cut) {
+    if (cut.stamp) s.stamp = cut.stamp
+    give(
+      s,
+      {
+        timestamp: s.stamp,
+        isCompactSummary: true,
+        message: { role: "user", content: [{ type: "text", text: cut.message }] },
+      },
+      out,
+    )
+    return
+  }
+  let rec: CodexLine
+  try {
+    rec = JSON.parse(line) as CodexLine
+  } catch {
+    return
+  }
+  if (!rec || typeof rec !== "object") return
+  if (typeof rec.timestamp === "string") s.stamp = rec.timestamp
+  const p = rec.payload
+  if (!p || typeof p !== "object") return
+
+  if (rec.type === "turn_context" || rec.type === "session_meta") {
+    if (typeof p.model === "string" && p.model) s.model = p.model
+    return
   }
 
-  for (const line of lines(text)) {
-    let rec: CodexLine
-    try {
-      rec = JSON.parse(line) as CodexLine
-    } catch {
-      continue
-    }
-    if (!rec || typeof rec !== "object") continue
-    if (typeof rec.timestamp === "string") stamp = rec.timestamp
-    const p = rec.payload
-    if (!p || typeof p !== "object") continue
-
-    if (rec.type === "turn_context" || rec.type === "session_meta") {
-      if (typeof p.model === "string" && p.model) model = p.model
-      continue
-    }
-
-    /* Compaction rewrites the prefix, which the walk has to be told about or it will read the
-       rewrite as content that arrived. */
-    if (rec.type === "compacted") {
-      yield {
-        timestamp: stamp,
+  // The fallback for a compaction `compaction` could not read the front of.
+  if (rec.type === "compacted") {
+    give(
+      s,
+      {
+        timestamp: s.stamp,
         isCompactSummary: true,
         message: { role: "user", content: [{ type: "text", text: str(p.message) }] },
-      }
-      continue
-    }
-
-    if (rec.type === "event_msg" && p.type === "token_count") {
-      const info = p.info
-      if (!info) continue
-      const total = info.total_token_usage
-      /* A rollout can write the same event twice, and the running total is what tells a repeat
-         from a request. Without one there is nothing to compare, and counting a rare repeat is
-         the better error: the alternative drops every request after the first. */
-      if (total) {
-        const cum = num(total.total_tokens)
-        if (prevTotal !== null && cum === prevTotal) continue
-        prevTotal = cum
-      }
-      let u = info.last_token_usage
-      if (!u && total) {
-        u = {
-          input_tokens: num(total.input_tokens) - prevIn,
-          cached_input_tokens: num(total.cached_input_tokens) - prevCached,
-          cache_write_input_tokens: num(total.cache_write_input_tokens) - prevWrite,
-          output_tokens: num(total.output_tokens) - prevOut,
-          reasoning_output_tokens: num(total.reasoning_output_tokens) - prevReason,
-        }
-      }
-      if (total) {
-        prevIn = num(total.input_tokens)
-        prevCached = num(total.cached_input_tokens)
-        prevOut = num(total.output_tokens)
-        prevWrite = num(total.cache_write_input_tokens)
-        prevReason = num(total.reasoning_output_tokens)
-      }
-      if (!u) continue
-      yield* flush(u)
-      continue
-    }
-
-    /* An MCP call arrives as one event carrying both halves, so both are made here. */
-    if (rec.type === "event_msg" && p.type === "mcp_tool_call_end") {
-      const inv = p.invocation
-      const server = str(inv?.server),
-        tool = str(inv?.tool)
-      if (!server || !tool) continue
-      const id = str(p.call_id)
-      const args = inv?.arguments
-      blocks.push({
-        type: "tool_use",
-        id,
-        name: `mcp__${server}__${tool}`,
-        input: args && typeof args === "object" ? (args as Record<string, unknown>) : {},
-      })
-      results.push({
-        type: "tool_result",
-        tool_use_id: id,
-        content: JSON.stringify(p.result ?? ""),
-      })
-      continue
-    }
-
-    if (rec.type !== "response_item") continue
-
-    switch (p.type) {
-      case "message": {
-        const content = blocksOf(p.content)
-        if (!content.length) break
-        if (p.role === "assistant") blocks.push(...content)
-        // A developer message is the harness talking, not the reader.
-        else
-          yield { timestamp: stamp, isMeta: p.role !== "user", message: { role: "user", content } }
-        break
-      }
-      /* Traffic between agents, which is neither of them talking to the reader. */
-      case "agent_message": {
-        const content = blocksOf(p.content)
-        if (content.length)
-          yield { timestamp: stamp, isMeta: true, message: { role: "user", content } }
-        break
-      }
-      case "function_call":
-      case "custom_tool_call":
-        blocks.push({
-          type: "tool_use",
-          id: str(p.call_id),
-          name: str(p.name) || "(unnamed tool)",
-          input: argsOf(p),
-        })
-        break
-      case "function_call_output":
-      case "custom_tool_call_output":
-        results.push({
-          type: "tool_result",
-          tool_use_id: str(p.call_id),
-          content: str(p.output) || JSON.stringify(p.output ?? ""),
-        })
-        break
-      case "web_search_call":
-        blocks.push({
-          type: "tool_use",
-          id: str(p.call_id),
-          name: "web_search",
-          input: { query: str(p.action?.query) },
-        })
-        break
-      default:
-        break
-    }
+      },
+      out,
+    )
+    return
   }
 
-  /* A session read mid-flight ends with a turn nothing billed: it is still context, so it is
-     still held, and the walk charges it nothing. */
-  if (blocks.length) yield { timestamp: stamp, message: { role: "assistant", content: blocks } }
-  if (results.length) yield { timestamp: stamp, message: { role: "user", content: results } }
+  if (rec.type === "event_msg" && p.type === "token_count") {
+    const info = p.info
+    if (!info) return
+    const total = info.total_token_usage
+    /* A rollout can write the same event twice, and the running total is what tells a repeat
+       from a request. Without one there is nothing to compare, and counting a rare repeat is
+       the better error: the alternative drops every request after the first. */
+    if (total) {
+      const cum = num(total.total_tokens)
+      if (s.prevTotal !== null && cum === s.prevTotal) return
+      s.prevTotal = cum
+    }
+    let u = info.last_token_usage
+    if (!u && total) {
+      u = {
+        input_tokens: num(total.input_tokens) - s.prevIn,
+        cached_input_tokens: num(total.cached_input_tokens) - s.prevCached,
+        cache_write_input_tokens: num(total.cache_write_input_tokens) - s.prevWrite,
+        output_tokens: num(total.output_tokens) - s.prevOut,
+        reasoning_output_tokens: num(total.reasoning_output_tokens) - s.prevReason,
+      }
+    }
+    if (total) {
+      s.prevIn = num(total.input_tokens)
+      s.prevCached = num(total.cached_input_tokens)
+      s.prevOut = num(total.output_tokens)
+      s.prevWrite = num(total.cache_write_input_tokens)
+      s.prevReason = num(total.reasoning_output_tokens)
+    }
+    if (!u) return
+    flush(s, u, out)
+    return
+  }
+
+  /* An MCP call arrives as one event carrying both halves, so both are made here. */
+  if (rec.type === "event_msg" && p.type === "mcp_tool_call_end") {
+    const inv = p.invocation
+    const server = str(inv?.server),
+      tool = str(inv?.tool)
+    if (!server || !tool) return
+    const id = str(p.call_id)
+    const args = inv?.arguments
+    s.blocks.push({
+      type: "tool_use",
+      id,
+      name: `mcp__${server}__${tool}`,
+      input: args && typeof args === "object" ? (args as Record<string, unknown>) : {},
+    })
+    s.results.push({
+      type: "tool_result",
+      tool_use_id: id,
+      content: JSON.stringify(p.result ?? ""),
+    })
+    return
+  }
+
+  if (rec.type !== "response_item") return
+
+  switch (p.type) {
+    case "message": {
+      const content = blocksOf(p.content)
+      if (!content.length) break
+      if (p.role === "assistant") s.blocks.push(...content)
+      // A developer message is the harness talking, not the reader.
+      else
+        give(
+          s,
+          { timestamp: s.stamp, isMeta: p.role !== "user", message: { role: "user", content } },
+          out,
+        )
+      break
+    }
+    /* Traffic between agents, which is neither of them talking to the reader. */
+    case "agent_message": {
+      const content = blocksOf(p.content)
+      if (content.length)
+        give(s, { timestamp: s.stamp, isMeta: true, message: { role: "user", content } }, out)
+      break
+    }
+    case "function_call":
+    case "custom_tool_call":
+      s.blocks.push({
+        type: "tool_use",
+        id: str(p.call_id),
+        name: str(p.name) || "(unnamed tool)",
+        input: argsOf(p),
+      })
+      break
+    case "function_call_output":
+    case "custom_tool_call_output":
+      s.results.push({
+        type: "tool_result",
+        tool_use_id: str(p.call_id),
+        content: str(p.output) || JSON.stringify(p.output ?? ""),
+      })
+      break
+    case "web_search_call":
+      s.blocks.push({
+        type: "tool_use",
+        id: str(p.call_id),
+        name: "web_search",
+        input: { query: str(p.action?.query) },
+      })
+      break
+    default:
+      break
+  }
+}
+
+/** A session read mid-flight ends with a turn nothing billed: it is still context, so it is still
+ *  held, and the walk charges it nothing. Whatever was waiting on a model that never came goes out
+ *  here too, unpriced, which is what the bill has to admit to. */
+export function codexEnd(s: CodexState, out: Out): void {
+  if (s.blocks.length) {
+    give(s, { timestamp: s.stamp, message: { role: "assistant", content: s.blocks } }, out)
+    s.blocks = []
+  }
+  if (s.results.length) {
+    give(s, { timestamp: s.stamp, message: { role: "user", content: s.results } }, out)
+    s.results = []
+  }
+  if (s.held) release(s, out)
 }

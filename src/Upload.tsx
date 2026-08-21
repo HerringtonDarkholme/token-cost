@@ -5,10 +5,13 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import {
   billedSoFar,
   closeWalk,
+  endText,
+  openFile,
   openWalk,
+  pushText,
   report,
   skipFile,
-  walkOne,
+  stepFile,
   type Analysis,
   type Scanned,
 } from "./engine.ts"
@@ -271,6 +274,35 @@ const NAMES = 24
 /** How often the count is allowed to repaint. */
 const PAINT = 60
 
+/** How long the walk waits for a frame before deciding none is coming. Long enough that a frame
+ *  always wins the race while the tab is on screen, short enough that the one frame still pending
+ *  when the reader changed tabs does not hold the walk up. */
+const UNDRAWN = 60
+
+/** Hand the thread back until the next frame. The frame is what the walk is sharing the thread
+ *  with, so it is the thing to wait for: `scheduler.yield` resumes ahead of ordinary tasks by
+ *  design, which starves the interval the header's figure is sampled on, and `setTimeout` is
+ *  floored at four milliseconds once one timer is scheduled from inside another. Off screen there
+ *  is no frame to leave room for and none arrives either, so the walk keeps the thread rather than
+ *  waiting on a clock a hidden tab has throttled to one tick a second. */
+function handBack(): Promise<void> {
+  if (document.hidden || typeof requestAnimationFrame !== "function") return Promise.resolve()
+  return new Promise<void>((r) => {
+    /* oxlint-disable promise/no-multiple-resolved -- one resolver on two clocks is a race with a
+       single winner rather than two resolutions, and the winner calls off the loser. The timer is
+       for the frame that was already pending when the tab went behind another, which will not
+       arrive until it comes back -- and without it the walk stops there dead. */
+    const settle = (): void => {
+      cancelAnimationFrame(frame)
+      clearTimeout(timer)
+      r()
+    }
+    const frame = requestAnimationFrame(settle)
+    const timer = setTimeout(settle, UNDRAWN)
+    /* oxlint-enable promise/no-multiple-resolved */
+  })
+}
+
 /** One line of the panel: a name, and how long it should take to write itself. */
 interface Line {
   key: string
@@ -351,52 +383,67 @@ function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
 }
 
 /** One transcript, however it is going to be produced: a file off the disk, or a line of the
- *  example built on demand. The walk below reads them strictly one at a time, so neither kind is
- *  ever held in full. */
+ *  example built on demand. Never as one string -- a rollout can run past what a JS string holds,
+ *  and Chrome answers `text()` on one of those with an empty string rather than an error, which
+ *  drops the file out of the bill without saying so. */
 export interface Source {
   name: string
-  read: () => Promise<string>
+  /** Anything that changes when the file does. With the name, this is what tells one session's
+   *  transcript from a longer copy of the same session. */
+  size: number
+  /** The bytes as text, a chunk at a time. */
+  chunks: () => AsyncIterable<string>
 }
 
 /** The `File` beside the handle is a snapshot from the listing, minutes stale by the time the read
- *  reaches it, and Chrome rejects `text()` with `NotReadableError` if a live session appended in
+ *  reaches it, and Chrome rejects the read with `NotReadableError` if a live session appended in
  *  between -- so where there is a handle the bytes are taken from a fresh one. */
-export function readPicked(p: Picked): Promise<string> {
-  return p.handle ? p.handle.getFile().then((f) => f.text()) : p.file.text()
+export function pickedFile(p: Picked): Promise<File> {
+  return p.handle ? p.handle.getFile() : Promise.resolve(p.file)
 }
 
-/** The corpus one transcript at a time, `null` for the ones that would not read: a store is a
- *  live directory, so stopping at the first bad file threw away everything already priced. */
+/** One transcript as text, a chunk at a time. */
+export async function* chunkPicked(p: Picked): AsyncGenerator<string> {
+  const file = await pickedFile(p)
+  const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader()
+  /* oxlint-disable no-await-in-loop -- pulling the chunks in turn is the point of the loop: the
+     whole file at once is what this exists to avoid. */
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) return
+      if (value) yield value
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  /* oxlint-enable no-await-in-loop */
+}
+
+/** The corpus one transcript at a time: a store is a live directory, so one that will not read is
+ *  counted rather than allowed to end the walk. `onFile` answers whether it got any bytes at all,
+ *  which is the only thing that makes a transcript skipped rather than short. */
 export async function readEach(
   files: readonly Source[],
-  onFile: (name: string, text: string | null, i: number) => Promise<void> | void,
+  onFile: (f: Source, i: number) => Promise<boolean>,
+  /** Asked before each transcript: `false` leaves the rest of the corpus unread. A second pick
+   *  supersedes the first, and the first has a folder's worth of reading still ahead of it. */
+  alive: () => boolean = () => true,
 ): Promise<{ skipped: number; firstErr: Error | null }> {
-  /* One read runs ahead of the walk, and only one: reading a transcript is the disk's work and
-     walking it is this thread's, and done strictly in turn each waits out the other. The empty
-     `catch` marks the read as handled so a failure mid-corpus is not also an unhandled
-     rejection -- the `await` below still throws it. */
-  const readAt = (i: number): Promise<string> | null => {
-    if (i >= files.length) return null
-    const p = files[i].read()
-    p.catch(() => {})
-    return p
-  }
-  let ahead = readAt(0)
   let skipped = 0
   let firstErr: Error | null = null
-  /* oxlint-disable no-await-in-loop -- awaiting each file in turn is the point of the loop rather
-     than an oversight in it. `Promise.all` over the reads holds the whole folder at once, which
-     for a real store is a few hundred megabytes of string and twice that in memory. */
-  for (const [i, p] of files.entries()) {
-    let text: string | null = null
+  /* oxlint-disable no-await-in-loop -- reading one transcript at a time is the point of the loop
+     rather than an oversight in it. `Promise.all` over the corpus holds the whole folder at once,
+     which for a real store is gigabytes. */
+  for (const [i, f] of files.entries()) {
+    if (!alive()) break
+    let got = false
     try {
-      text = await ahead!
+      got = await onFile(f, i)
     } catch (e) {
-      skipped++
       firstErr ??= e as Error
     }
-    ahead = readAt(i + 1)
-    await onFile(p.name, text, i)
+    if (!got) skipped++
   }
   /* oxlint-enable no-await-in-loop */
   return { skipped, firstErr }
@@ -521,7 +568,11 @@ export function Intake({
       return
     }
     await walkFiles(
-      files.map((p) => ({ name: p.file.name, read: () => readPicked(p) })),
+      files.map((p) => ({
+        name: p.file.name,
+        size: p.file.size,
+        chunks: () => chunkPicked(p),
+      })),
       where,
       false,
     )
@@ -532,7 +583,21 @@ export function Intake({
    *  shortcut. */
   async function example(): Promise<void> {
     await walkFiles(
-      sampleFiles().map((f) => ({ name: f.name, read: () => Promise.resolve(f.build()) })),
+      sampleFiles().map((f) => {
+        /* Built at the read rather than at the pick, the way a folder's transcripts arrive one at
+           a time -- which is what gives the column something to draw. */
+        let text = ""
+        const once = (): string => (text ||= f.build())
+        return {
+          name: f.name,
+          get size(): number {
+            return once().length
+          },
+          chunks: async function* (): AsyncGenerator<string> {
+            yield once()
+          },
+        }
+      }),
       { root: null, store: "claude" },
       true,
     )
@@ -551,9 +616,14 @@ export function Intake({
     sofar.current = 0
     setBusy(true)
 
+    /** Whether this pick is still the one the card is waiting on. Everything below asks before it
+     *  writes anything down, because a second pick can arrive in the middle of the first and the
+     *  first would otherwise finish over the top of it. */
+    const alive = (): boolean => picks.current === id
+
     /* The walk is driven from here rather than handed the corpus, which is the whole shape of
-       this: `walkOne` takes one file at a time, so the page holds one transcript instead of the
-       whole folder, and gets the frame back between them. */
+       this: it takes one file at a time and one slice of a file at a time, so the page holds one
+       transcript instead of the whole folder, and gives the frame back inside the big ones. */
     const lines: Line[] = []
     const every = Math.max(1, Math.ceil(files.length / NAMES))
     let wrote = performance.now()
@@ -561,6 +631,7 @@ export function Intake({
 
     /** One file done. */
     const step = async (i: number, total: number, name: string): Promise<void> => {
+      if (!alive()) return
       const now = performance.now()
       const last = i + 1 >= total
       if (i % every === 0 || last) {
@@ -580,23 +651,67 @@ export function Intake({
     }
 
     const w = openWalk()
-    /* A rejected read is `null` and counted inside, so what is left for the `catch` is the walk
-       itself coming apart -- which has to end with a message rather than with the column sitting
-       there. */
-    const read = await readEach(files, (name, text, i) => {
-      if (text !== null) {
-        walkOne(w, { name, text })
-        /* Left where the header can find it, on every file rather than on a beat: this is two
-           adds and a multiply, and deciding how often it is worth looking at is the job of
-           whoever is drawing it. */
-        sofar.current = billedSoFar(w)
-      } else skipFile(w)
-      return step(i, files.length, name)
-    }).catch((e: unknown) => {
-      stop(t.intake.errRead((e as Error).message))
+    /* A transcript that will not read is counted inside, so what is left for the `catch` is the
+       walk itself coming apart -- which has to end with a message rather than with the column
+       sitting there. */
+    const read = await readEach(
+      files,
+      async (f, i) => {
+        const fw = openFile(w, f.name, f.size)
+        let got = false
+        let broke: Error | null = null
+        /* oxlint-disable no-await-in-loop -- the awaits are the point of these loops: one is the
+           next chunk arriving, the other is the frame the caret needs. */
+        /** Walk what has arrived, giving the frame back whenever the walk has held it long
+         *  enough. `false` once this pick has been superseded and there is no reason to go on. */
+        const drain = async (): Promise<boolean> => {
+          const steps = stepFile(fw)
+          for (;;) {
+            const done = steps.next().done
+            /* Left where the header can find it, on every slice rather than on a beat: this is two
+               adds and a multiply, and the figure is polled by whoever is drawing it -- so a
+               rollout big enough to take several slices counts up through them instead of standing
+               still. */
+            sofar.current = billedSoFar(w)
+            if (done) return true
+            await handBack()
+            if (!alive()) return false
+          }
+        }
+        try {
+          const it = f.chunks()[Symbol.asyncIterator]()
+          /* One chunk in flight while the last one is walked: reading is the disk's work and
+             walking is this thread's, and taken strictly in turn each waits out the other. */
+          let ahead = it.next()
+          for (;;) {
+            const next = await ahead
+            if (next.done) break
+            ahead = it.next()
+            got = true
+            pushText(fw, next.value)
+            if (!(await drain())) return got
+          }
+        } catch (e) {
+          /* A store is a live directory. A transcript that moved out from under the read leaves
+             what it had already given rather than taking the folder down with it. */
+          broke = e as Error
+        }
+        endText(fw)
+        if (!(await drain())) return got
+        /* oxlint-enable no-await-in-loop */
+        if (!got) {
+          skipFile(w)
+          if (broke) throw broke
+        }
+        await step(i, files.length, f.name)
+        return got
+      },
+      alive,
+    ).catch((e: unknown) => {
+      if (alive()) stop(t.intake.errRead((e as Error).message))
       return null
     })
-    if (!read) return
+    if (!read || !alive()) return
     if (read.firstErr && read.skipped === files.length) {
       stop(t.intake.errRead(read.firstErr.message))
       return

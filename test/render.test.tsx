@@ -782,7 +782,17 @@ describe("the card's two faces", () => {
       })
       /* A transcript that is held open: the assertions in the middle are about the state the
          page is in *while* it reads, which is over in a microtask if nothing holds it. */
-      const file = { name: "0f2c9a.jsonl", text: () => gate.then(() => "") }
+      const file = {
+        name: "0f2c9a.jsonl",
+        size: 0,
+        stream: () =>
+          new ReadableStream<Uint8Array>({
+            async pull(c) {
+              await gate
+              c.close()
+            },
+          }),
+      }
       const dir = {
         name: "-Users-me-code-thing",
         values: () =>
