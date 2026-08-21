@@ -18,19 +18,22 @@ import {
   report,
   skipFile,
 } from "../src/engine.ts"
+import { GROK_SIDECARS } from "../src/grok.ts"
 
 /** Where the report is read. The override is what lets `pnpm dev`, or a copy of the page someone
  *  hosts themselves, stand in for the deployed one -- which is how the hand-off gets tested
  *  against the working tree rather than against whatever is currently in production. */
 const REPORT_URL = process.env.TOKEN_BILLING_URL || "https://token-billing.vercel.app/"
 
-/** The two stores, and where each agent keeps its sessions. `CODEX_HOME` is Codex's own override
- *  for the second one. */
+/** The stores, and where each agent keeps its sessions. `CODEX_HOME` and `GROK_HOME` are those
+ *  agents' own overrides. */
 const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), ".codex")
+const GROK_HOME = process.env.GROK_HOME || join(homedir(), ".grok")
 const STORES = [
   join(homedir(), ".claude", "projects"),
   join(CODEX_HOME, "sessions"),
   join(CODEX_HOME, "archived_sessions"),
+  join(GROK_HOME, "sessions"),
 ]
 
 /** Windows caps a `cmd` command line at 8191 characters, which a corpus with enough distinct
@@ -53,7 +56,7 @@ function walk(dir: string, out: string[]): void {
       }
     }
     if (dirent) walk(p, out)
-    else if (e.name.endsWith(".jsonl")) out.push(p)
+    else if (e.name.endsWith(".jsonl") && !GROK_SIDECARS.has(e.name)) out.push(p)
   }
 }
 
@@ -105,8 +108,8 @@ async function main(): Promise<void> {
      hand-off is tested without a browser being taken over to do it. */
   const print = argv.includes("--print") || argv.includes("-p")
   const named = argv.filter((a) => !a.startsWith("-"))
-  /* With nothing named, both stores are read and a missing one is not a failure: most machines run
-     one of the two agents rather than both. */
+  /* With nothing named, every store is read and a missing one is not a failure: most machines run
+     one of the agents rather than all of them. */
   const dirs = named.length ? named : STORES
   const where = dirs.join(", ")
   const paths: string[] = []
@@ -175,7 +178,7 @@ async function main(): Promise<void> {
   if (!data.requests) {
     console.error(
       `${paths.length} session(s) read, but nothing in them was billed -- is ${where} really ` +
-        `a Claude Code projects folder or a Codex sessions folder?`,
+        `a Claude Code projects folder, a Codex sessions folder, or a Grok sessions folder?`,
     )
     process.exitCode = 1
     return
