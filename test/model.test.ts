@@ -1,8 +1,8 @@
 /* The arithmetic behind the views, with no renderer in the way. */
 
-import { analyze, type Dataset } from "../src/engine.ts"
-import { LANGS } from "../src/i18n.ts"
-import { postCopy } from "../src/post-copy.ts"
+import { analyze, type Dataset } from "../src/core/engine.ts"
+import { LANGS } from "../src/core/i18n.ts"
+import { postCopy } from "../src/core/post-copy.ts"
 import {
   fold,
   focusOf,
@@ -18,7 +18,7 @@ import {
   SUN_RINGS,
   vouched,
   type CostNode,
-} from "../src/model.ts"
+} from "../src/core/model.ts"
 import { corpus } from "./fixture.ts"
 
 let fails = 0

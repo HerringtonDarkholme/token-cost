@@ -4,7 +4,7 @@
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
 import { isCode, labelOf, nodeName, useT } from "./copy.tsx"
-import { branches, fold, kidsOf, pctOf, type CostNode } from "./model.ts"
+import { branches, fold, kidsOf, pctOf, type CostNode } from "../core/model.ts"
 import { hoverBind, useHover, useNarrow } from "./store.ts"
 
 /** How much of its parent a block has to be worth before its name is written on it. Two numbers

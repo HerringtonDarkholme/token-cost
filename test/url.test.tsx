@@ -4,11 +4,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { analyze } from "../src/engine.ts"
-import { pathOf, slug } from "../src/model.ts"
-import { loadFace } from "../src/faces.ts"
-import { Page } from "../src/Page.tsx"
-import { applyUrl, getState, pathFor, readPath, resetState, setState } from "../src/store.ts"
+import { analyze } from "../src/core/engine.ts"
+import { pathOf, slug } from "../src/core/model.ts"
+import { loadFace } from "../src/ui/faces.ts"
+import { Page } from "../src/ui/Page.tsx"
+import { applyUrl, getState, pathFor, readPath, resetState, setState } from "../src/ui/store.ts"
 import { corpus } from "./fixture.ts"
 
 const data = analyze(corpus())

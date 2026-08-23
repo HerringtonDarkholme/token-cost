@@ -2,7 +2,7 @@
 
 import fs from "node:fs"
 import path from "node:path"
-import type { RawFile } from "../src/engine.ts"
+import type { RawFile } from "../src/core/engine.ts"
 
 export function readDir(dir: string): RawFile[] {
   return fs

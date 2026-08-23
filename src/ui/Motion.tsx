@@ -12,7 +12,7 @@ import {
 } from "react"
 import { flushSync } from "react-dom"
 import NumberFlow, { useIsSupported, type Format } from "@number-flow/react"
-import { tagOf } from "./i18n.ts"
+import { tagOf } from "../core/i18n.ts"
 import { useViewState } from "./store.ts"
 
 /** A custom property off the document root, or `fallback` where the stylesheet has not loaded --

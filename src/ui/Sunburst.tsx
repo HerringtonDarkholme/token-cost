@@ -4,7 +4,7 @@ import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
 import { isCode, labelOf, useT } from "./copy.tsx"
 import { Figure, TextCross } from "./Motion.tsx"
-import { pctOf, sunburst, type SunBranch } from "./model.ts"
+import { pctOf, sunburst, type SunBranch } from "../core/model.ts"
 import { disarmHover, hoverBind, setState, useHover } from "./store.ts"
 
 /* Ring geometry, in the viewBox's own units: the box is 200 across and centred on the origin, so

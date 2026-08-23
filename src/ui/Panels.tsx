@@ -3,7 +3,7 @@
 import { memo, useMemo } from "react"
 import { useReport } from "./context.ts"
 import { isCode, nodeName, useT } from "./copy.tsx"
-import { fold, kidsOf, maxCost, moneyFine, pctOf, type CostNode } from "./model.ts"
+import { fold, kidsOf, maxCost, moneyFine, pctOf, type CostNode } from "../core/model.ts"
 import { vtName } from "./Motion.tsx"
 import { hoverBind, useHover } from "./store.ts"
 

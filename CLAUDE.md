@@ -40,12 +40,21 @@ round trip to undo.
 `cost-report.html`, and that one asserts the document is self-contained — so a change that
 reaches the network fails here rather than in someone's browser.
 
-The app lives in `src/` — the `.ts`, the `.tsx` and `style.css`. What stays at the root is
-the things that address it from outside: `index.html`, the three Vite configs, `tsconfig.json`,
-`vercel.json`. The suites stay in `test/` as a peer of `src/` rather than inside it, because
+The app lives in `src/`, and `src/` is two folders. `core/` is the bill: the walk, the prices,
+the view model, the words the share image carries. `ui/` is the page that shows it: the components,
+the view state held outside them, the dictionary, the stylesheet. Beside them sits `main.tsx`,
+in neither: it is the entry `index.html` names, and all it does is mount `ui/` against a div.
+What stays at the repo root is the things that address the app from outside: `index.html`, the
+three Vite configs, `tsconfig.json`, `vercel.json`. The suites stay in `test/` as a peer of `src/` rather than inside it, because
 two of the three run as plain `node` scripts against a real transcript directory.
 
-`src/agents/` holds one file per agent the bill reads — `claude.ts`, `codex.ts`, `grok.ts` — behind
+The line between the two is a rule the imports keep: **`core/` imports React never and touches
+the document never**, so `ui/` reads `core/` and nothing reads back. A module that needs
+`useSyncExternalStore`, `location` or an element is `ui/` however little it renders — `store.ts`,
+`transfer.ts` and `snapshot.ts` are all there for that reason. When a core module starts wanting
+something out of `ui/`, the answer is to move the piece it wants down, not to import upwards.
+
+`src/core/agents/` holds one file per agent the bill reads — `claude.ts`, `codex.ts`, `grok.ts` — behind
 the `Agent` contract in `index.ts`: claim a file, read its lines, price its models, say where its
 sessions live. `engine.ts` names no agent. It asks the registry whose file this is and reads what
 comes back, so a fourth agent is a file in that folder and a line in `AGENTS` — not an edit to the

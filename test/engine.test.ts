@@ -1,11 +1,11 @@
-import * as E from "../src/engine.ts"
-import { agentFor, AGENTS, SIDECAR_NAMES } from "../src/agents/index.ts"
-import { imageDims } from "../src/agents/image.ts"
-import type { Dataset, RawFile } from "../src/engine.ts"
+import * as E from "../src/core/engine.ts"
+import { agentFor, AGENTS, SIDECAR_NAMES } from "../src/core/agents/index.ts"
+import { imageDims } from "../src/core/agents/image.ts"
+import type { Dataset, RawFile } from "../src/core/engine.ts"
 /* The fixtures below are Claude Code transcripts, so the shape they are written in is that
    agent's own -- and the walk reads them through the same reader a real one goes through. */
-import type { Usage } from "../src/agents/claude.ts"
-import { sampleCorpus } from "../src/sample.ts"
+import type { Usage } from "../src/core/agents/claude.ts"
+import { sampleCorpus } from "../src/core/sample.ts"
 import fs from "node:fs"
 import path from "node:path"
 

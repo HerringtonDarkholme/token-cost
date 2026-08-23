@@ -2,7 +2,7 @@
    and one that cannot be read at all. */
 
 import { describe, expect, it } from "vitest"
-import { chunkPicked, pickedFile, pickHandle, readEach, type Source } from "../src/Upload.tsx"
+import { chunkPicked, pickedFile, pickHandle, readEach, type Source } from "../src/ui/Upload.tsx"
 
 /** A source that gives up its own name, in one chunk. */
 const ok = (name: string): Source => ({

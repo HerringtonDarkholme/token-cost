@@ -14,11 +14,11 @@ import {
   stepFile,
   type Analysis,
   type Scanned,
-} from "./engine.ts"
-import { SIDECAR_NAMES } from "./agents/index.ts"
+} from "../core/engine.ts"
+import { SIDECAR_NAMES } from "../core/agents/index.ts"
 import { useT, type Dict, type Os } from "./copy.tsx"
 import { TextSwap } from "./Motion.tsx"
-import { sampleFiles } from "./sample.ts"
+import { sampleFiles } from "../core/sample.ts"
 import { Tip } from "./Tip.tsx"
 
 /* The three platforms, each a mark and a word. */

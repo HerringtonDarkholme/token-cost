@@ -1,9 +1,9 @@
 /* What a pageview is allowed to say. The drill path is built from the reader's own line-item
    names, so this suite is the thing standing between an in-house MCP server and Vercel. */
 
-import { analyze } from "../src/engine.ts"
-import { hosted, scrub } from "../src/analytics.ts"
-import { pathFor } from "../src/store.ts"
+import { analyze } from "../src/core/engine.ts"
+import { hosted, scrub } from "../src/core/analytics.ts"
+import { pathFor } from "../src/ui/store.ts"
 
 import { synthetic } from "./fixture.ts"
 

@@ -2,7 +2,7 @@
    analysis rides in the URL fragment, which the browser never sends anywhere, gzipped and
    base64url'd so a corpus's worth of distinct tools and shells still fits an address bar. */
 
-import type { Analysis } from "./engine.ts"
+import type { Analysis } from "../core/engine.ts"
 import { parseHash } from "./store.ts"
 
 /** The one hash key that is not a view setting. */

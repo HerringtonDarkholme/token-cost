@@ -2,8 +2,8 @@
    rather than imported from `bin/cli.ts`, which also wants to run `open()` on the way out. */
 
 import { gzipSync } from "node:zlib"
-import { analyze } from "../src/engine.ts"
-import { decodeImport, landing, readImport, stripImport } from "../src/transfer.ts"
+import { analyze } from "../src/core/engine.ts"
+import { decodeImport, landing, readImport, stripImport } from "../src/ui/transfer.ts"
 import { synthetic } from "./fixture.ts"
 
 let fails = 0

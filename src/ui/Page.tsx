@@ -1,10 +1,10 @@
 /* The page, which is one card that changes what it holds. */
 
 import { Fragment, useEffect, useRef } from "react"
-import type { Analysis } from "./engine.ts"
+import type { Analysis } from "../core/engine.ts"
 import { ReportContext, useReportCtx } from "./context.ts"
 import { useT, type Dict, type Word } from "./copy.tsx"
-import { money } from "./model.ts"
+import { money } from "../core/model.ts"
 import {
   applyUrl,
   hashFor,

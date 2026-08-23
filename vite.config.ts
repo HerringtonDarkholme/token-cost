@@ -10,16 +10,22 @@ const root = fileURLToPath(new URL(".", import.meta.url))
  *  where every visit pays for it -- which looks like nothing until you read the chunk sizes. */
 const OWNED: Record<string, string[]> = {
   FaceIntake: [
-    "Upload.tsx",
-    "engine.ts",
-    "sample.ts",
-    "agents/index.ts",
-    "agents/claude.ts",
-    "agents/codex.ts",
-    "agents/grok.ts",
+    "ui/Upload.tsx",
+    "core/engine.ts",
+    "core/sample.ts",
+    "core/agents/index.ts",
+    "core/agents/claude.ts",
+    "core/agents/codex.ts",
+    "core/agents/grok.ts",
   ],
-  FaceReport: ["Report.tsx", "Sunburst.tsx", "Mosaic.tsx", "Ledger.tsx", "Panels.tsx"],
-  "post-copy": ["post-copy.ts"],
+  FaceReport: [
+    "ui/Report.tsx",
+    "ui/Sunburst.tsx",
+    "ui/Mosaic.tsx",
+    "ui/Ledger.tsx",
+    "ui/Panels.tsx",
+  ],
+  "post-copy": ["core/post-copy.ts"],
 }
 
 /** Which source files went into a chunk, in the one spelling both bundlers agree on. */

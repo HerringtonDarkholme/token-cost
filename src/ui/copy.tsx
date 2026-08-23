@@ -1,8 +1,8 @@
 /* Every word on the page, six times over. */
 
-import { GROUPS } from "./groups.ts"
-import { LANGS, type Lang } from "./i18n.ts"
-import type { CostNode } from "./model.ts"
+import { GROUPS } from "../core/groups.ts"
+import { LANGS, type Lang } from "../core/i18n.ts"
+import type { CostNode } from "../core/model.ts"
 import { useViewState } from "./store.ts"
 
 /** Which dialog the reader is about to meet. */

@@ -17,8 +17,8 @@ import {
   pushText,
   report,
   skipFile,
-} from "../src/engine.ts"
-import { AGENTS, SIDECAR_NAMES } from "../src/agents/index.ts"
+} from "../src/core/engine.ts"
+import { AGENTS, SIDECAR_NAMES } from "../src/core/agents/index.ts"
 
 /** Where the report is read. The override is what lets `pnpm dev`, or a copy of the page someone
  *  hosts themselves, stand in for the deployed one -- which is how the hand-off gets tested
@@ -26,7 +26,7 @@ import { AGENTS, SIDECAR_NAMES } from "../src/agents/index.ts"
 const REPORT_URL = process.env.TOKEN_BILLING_URL || "https://token-billing.vercel.app/"
 
 /** Every folder any agent keeps its sessions in, each agent having said where that is and which
- *  of its own variables moves it. An agent added to `src/agents/` is read here without being
+ *  of its own variables moves it. An agent added to `src/core/agents/` is read here without being
  *  named here. */
 const STORES = AGENTS.flatMap((a) =>
   (a.stores ?? []).flatMap((store) => {

@@ -1,10 +1,10 @@
 /* The report's own parts: thesis strip, the picture, the breakdown, the footnotes. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { Dataset } from "./engine.ts"
+import type { Dataset } from "../core/engine.ts"
 import { useReport } from "./context.ts"
 import { labelOf, useT, type Dict } from "./copy.tsx"
-import { count, FOLD_MIN, ledger, money, moneyFine, pctOf } from "./model.ts"
+import { count, FOLD_MIN, ledger, money, moneyFine, pctOf } from "../core/model.ts"
 import { disarmHover, setState, useNarrow, type ViewState } from "./store.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
 import { cssMs, Reveal, transition } from "./Motion.tsx"

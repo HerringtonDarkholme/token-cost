@@ -4,7 +4,7 @@
 import { useSyncExternalStore } from "react"
 import type { Dict } from "./copy.tsx"
 import { onIdle } from "./idle.ts"
-import type { Analysis, Dataset } from "./engine.ts"
+import type { Analysis, Dataset } from "../core/engine.ts"
 
 /** What the card holds once there is a bill, and what stands under it. */
 export interface ReportFace {

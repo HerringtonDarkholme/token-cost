@@ -2,10 +2,10 @@
 
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import { App } from "./App.tsx"
-import { loadFace } from "./faces.ts"
-import { readHash, setState } from "./store.ts"
-import { landing, pendingImport, takeImport } from "./transfer.ts"
+import { App } from "./ui/App.tsx"
+import { loadFace } from "./ui/faces.ts"
+import { readHash, setState } from "./ui/store.ts"
+import { landing, pendingImport, takeImport } from "./ui/transfer.ts"
 
 const host = document.getElementById("app")
 if (!host) throw new Error("missing #app in the document")

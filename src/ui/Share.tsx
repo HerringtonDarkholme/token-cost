@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useReport } from "./context.ts"
 import { useT, type Dict } from "./copy.tsx"
 import { onIdle } from "./idle.ts"
-import { postText } from "./model.ts"
+import { postText } from "../core/model.ts"
 import { TextSwap } from "./Motion.tsx"
 import { download, snapshot } from "./snapshot.ts"
 
@@ -14,10 +14,10 @@ const FILENAME = "where-the-money-went.png"
  *  is the button below: they are fetched rather than bundled, so a visit that shares nothing never
  *  pays for them. Kept once fetched, because the promise is what both the prefetch and the click
  *  wait on. */
-let captions: Promise<typeof import("./post-copy.ts")> | null = null
+let captions: Promise<typeof import("../core/post-copy.ts")> | null = null
 
-function loadCaptions(): Promise<typeof import("./post-copy.ts")> {
-  return (captions ??= import("./post-copy.ts"))
+function loadCaptions(): Promise<typeof import("../core/post-copy.ts")> {
+  return (captions ??= import("../core/post-copy.ts"))
 }
 
 /** Not a result, so it never times out: "busy" ends when the work does. */

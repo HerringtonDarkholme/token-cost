@@ -1,9 +1,9 @@
 /* View state, held outside the component tree. */
 
 import { useSyncExternalStore } from "react"
-import type { Analysis, TtlAssumption } from "./engine.ts"
-import { GUESSED, isLang, noteLang, type Lang } from "./i18n.ts"
-import { pathOf, slug } from "./model.ts"
+import type { Analysis, TtlAssumption } from "../core/engine.ts"
+import { GUESSED, isLang, noteLang, type Lang } from "../core/i18n.ts"
+import { pathOf, slug } from "../core/model.ts"
 
 /** What the pointer (or keyboard focus) is on. */
 export interface HoverTarget {

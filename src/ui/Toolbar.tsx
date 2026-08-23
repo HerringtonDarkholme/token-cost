@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { LANGS, useT, type Dict } from "./copy.tsx"
-import type { TtlAssumption } from "./engine.ts"
-import type { Lang } from "./i18n.ts"
+import type { TtlAssumption } from "../core/engine.ts"
+import type { Lang } from "../core/i18n.ts"
 import { transition } from "./Motion.tsx"
 import { Cycle, type SegOption } from "./Seg.tsx"
 import { CopyChartButton, ShareButton } from "./Share.tsx"

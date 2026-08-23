@@ -3,8 +3,8 @@
    whose behaviour changes when amounts are hidden. */
 
 import { createContext, useCallback, useContext, useMemo } from "react"
-import type { Analysis, Dataset } from "./engine.ts"
-import { branches, focusOf, money, palette, type Focus, type Palette } from "./model.ts"
+import type { Analysis, Dataset } from "../core/engine.ts"
+import { branches, focusOf, money, palette, type Focus, type Palette } from "../core/model.ts"
 import { disarmHover, setState, type ViewState } from "./store.ts"
 
 export interface ReportCtx {

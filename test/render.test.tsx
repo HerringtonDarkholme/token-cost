@@ -5,13 +5,20 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { dict } from "../src/copy.tsx"
-import { analyze, type Analysis } from "../src/engine.ts"
-import { LANGS } from "../src/i18n.ts"
-import { loadFace } from "../src/faces.ts"
-import { Page, type Dir } from "../src/Page.tsx"
-import { originOf, type Origin } from "../src/Upload.tsx"
-import { getHover, getState, resetState, setHover, setState, type ViewState } from "../src/store.ts"
+import { dict } from "../src/ui/copy.tsx"
+import { analyze, type Analysis } from "../src/core/engine.ts"
+import { LANGS } from "../src/core/i18n.ts"
+import { loadFace } from "../src/ui/faces.ts"
+import { Page, type Dir } from "../src/ui/Page.tsx"
+import { originOf, type Origin } from "../src/ui/Upload.tsx"
+import {
+  getHover,
+  getState,
+  resetState,
+  setHover,
+  setState,
+  type ViewState,
+} from "../src/ui/store.ts"
 import { corpus, synthetic } from "./fixture.ts"
 
 const data = analyze(corpus(process.env.TRANSCRIPT_DIR))
