@@ -2,13 +2,13 @@
    files are yours, how do they read, what do your models cost. A fourth agent is a file in this
    folder and a line in the list below -- the engine names none of them. */
 
-import type { Rate, TranscriptRecord } from "../engine.ts"
+import type { Rate, Turn } from "../engine.ts"
 import { claude } from "./claude.ts"
 import { codex } from "./codex.ts"
 import { grok } from "./grok.ts"
 
-/** Where a record goes once a reader has one. */
-export type Emit = (rec: TranscriptRecord) => void
+/** Where a turn goes once a reader has one. */
+export type Emit = (turn: Turn) => void
 
 /** One file, part way read. Made per file, so a reader may hold whatever its format needs across
  *  the lines of one session and nothing wider. */

@@ -9,7 +9,15 @@ const root = fileURLToPath(new URL(".", import.meta.url))
  *  ever needs. A static import from anywhere else quietly moves one of these back into the entry,
  *  where every visit pays for it -- which looks like nothing until you read the chunk sizes. */
 const OWNED: Record<string, string[]> = {
-  FaceIntake: ["Upload.tsx", "engine.ts", "sample.ts"],
+  FaceIntake: [
+    "Upload.tsx",
+    "engine.ts",
+    "sample.ts",
+    "agents/index.ts",
+    "agents/claude.ts",
+    "agents/codex.ts",
+    "agents/grok.ts",
+  ],
   FaceReport: ["Report.tsx", "Sunburst.tsx", "Mosaic.tsx", "Ledger.tsx", "Panels.tsx"],
   "post-copy": ["post-copy.ts"],
 }

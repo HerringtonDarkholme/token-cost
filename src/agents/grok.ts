@@ -1,6 +1,6 @@
 /* Grok `updates.jsonl`, translated into the record shape the walk already reads. */
 
-import type { ContentBlock, Rate, TranscriptRecord, Usage } from "../engine.ts"
+import type { Block, Rate, Spend, Turn } from "../engine.ts"
 import type { Agent, Reader } from "./index.ts"
 import { firstString, lines } from "./jsonl.ts"
 
@@ -191,13 +191,16 @@ function ahead(text: string): string {
 
 /** xAI counts cached tokens inside `inputTokens`, the same way OpenAI does -- so the write is
  *  already in there at the plain input price, and declaring it again would bill it twice. */
-function usageOf(u: GrokUsage): Usage {
+function spendOf(u: GrokUsage): Spend {
   const inp = num(u.inputTokens)
   const cached = Math.min(num(u.cachedReadTokens), inp)
   return {
-    input_tokens: inp - cached,
-    cache_read_input_tokens: cached,
-    output_tokens: num(u.outputTokens),
+    fresh: inp - cached,
+    cached,
+    write1h: 0,
+    write5m: 0,
+    writeUnknown: 0,
+    out: num(u.outputTokens),
   }
 }
 
@@ -226,18 +229,17 @@ function modelFromUsage(u: GrokUsage): string {
   return best
 }
 
-/** Built-in tools live in `grok_build`; anything else is an MCP server. */
 function toolMeta(u: GrokUpdate): GrokToolMeta | undefined {
   const tool = metaBag(u)?.["x.ai/tool"]
   return tool && typeof tool === "object" ? (tool as GrokToolMeta) : undefined
 }
 
-function toolName(u: GrokUpdate): string {
-  const tool = toolMeta(u)
-  const name = str(tool?.name) || str(u.title) || "(unnamed tool)"
-  const ns = str(tool?.namespace)
-  if (ns && ns !== "grok_build") return `mcp__${ns}__${name}`
-  return name
+/** Built-in tools live in `grok_build`; any other namespace is an MCP server. */
+function toolOf(u: GrokUpdate): { tool: string; server?: string } {
+  const meta = toolMeta(u)
+  const tool = str(meta?.name) || str(u.title) || "(unnamed tool)"
+  const ns = str(meta?.namespace)
+  return ns && ns !== "grok_build" ? { tool, server: ns } : { tool }
 }
 
 function argsOf(u: GrokUpdate): Record<string, unknown> {
@@ -262,14 +264,14 @@ function resultText(u: GrokUpdate): string {
   return textOf(u.content)
 }
 
-type Out = (rec: TranscriptRecord) => void
+type Out = (turn: Turn) => void
 
 interface Call {
-  blocks: ContentBlock[]
+  blocks: Block[]
   results: Map<string, string>
   ctx: number
   stamp: string
-  rec?: TranscriptRecord
+  turn?: Turn
 }
 
 export interface GrokState {
@@ -311,10 +313,7 @@ function emitUser(s: GrokState, out: Out): void {
   const text = s.user
   s.user = ""
   if (!text) return
-  out({
-    timestamp: s.stamp,
-    message: { role: "user", content: [{ type: "text", text }] },
-  })
+  out({ at: s.stamp, by: "user", blocks: [{ kind: "text", chars: text.length, text }] })
 }
 
 function share(total: number, weights: number[], i: number, used: number): number {
@@ -355,18 +354,16 @@ function applyUsage(s: GrokState, u: GrokUsage): void {
     usedO += oN
     usedR += rN
     if (rN > 0) {
-      const think = c.blocks.find((b) => b.type === "thinking")
+      const think = c.blocks.find((b) => b.kind === "reasoning")
       if (think) think.tokens = rN
-      else c.blocks.unshift({ type: "thinking", tokens: rN })
+      else c.blocks.unshift({ kind: "reasoning", chars: 0, tokens: rN })
     }
-    c.rec = {
-      timestamp: c.stamp || s.stamp,
-      message: {
-        role: "assistant",
-        model: s.model,
-        usage: usageOf({ inputTokens: iN, cachedReadTokens: cN, outputTokens: oN }),
-        content: c.blocks,
-      },
+    c.turn = {
+      at: c.stamp || s.stamp,
+      by: "model",
+      model: s.model,
+      spend: spendOf({ inputTokens: iN, cachedReadTokens: cN, outputTokens: oN }),
+      blocks: c.blocks,
     }
   }
 }
@@ -375,28 +372,23 @@ function emitPending(s: GrokState, out: Out): void {
   const pending = s.pending
   s.pending = []
   for (const c of pending) {
-    if (c.rec) out(c.rec)
+    if (c.turn) out(c.turn)
     else if (c.blocks.length)
-      out({
-        timestamp: c.stamp || s.stamp,
-        message: { role: "assistant", model: s.model, content: c.blocks },
-      })
+      out({ at: c.stamp || s.stamp, by: "model", model: s.model, blocks: c.blocks })
     for (const [id, text] of c.results)
       out({
-        timestamp: c.stamp || s.stamp,
-        message: {
-          role: "user",
-          content: [{ type: "tool_result", tool_use_id: id, content: text }],
-        },
+        at: c.stamp || s.stamp,
+        by: "user",
+        blocks: [{ kind: "result", chars: text.length, id }],
       })
   }
 }
 
 function findCall(s: GrokState, id: string): Call | null {
-  if (s.call?.blocks.some((b) => b.type === "tool_use" && b.id === id)) return s.call
+  if (s.call?.blocks.some((b) => b.kind === "call" && b.id === id)) return s.call
   for (let i = s.pending.length - 1; i >= 0; i--) {
     const c = s.pending[i]
-    if (c.blocks.some((b) => b.type === "tool_use" && b.id === id) || c.results.has(id)) return c
+    if (c.blocks.some((b) => b.kind === "call" && b.id === id) || c.results.has(id)) return c
   }
   return s.call || s.pending[s.pending.length - 1] || null
 }
@@ -441,19 +433,16 @@ export function grokLine(s: GrokState, line: string, out: Out): boolean {
   if (kind === "agent_thought_chunk" || kind === "agent_message_chunk") {
     emitUser(s, out)
     const call = s.call
-    if (call && call.blocks.some((b) => b.type === "tool_use")) closeCall(s)
+    if (call && call.blocks.some((b) => b.kind === "call")) closeCall(s)
     const text = textOf(u.content)
     if (!text) return true
     const cur = openCall(s)
-    if (kind === "agent_thought_chunk") {
-      const last = cur.blocks[cur.blocks.length - 1]
-      if (last && last.type === "thinking") last.thinking = (last.thinking || "") + text
-      else cur.blocks.push({ type: "thinking", thinking: text })
-    } else {
-      const last = cur.blocks[cur.blocks.length - 1]
-      if (last && last.type === "text") last.text = (last.text || "") + text
-      else cur.blocks.push({ type: "text", text })
-    }
+    /* Chunks of one message arrive as their own updates, so the block they belong to grows rather
+       than the message becoming one block per chunk. */
+    const want = kind === "agent_thought_chunk" ? "reasoning" : "text"
+    const last = cur.blocks[cur.blocks.length - 1]
+    if (last && last.kind === want) last.chars += text.length
+    else cur.blocks.push({ kind: want, chars: text.length })
     return true
   }
 
@@ -461,13 +450,15 @@ export function grokLine(s: GrokState, line: string, out: Out): boolean {
     emitUser(s, out)
     const cur = openCall(s)
     const id = str(u.toolCallId)
-    cur.blocks.push({ type: "tool_use", id, name: toolName(u), input: argsOf(u) })
+    const input = argsOf(u)
+    const { tool, server } = toolOf(u)
+    cur.blocks.push({ kind: "call", chars: JSON.stringify(input).length, id, tool, server, input })
     return true
   }
 
   if (kind === "tool_call_update") {
     emitUser(s, out)
-    if (s.call && s.call.blocks.some((b) => b.type === "tool_use")) closeCall(s)
+    if (s.call && s.call.blocks.some((b) => b.kind === "call")) closeCall(s)
     const id = str(u.toolCallId)
     const text = resultText(u)
     if (!id || !text) return true

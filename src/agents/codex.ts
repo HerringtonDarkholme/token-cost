@@ -1,7 +1,8 @@
 /* Codex rollouts, translated into the record shape the walk already reads, so one engine prices
    every store. */
 
-import type { ContentBlock, Rate, TranscriptRecord, Usage } from "../engine.ts"
+import type { Block, Rate, Spend, Turn } from "../engine.ts"
+import { imageTokens } from "./image.ts"
 import type { Agent, Reader } from "./index.ts"
 import { lines } from "./jsonl.ts"
 
@@ -167,37 +168,40 @@ function ahead(text: string): { model: string; sidechain: boolean } {
 
 /** OpenAI counts cached tokens inside `input_tokens`, and has no cache TTL to choose -- so the
  *  writes are declared as the short ones, where the report's TTL toggle cannot move them. */
-function usageOf(u: CodexUsage): Usage {
+function spendOf(u: CodexUsage): Spend {
   const inp = num(u.input_tokens)
   const cached = Math.min(num(u.cached_input_tokens), inp)
   const write = num(u.cache_write_input_tokens)
   return {
-    input_tokens: inp - cached,
-    cache_read_input_tokens: cached,
-    cache_creation_input_tokens: write,
-    cache_creation: { ephemeral_5m_input_tokens: write },
-    output_tokens: num(u.output_tokens),
+    fresh: inp - cached,
+    cached,
+    write1h: 0,
+    write5m: write,
+    writeUnknown: 0,
+    out: num(u.output_tokens),
   }
 }
 
-/** The text blocks of a rollout message, whichever direction it was going. */
-function blocksOf(content: unknown): ContentBlock[] {
+/** The blocks of a rollout message, whichever direction it was going. */
+function blocksOf(content: unknown): Block[] {
   if (!Array.isArray(content))
-    return typeof content === "string" ? [{ type: "text", text: content }] : []
-  const out: ContentBlock[] = []
+    return typeof content === "string"
+      ? [{ kind: "text", chars: content.length, text: content }]
+      : []
+  const out: Block[] = []
   for (const b of content) {
     if (!b || typeof b !== "object") continue
-    const c = b as { type?: string; text?: string }
+    const c = b as { type?: string; text?: string; image_url?: string }
     if (c.type === "input_image")
+      /* Sized off its own header where it carries one, so a thumbnail is not charged as a
+         full-page capture. */
       out.push({
-        type: "image",
-        /* Sized off its own header where it carries one, so a thumbnail is not charged as a
-           full-page capture. */
-        ...(typeof (b as { image_url?: string }).image_url === "string"
-          ? { source: { data: (b as { image_url?: string }).image_url } }
-          : {}),
+        kind: "image",
+        chars: 0,
+        tokens: imageTokens(typeof c.image_url === "string" ? c.image_url : undefined),
       })
-    else if (typeof c.text === "string" && c.text) out.push({ type: "text", text: c.text })
+    else if (typeof c.text === "string" && c.text)
+      out.push({ kind: "text", chars: c.text.length, text: c.text })
   }
   return out
 }
@@ -262,8 +266,8 @@ export interface CodexState {
   sidechain: boolean
   /* What the assistant produced, and the tool output it drew -- held because a rollout writes the
      token count last. */
-  blocks: ContentBlock[]
-  results: ContentBlock[]
+  blocks: Block[]
+  results: Block[]
   stamp: string
   /* The cumulative counters, for the rollouts that report a running total and no per-call one. */
   prevTotal: number | null
@@ -275,7 +279,7 @@ export interface CodexState {
   /** Records made before the rollout named the model that prices them, `null` once it has. Two of
    *  a real store's thousand rollouts bill a request tens of megabytes before they name one, which
    *  is far too deep to hold the file open for. */
-  held: TranscriptRecord[] | null
+  held: Turn[] | null
 }
 
 /** Open a rollout on as much of its front as the reader has been handed. */
@@ -299,29 +303,28 @@ export function codexOpen(head: string): CodexState {
 
 /** What the walk reads. A rollout is read straight through into one of these rather than into a
  *  generator per line, because a big one has a record every few hundred bytes. */
-type Out = (rec: TranscriptRecord) => void
+type Out = (turn: Turn) => void
 
 /** Let the backlog go, with the model it was waiting for written into it. */
 function release(s: CodexState, out: Out): void {
   const held = s.held
   s.held = null
   if (!held) return
-  for (const rec of held) {
-    const m = rec.message
-    if (m && m.role === "assistant" && !m.model && s.model) m.model = s.model
-    out(rec)
+  for (const turn of held) {
+    if (turn.by === "model" && !turn.model && s.model) turn.model = s.model
+    out(turn)
   }
 }
 
 /** One record on its way to the walk, or into the backlog if there is still no model to price it
  *  with. */
-function give(s: CodexState, rec: TranscriptRecord, out: Out): void {
+function give(s: CodexState, turn: Turn, out: Out): void {
   const held = s.held
   if (!held) {
-    out(rec)
+    out(turn)
     return
   }
-  held.push(rec)
+  held.push(turn)
   // Waited long enough: a rollout this far in without naming a model is not going to name one.
   if (held.length > HELD_MAX) release(s, out)
 }
@@ -332,7 +335,7 @@ function flush(s: CodexState, u: CodexUsage, out: Out): void {
   const reasoning = num(u.reasoning_output_tokens)
   /* Codex encrypts its reasoning but still counts it, so the block is sized by the count rather
      than by text there is none of. */
-  if (reasoning > 0) s.blocks.push({ type: "thinking", tokens: reasoning })
+  if (reasoning > 0) s.blocks.push({ kind: "reasoning", chars: 0, tokens: reasoning })
   const blocks = s.blocks,
     results = s.results
   s.blocks = []
@@ -340,14 +343,16 @@ function flush(s: CodexState, u: CodexUsage, out: Out): void {
   give(
     s,
     {
-      timestamp: s.stamp,
-      isSidechain: s.sidechain,
-      message: { role: "assistant", model: s.model, usage: usageOf(u), content: blocks },
+      at: s.stamp,
+      by: "model",
+      model: s.model,
+      spend: spendOf(u),
+      blocks,
+      subagent: s.sidechain,
     },
     out,
   )
-  if (results.length)
-    give(s, { timestamp: s.stamp, message: { role: "user", content: results } }, out)
+  if (results.length) give(s, { at: s.stamp, by: "user", blocks: results }, out)
 }
 
 /** The payload's own type, where the payload names it first -- which is how a rollout writes an
@@ -409,13 +414,10 @@ const onMcp: Handler = (s, p) => {
   if (!server || !tool) return
   const id = str(p.call_id)
   const args = inv?.arguments
-  s.blocks.push({
-    type: "tool_use",
-    id,
-    name: `mcp__${server}__${tool}`,
-    input: args && typeof args === "object" ? (args as Record<string, unknown>) : {},
-  })
-  s.results.push({ type: "tool_result", tool_use_id: id, content: JSON.stringify(p.result ?? "") })
+  const input = args && typeof args === "object" ? (args as Record<string, unknown>) : {}
+  s.blocks.push({ kind: "call", chars: JSON.stringify(input).length, id, tool, server, input })
+  const result = JSON.stringify(p.result ?? "")
+  s.results.push({ kind: "result", chars: result.length, id })
 }
 
 const onMessage: Handler = (s, p, out) => {
@@ -423,44 +425,39 @@ const onMessage: Handler = (s, p, out) => {
   if (!content.length) return
   if (p.role === "assistant") s.blocks.push(...content)
   // A developer message is the harness talking, not the reader.
-  else
-    give(
-      s,
-      { timestamp: s.stamp, isMeta: p.role !== "user", message: { role: "user", content } },
-      out,
-    )
+  else give(s, { at: s.stamp, by: "user", blocks: content, harness: p.role !== "user" }, out)
 }
 
 /** Traffic between agents, which is neither of them talking to the reader. */
 const onAgentMessage: Handler = (s, p, out) => {
   const content = blocksOf(p.content)
-  if (content.length)
-    give(s, { timestamp: s.stamp, isMeta: true, message: { role: "user", content } }, out)
+  if (content.length) give(s, { at: s.stamp, by: "user", blocks: content, harness: true }, out)
 }
 
 const onCall: Handler = (s, p) => {
+  const input = argsOf(p)
   s.blocks.push({
-    type: "tool_use",
+    kind: "call",
+    chars: JSON.stringify(input).length,
     id: str(p.call_id),
-    name: str(p.name) || "(unnamed tool)",
-    input: argsOf(p),
+    tool: str(p.name) || "(unnamed tool)",
+    input,
   })
 }
 
 const onOutput: Handler = (s, p) => {
-  s.results.push({
-    type: "tool_result",
-    tool_use_id: str(p.call_id),
-    content: str(p.output) || JSON.stringify(p.output ?? ""),
-  })
+  const text = str(p.output) || JSON.stringify(p.output ?? "")
+  s.results.push({ kind: "result", chars: text.length, id: str(p.call_id) })
 }
 
 const onWebSearch: Handler = (s, p) => {
+  const input = { query: str(p.action?.query) }
   s.blocks.push({
-    type: "tool_use",
+    kind: "call",
+    chars: JSON.stringify(input).length,
     id: str(p.call_id),
-    name: "web_search",
-    input: { query: str(p.action?.query) },
+    tool: "web_search",
+    input,
   })
 }
 
@@ -509,9 +506,10 @@ export function codexFront(s: CodexState, front: string, out: Out): boolean {
     give(
       s,
       {
-        timestamp: s.stamp,
-        isCompactSummary: true,
-        message: { role: "user", content: [{ type: "text", text: cut.message }] },
+        at: s.stamp,
+        by: "user",
+        blocks: [{ kind: "text", chars: cut.message.length, text: cut.message }],
+        compacted: true,
       },
       out,
     )
@@ -522,7 +520,7 @@ export function codexFront(s: CodexState, front: string, out: Out): boolean {
   const shot = screenshot(front)
   if (!shot) return false
   if (shot.stamp) s.stamp = shot.stamp
-  s.results.push({ type: "image", source: { data: shot.data } })
+  s.results.push({ kind: "image", chars: 0, tokens: imageTokens(shot.data) })
   return true
 }
 
@@ -562,12 +560,14 @@ function read(s: CodexState, line: string, out: Out): boolean {
 
   // The fallback for a compaction `compaction` could not read the front of.
   if (rec.type === "compacted") {
+    const text = str(p.message)
     give(
       s,
       {
-        timestamp: s.stamp,
-        isCompactSummary: true,
-        message: { role: "user", content: [{ type: "text", text: str(p.message) }] },
+        at: s.stamp,
+        by: "user",
+        blocks: [{ kind: "text", chars: text.length, text }],
+        compacted: true,
       },
       out,
     )
@@ -585,11 +585,11 @@ function read(s: CodexState, line: string, out: Out): boolean {
  *  here too, unpriced, which is what the bill has to admit to. */
 export function codexEnd(s: CodexState, out: Out): void {
   if (s.blocks.length) {
-    give(s, { timestamp: s.stamp, message: { role: "assistant", content: s.blocks } }, out)
+    give(s, { at: s.stamp, by: "model", model: s.model, blocks: s.blocks }, out)
     s.blocks = []
   }
   if (s.results.length) {
-    give(s, { timestamp: s.stamp, message: { role: "user", content: s.results } }, out)
+    give(s, { at: s.stamp, by: "user", blocks: s.results }, out)
     s.results = []
   }
   if (s.held) release(s, out)

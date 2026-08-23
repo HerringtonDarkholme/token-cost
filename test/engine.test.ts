@@ -1,6 +1,10 @@
 import * as E from "../src/engine.ts"
 import { agentFor, AGENTS, SIDECAR_NAMES } from "../src/agents/index.ts"
-import type { Dataset, RawFile, Usage } from "../src/engine.ts"
+import { imageDims } from "../src/agents/image.ts"
+import type { Dataset, RawFile } from "../src/engine.ts"
+/* The fixtures below are Claude Code transcripts, so the shape they are written in is that
+   agent's own -- and the walk reads them through the same reader a real one goes through. */
+import type { Usage } from "../src/agents/claude.ts"
 import { sampleCorpus } from "../src/sample.ts"
 import fs from "node:fs"
 import path from "node:path"
@@ -177,9 +181,7 @@ const png = Buffer.concat([
     return b
   })(),
 ])
-const dim = E.imageDims({
-  source: { type: "base64", media_type: "image/png", data: png.toString("base64") },
-})
+const dim = imageDims(png.toString("base64"))
 ok(
   !!dim && dim.w === 1024 && dim.h === 768,
   `PNG dimensions read from header: ${JSON.stringify(dim)}`,

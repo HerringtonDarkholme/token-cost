@@ -55,6 +55,13 @@ Claude is one entry in that list and gets no privileges: it claims its files by 
 like the others do, and a file no agent claims is not a transcript rather than a Claude one. Keep
 it that way — the pull towards "everything else is Claude" is what this folder exists to stop.
 
+What crosses the boundary is `Turn`, `Spend` and `Block` in `engine.ts`: a turn is the model's or
+the other side's, a spend is six token counts, a block carries the characters its reader measured.
+No wire spelling goes past it — `cache_read_input_tokens`, `isCompactSummary`, `tool_use`, the
+`mcp__server__tool` name — each of those is one agent's, parsed in that agent's file. Adding a
+field to `Block` because one format has it is how the old shape happened; give the reader the job
+instead.
+
 The formatter is oxfmt, and it owns everything under `src/`: run `pnpm format` and commit
 what it gives you rather than arguing with it in review. `pnpm check` runs `oxfmt --check`,
 so an unformatted file fails the gate. The markdown and `index.html` are left out — they are
