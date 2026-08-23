@@ -45,10 +45,15 @@ the things that address it from outside: `index.html`, the three Vite configs, `
 `vercel.json`. The suites stay in `test/` as a peer of `src/` rather than inside it, because
 two of the three run as plain `node` scripts against a real transcript directory.
 
-`src/agents/` holds one file per store the bill reads — `claude.ts`, `codex.ts`, `grok.ts` — and
-nothing else. Each one turns its own transcript format into the records `engine.ts` walks; Claude
-Code's format *is* that record shape, so `claude.ts` is only the session id and the line parse.
-Pricing, the walk, the score and the tree stay in `engine.ts`, which is the one door onto all three.
+`src/agents/` holds one file per agent the bill reads — `claude.ts`, `codex.ts`, `grok.ts` — behind
+the `Agent` contract in `index.ts`: claim a file, read its lines, price its models, say where its
+sessions live. `engine.ts` names no agent. It asks the registry whose file this is and reads what
+comes back, so a fourth agent is a file in that folder and a line in `AGENTS` — not an edit to the
+walk, the CLI's store list, or the rate card.
+
+Claude is one entry in that list and gets no privileges: it claims its files by its own markers
+like the others do, and a file no agent claims is not a transcript rather than a Claude one. Keep
+it that way — the pull towards "everything else is Claude" is what this folder exists to stop.
 
 The formatter is oxfmt, and it owns everything under `src/`: run `pnpm format` and commit
 what it gives you rather than arguing with it in review. `pnpm check` runs `oxfmt --check`,

@@ -1,7 +1,9 @@
 /* Codex rollouts, translated into the record shape the walk already reads, so one engine prices
    every store. */
 
-import type { ContentBlock, TranscriptRecord, Usage } from "../engine.ts"
+import type { ContentBlock, Rate, TranscriptRecord, Usage } from "../engine.ts"
+import type { Agent, Reader } from "./index.ts"
+import { lines } from "./jsonl.ts"
 
 /** What a rollout's `token_count` event says it spent. */
 interface CodexUsage {
@@ -37,20 +39,6 @@ interface CodexLine {
   type?: string
   timestamp?: string
   payload?: CodexPayload
-}
-
-/** Walked by index rather than `split("\n")` for the reason the transcript walk is: a store is
- *  hundreds of megabytes, and the split builds every line before the first one is read. */
-function* lines(text: string): Generator<string> {
-  for (let i = 0, n = text.length; i < n;) {
-    let end = text.indexOf("\n", i)
-    if (end === -1) end = n
-    let from = i
-    i = end + 1
-    while (from < end && text.charCodeAt(from) <= 32) from++
-    if (from === end) continue
-    yield text.slice(from, end)
-  }
 }
 
 /* Structural, never a check on `originator`: that field is the client's own name for itself, and
@@ -493,11 +481,13 @@ const ITEMS = new Map<string, Handler>([
   ["web_search_call", onWebSearch],
 ])
 
-/** One line of a rollout, as the transcript records it would have been. */
-export function codexLine(s: CodexState, line: string, out: Out): void {
-  read(s, line, out)
+/** One line of a rollout, as the transcript records it would have been. `false` is a line that
+ *  would not parse, which the bill owns up to. */
+export function codexLine(s: CodexState, line: string, out: Out): boolean {
+  const parsed = read(s, line, out)
   /* The line that named the model is the line the backlog was waiting for. */
   if (s.held && s.model) release(s, out)
+  return parsed
 }
 
 /** The records the reader needs only the front of, which are also the two biggest a rollout
@@ -536,8 +526,8 @@ export function codexFront(s: CodexState, front: string, out: Out): boolean {
   return true
 }
 
-function read(s: CodexState, line: string, out: Out): void {
-  if (codexFront(s, line, out)) return
+function read(s: CodexState, line: string, out: Out): boolean {
+  if (codexFront(s, line, out)) return true
   const head = line.length > ENVELOPE ? line.slice(0, ENVELOPE) : line
   const at = head.indexOf(PAYLOAD)
   if (at > 0) {
@@ -550,7 +540,7 @@ function read(s: CodexState, line: string, out: Out): void {
       if (sub && !(kind === "event_msg" ? EVENTS : ITEMS).has(sub)) {
         const ts = envelopeValue(env, "timestamp")
         if (ts) s.stamp = ts
-        return
+        return true
       }
     }
   }
@@ -558,16 +548,16 @@ function read(s: CodexState, line: string, out: Out): void {
   try {
     rec = JSON.parse(line) as CodexLine
   } catch {
-    return
+    return false
   }
-  if (!rec || typeof rec !== "object") return
+  if (!rec || typeof rec !== "object") return true
   if (typeof rec.timestamp === "string") s.stamp = rec.timestamp
   const p = rec.payload
-  if (!p || typeof p !== "object") return
+  if (!p || typeof p !== "object") return true
 
   if (rec.type === "turn_context" || rec.type === "session_meta") {
     if (typeof p.model === "string" && p.model) s.model = p.model
-    return
+    return true
   }
 
   // The fallback for a compaction `compaction` could not read the front of.
@@ -581,12 +571,13 @@ function read(s: CodexState, line: string, out: Out): void {
       },
       out,
     )
-    return
+    return true
   }
 
   const table = rec.type === "event_msg" ? EVENTS : rec.type === "response_item" ? ITEMS : null
   const handler = table?.get(str(p.type))
   if (handler) handler(s, p, out)
+  return true
 }
 
 /** A session read mid-flight ends with a turn nothing billed: it is still context, so it is still
@@ -602,4 +593,48 @@ export function codexEnd(s: CodexState, out: Out): void {
     s.results = []
   }
   if (s.held) release(s, out)
+}
+
+/** $ per 1M tokens, as [input, output]. Cached input is a tenth of input on every card OpenAI
+ *  publishes, which is the engine's default, so only the two ends are listed. */
+const rates: Record<string, Rate> = {
+  "gpt-5": [1.25, 10],
+  "gpt-5-mini": [0.25, 2],
+  "gpt-5-nano": [0.05, 0.4],
+  "gpt-5-pro": [15, 120],
+  "gpt-5.1": [1.25, 10],
+  "gpt-5.2": [1.75, 14],
+  "gpt-5.2-pro": [21, 168],
+  "gpt-5.3": [1.75, 14],
+  "gpt-5.4": [2.5, 15],
+  "gpt-5.4-mini": [0.75, 4.5],
+  "gpt-5.4-nano": [0.2, 1.25],
+  "gpt-5.4-pro": [30, 180],
+  "gpt-5.5": [5, 30],
+  "gpt-5.5-pro": [30, 180],
+  "gpt-5.6": [5, 30],
+  "gpt-5.6-luna": [0.2, 1.2],
+  "gpt-5.6-luna-pro": [30, 180],
+  "gpt-5.6-sol": [5, 30],
+  "gpt-5.6-sol-pro": [30, 180],
+  "gpt-5.6-terra": [2, 12],
+  "gpt-5.6-terra-pro": [30, 180],
+  "codex-mini": [1.5, 6],
+  /* The reviewer Codex runs by itself, on the card it shares with gpt-5.4. */
+  "codex-auto-review": [2.5, 15],
+}
+
+export const codex: Agent = {
+  name: "Codex",
+  claims: isCodexRollout,
+  open(head: string): Reader {
+    const s = codexOpen(head)
+    return {
+      front: (part, emit) => codexFront(s, part, emit),
+      line: (text, emit) => codexLine(s, text, emit),
+      end: (emit) => codexEnd(s, emit),
+    }
+  },
+  rates,
+  stores: [{ home: ".codex", env: "CODEX_HOME", dirs: ["sessions", "archived_sessions"] }],
 }

@@ -18,23 +18,22 @@ import {
   report,
   skipFile,
 } from "../src/engine.ts"
-import { GROK_SIDECARS } from "../src/agents/grok.ts"
+import { AGENTS, SIDECAR_NAMES } from "../src/agents/index.ts"
 
 /** Where the report is read. The override is what lets `pnpm dev`, or a copy of the page someone
  *  hosts themselves, stand in for the deployed one -- which is how the hand-off gets tested
  *  against the working tree rather than against whatever is currently in production. */
 const REPORT_URL = process.env.TOKEN_BILLING_URL || "https://token-billing.vercel.app/"
 
-/** The stores, and where each agent keeps its sessions. `CODEX_HOME` and `GROK_HOME` are those
- *  agents' own overrides. */
-const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), ".codex")
-const GROK_HOME = process.env.GROK_HOME || join(homedir(), ".grok")
-const STORES = [
-  join(homedir(), ".claude", "projects"),
-  join(CODEX_HOME, "sessions"),
-  join(CODEX_HOME, "archived_sessions"),
-  join(GROK_HOME, "sessions"),
-]
+/** Every folder any agent keeps its sessions in, each agent having said where that is and which
+ *  of its own variables moves it. An agent added to `src/agents/` is read here without being
+ *  named here. */
+const STORES = AGENTS.flatMap((a) =>
+  (a.stores ?? []).flatMap((store) => {
+    const root = (store.env && process.env[store.env]) || join(homedir(), store.home)
+    return store.dirs.map((d) => join(root, d))
+  }),
+)
 
 /** Windows caps a `cmd` command line at 8191 characters, which a corpus with enough distinct
  *  tools in it can exceed on its own. Past this the address goes through a file instead of
@@ -56,7 +55,7 @@ function walk(dir: string, out: string[]): void {
       }
     }
     if (dirent) walk(p, out)
-    else if (e.name.endsWith(".jsonl") && !GROK_SIDECARS.has(e.name)) out.push(p)
+    else if (e.name.endsWith(".jsonl") && !SIDECAR_NAMES.has(e.name)) out.push(p)
   }
 }
 
@@ -177,8 +176,8 @@ async function main(): Promise<void> {
   }
   if (!data.requests) {
     console.error(
-      `${paths.length} session(s) read, but nothing in them was billed -- is ${where} really ` +
-        `a Claude Code projects folder, a Codex sessions folder, or a Grok sessions folder?`,
+      `${paths.length} session(s) read, but nothing in them was billed -- is ${where} really a ` +
+        `session folder for one of ${AGENTS.map((a) => a.name).join(", ")}?`,
     )
     process.exitCode = 1
     return

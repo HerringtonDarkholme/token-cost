@@ -1,4 +1,5 @@
 import * as E from "../src/engine.ts"
+import { agentFor, AGENTS, SIDECAR_NAMES } from "../src/agents/index.ts"
 import type { Dataset, RawFile, Usage } from "../src/engine.ts"
 import { sampleCorpus } from "../src/sample.ts"
 import fs from "node:fs"
@@ -301,8 +302,12 @@ console.log("\n== a Codex rollout ==")
   count([132000, 120000, 6000, 1200], null)
 
   const roll: RawFile = { name: "rollout-2026-06-01T00-00-00-roll-1.jsonl", text: R.join("\n") }
-  ok(E.isCodexRollout(roll.text), "it is read as a rollout rather than as a transcript")
-  ok(!E.isCodexRollout(lines[0]), "and a transcript is not")
+  ok(agentFor(roll.text)?.name === "Codex", "it is claimed by Codex rather than by anyone else")
+  ok(agentFor(lines[0])?.name === "Claude Code", "and a transcript is claimed by Claude Code")
+  ok(
+    AGENTS.filter((a) => a.claims(roll.text)).length === 1,
+    "and by exactly one of them, whatever order they are asked in",
+  )
 
   const C = E.analyze([roll])
   const D = C.datasets["1h"]
@@ -839,16 +844,21 @@ console.log("\n== a Grok session ==")
     }),
   }
 
-  ok(E.isGrokSession(grokFile.text), "it is read as a Grok session rather than as a transcript")
-  ok(!E.isGrokSession(lines[0]), "and a transcript is not")
-  ok(!E.isCodexRollout(grokFile.text), "and it is not a Codex rollout")
-  ok(E.GROK_SIDECARS.has(chat.name), "chat_history is a sidecar, by the name both callers filter")
-  ok(E.isGrokSidecar(events.text), "and events.jsonl is one by what it holds")
-  ok(!E.isGrokSidecar(grokFile.text), "the conversation log is not")
+  const grokAgent = AGENTS.find((a) => a.name === "Grok")!
+  ok(agentFor(grokFile.text)?.name === "Grok", "it is claimed by Grok rather than by anyone else")
+  /* One file, one claim: which agent wrote it does not depend on the order they are asked in. */
+  ok(
+    AGENTS.filter((a) => a.claims(grokFile.text)).length === 1 &&
+      AGENTS.filter((a) => a.claims(lines[0])).length === 1,
+    "each of the two answers to exactly one agent",
+  )
+  ok(SIDECAR_NAMES.has(chat.name), "chat_history is a sidecar, by the name both callers filter")
+  ok(grokAgent.sidecar!(events.text), "and events.jsonl is one by what it holds")
+  ok(!grokAgent.sidecar!(grokFile.text), "the conversation log is not")
   /* The reason the content test asks only what Grok alone writes: `system` is Claude Code's word
      too, and a transcript that opens with one used to be dropped whole. */
   ok(
-    !E.isGrokSidecar(
+    !grokAgent.sidecar!(
       JSON.stringify({ type: "system", content: "hook ran", uuid: "u0", isMeta: true }) +
         "\n" +
         lines[0],

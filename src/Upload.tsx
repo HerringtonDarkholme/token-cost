@@ -15,7 +15,7 @@ import {
   type Analysis,
   type Scanned,
 } from "./engine.ts"
-import { GROK_SIDECARS } from "./agents/grok.ts"
+import { SIDECAR_NAMES } from "./agents/index.ts"
 import { useT, type Dict, type Os } from "./copy.tsx"
 import { TextSwap } from "./Motion.tsx"
 import { sampleFiles } from "./sample.ts"
@@ -561,7 +561,7 @@ export function Intake({
 
   async function handle(picked: Picked[]): Promise<void> {
     const files = picked.filter(
-      (p) => p.file.name.endsWith(".jsonl") && !GROK_SIDECARS.has(p.file.name),
+      (p) => p.file.name.endsWith(".jsonl") && !SIDECAR_NAMES.has(p.file.name),
     )
     /* Judged before anything is read, and kept for whatever has to be said afterwards: the two
        ways this can come to nothing are both questions about the folder, and the folder is

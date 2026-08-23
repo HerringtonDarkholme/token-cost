@@ -1,29 +1,8 @@
-/* Cost attribution engine for Claude Code transcripts, Codex rollouts, and Grok sessions. */
+/* Cost attribution engine. What it walks is a stream of records; which agent's transcript those
+   records were read out of is a question for `agents/`, and nothing here asks it. */
 
-import {
-  codexEnd,
-  codexFront,
-  codexLine,
-  codexOpen,
-  isCodexRollout,
-  type CodexState,
-} from "./agents/codex.ts"
-import { claudeLine, claudeSession } from "./agents/claude.ts"
+import { AGENTS, agentFor, type Reader } from "./agents/index.ts"
 import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
-import {
-  grokEnd,
-  grokFront,
-  grokLine,
-  grokOpen,
-  isGrokSession,
-  isGrokSidecar,
-  type GrokState,
-} from "./agents/grok.ts"
-
-/* The engine is the one door onto every format, so the detectors are re-exported rather than left
-   for a caller to reach past it for. */
-export { isCodexRollout } from "./agents/codex.ts"
-export { isGrokSession, isGrokSidecar, GROK_SIDECARS } from "./agents/grok.ts"
 
 /* data in -- What the caller hands us, and the transcript shapes we read out of it. */
 
@@ -92,69 +71,15 @@ export interface TranscriptRecord {
  *  `CACHE_READ_MULT` times input, which is what Anthropic and OpenAI publish. */
 export type Rate = [input: number, output: number, cached?: number]
 
-export const RATES: Record<string, Rate> = {
-  "claude-fable-5": [10, 50],
-  "claude-mythos-5": [10, 50],
-  "claude-opus-5": [5, 25],
-  "claude-opus-4": [5, 25], // 4, 4-5, 4-6, 4-7, 4-8 all share this rate
-  "claude-sonnet-5": [3, 15],
-  "claude-sonnet-4": [3, 15],
-  "claude-haiku-4": [1, 5],
-  "claude-3-opus": [15, 75], // legacy 3.x cards differ from their tier default
-  "claude-3-5-sonnet": [3, 15],
-  "claude-3-7-sonnet": [3, 15],
-  "claude-3-5-haiku": [0.8, 4],
-  "claude-3-haiku": [0.25, 1.25],
-  "claude-2": [8, 24],
-  /* OpenAI, for Codex rollouts. Cached input is a tenth of input on every card OpenAI publishes,
-     which is the multiplier below, so only the two ends are listed. */
-  "gpt-5": [1.25, 10],
-  "gpt-5-mini": [0.25, 2],
-  "gpt-5-nano": [0.05, 0.4],
-  "gpt-5-pro": [15, 120],
-  "gpt-5.1": [1.25, 10],
-  "gpt-5.2": [1.75, 14],
-  "gpt-5.2-pro": [21, 168],
-  "gpt-5.3": [1.75, 14],
-  "gpt-5.4": [2.5, 15],
-  "gpt-5.4-mini": [0.75, 4.5],
-  "gpt-5.4-nano": [0.2, 1.25],
-  "gpt-5.4-pro": [30, 180],
-  "gpt-5.5": [5, 30],
-  "gpt-5.5-pro": [30, 180],
-  "gpt-5.6": [5, 30],
-  "gpt-5.6-luna": [0.2, 1.2],
-  "gpt-5.6-luna-pro": [30, 180],
-  "gpt-5.6-sol": [5, 30],
-  "gpt-5.6-sol-pro": [30, 180],
-  "gpt-5.6-terra": [2, 12],
-  "gpt-5.6-terra-pro": [30, 180],
-  "codex-mini": [1.5, 6],
-  /* The reviewer Codex runs by itself, on the card it shares with gpt-5.4. */
-  "codex-auto-review": [2.5, 15],
-  /* xAI, for Grok sessions. Cached input is not a fixed fraction of input, so the third figure is
-     the published cache-read price rather than a multiplier. */
-  "grok-4.6": [2, 6, 0.5],
-  "grok-4.5": [2, 6, 0.3],
-  "grok-4.3": [1.25, 2.5],
-  "grok-4": [3, 15],
-  /* Ahead of `grok-4`, which the longest-prefix fallback would otherwise sell it at fifteen
-     times the output price. */
-  "grok-4-fast": [0.2, 0.5],
-  "grok-3-mini": [0.3, 0.5],
-  "grok-3": [3, 15],
-  "grok-4.1-fast": [0.2, 0.5],
-  "grok-4-1-fast": [0.2, 0.5],
-  "grok-code-fast-1": [0.2, 1.5],
-  "grok-code-fast": [0.2, 1.5],
-}
-/* Last resort before giving up: the tier word implies the current rate for that tier. */
-const TIERS: Array<[RegExp, Rate]> = [
-  [/\bopus\b|opus/, [5, 25]],
-  [/sonnet/, [3, 15]],
-  [/haiku/, [1, 5]],
-  [/fable|mythos/, [10, 50]],
-]
+/* Every agent's card in one table, because a model id is priced by what it is rather than by
+   which transcript it turned up in -- two agents billing the same model bill it the same. */
+export const RATES: Record<string, Rate> = Object.assign(
+  {},
+  ...AGENTS.map((a) => a.rates),
+) as Record<string, Rate>
+
+/* Last resort before giving up: a word in the id implies a rate, per the agent that published it. */
+const TIERS: ReadonlyArray<readonly [RegExp, Rate]> = AGENTS.flatMap((a) => a.tiers ?? [])
 
 /** Which cache-write multiplier a TTL implies. */
 export type TtlAssumption = "1h" | "5m"
@@ -167,23 +92,18 @@ export function setRates(partial: Record<string, Rate>): void {
   RESOLVED.clear()
 }
 
-/** Strip the decorations cloud vendors and release dates add, so one card serves all. */
+/** Strip the decorations a release date, a context window or a cloud reseller adds, so one card
+ *  serves all. What only one agent's ids carry, that agent strips. */
 export function normalizeModel(id: unknown): string {
   let m = String(id || "")
     .toLowerCase()
     .trim()
   m = m.replace(/\[[^\]]*\]/g, "") // context-window suffix: [1m]
-  m = m.replace(/^publishers\/anthropic\/models\//, "") // Vertex AI
-  // Bedrock stacks these: "us.anthropic.claude-…" is a region prefix on a vendor prefix.
-  for (let prev: string | null = null; prev !== m;) {
-    prev = m
-    m = m.replace(/^(anthropic|us|eu|apac|global|gov)\./, "")
-  }
   m = m.replace(/[:@]\d+(\.\d+)?$/, "") // :0, @1
   m = m.replace(/-v\d+$/, "") // -v1
   m = m.replace(/[-@](\d{8}|\d{6})$/, "") // -20250219 / @250219
   m = m.replace(/-latest$/, "")
-  m = m.replace(/-build$/, "") // Grok's internal id for the same published card
+  for (const a of AGENTS) if (a.normalize) m = a.normalize(m)
   return m.replace(/-+$/, "")
 }
 
@@ -209,7 +129,8 @@ export function resolveRate(model: unknown): RateResolution {
 
 function resolve(raw: string): RateResolution {
   if (!raw) return { rate: null, basis: "missing", id: raw }
-  // Claude Code writes <synthetic> for records it produced locally with no API call.
+  /* An id in angle brackets is an agent naming something it did itself -- a record it wrote with
+     no API call behind it, which there is nothing to price. */
   if (raw.startsWith("<")) return { rate: null, basis: "synthetic", id: raw }
   const id = normalizeModel(raw)
   const exact = RATES[id]
@@ -815,7 +736,7 @@ const DISPATCH_MIN_CALLS = 5,
  *  could not be known until all of them had been. */
 export interface Scanned {
   filesUsed: number
-  /** Transcripts the reader could not get bytes out of at all. */
+  /** Files the bill could not read: no agent here wrote them, or no bytes came out of them. */
   filesSkipped: number
   duplicatesDropped: number
   badLines: number
@@ -954,8 +875,8 @@ function hold(
   h.adds.push({ slot, amt, cls })
 }
 
-/** A transcript the reader could not open, which the bill has to admit to rather than quietly
- *  leave out. */
+/** A file the reader could not open, which the bill has to admit to rather than quietly leave
+ *  out. */
 export function skipFile(st: Walk): void {
   st.filesSkipped++
 }
@@ -990,8 +911,8 @@ export interface FileWalk {
   /** Set where the front of a line was all the reader wanted: the rest of it is then read past
    *  rather than collected, which on a real store leaves three and a half gigabytes unjoined. */
   skipping: boolean
-  codex: CodexState | null
-  grok: GrokState | null
+  /** Whichever agent wrote the file, part way through reading it. */
+  reader: Reader | null
   /** When the walk next offers the thread back. */
   due: number
   feed: ((rec: TranscriptRecord) => void) | null
@@ -1012,8 +933,7 @@ export function openFile(st: Walk, name: string, size: number): FileWalk {
     at: 0,
     carry: [],
     skipping: false,
-    codex: null,
-    grok: null,
+    reader: null,
     due: performance.now() + SLICE,
     feed: null,
   }
@@ -1029,26 +949,34 @@ function settle(fw: FileWalk): void {
   fw.opened = true
   fw.buf = fw.head
   fw.head = ""
-  const id = detach((claudeSession(head) || fw.name) + "::" + fw.size)
+  /* Whose file this is, asked before anything else: a file no agent here wrote is not a transcript
+     that came out empty, and must not be counted as one. */
+  const agent = agentFor(head)
+  if (!agent) {
+    st.filesSkipped++
+    fw.dropped = true
+    fw.buf = ""
+    return
+  }
+  const id = detach((agent.session?.(head) || fw.name) + "::" + fw.size)
   if (st.seen.has(id)) {
     st.duplicatesDropped++
     fw.dropped = true
     fw.buf = ""
     return
   }
-  /* Grok writes several jsonl files per session; only `updates.jsonl` is the billed conversation,
-     and the others must not count as transcripts that then show up empty. */
-  if (isGrokSidecar(head)) {
+  /* An agent may write several jsonl files per session where only one of them is the billed
+     conversation; the rest must not count as transcripts that then show up empty. */
+  if (agent.sidecar?.(head)) {
     fw.dropped = true
     fw.buf = ""
     return
   }
   st.seen.add(id)
   st.filesUsed++
-  /* A Codex rollout or a Grok session tells the same story in another hand, so it is turned into
-     the records this walk already reads rather than given a second walk of its own. */
-  fw.codex = isCodexRollout(head) ? codexOpen(head) : null
-  fw.grok = !fw.codex && isGrokSession(head) ? grokOpen(head) : null
+  /* Every agent tells the same story in its own hand, so each one is read into the records this
+     walk already reads rather than given a walk of its own. */
+  fw.reader = agent.open(head)
 
   const { verbs, S, billed, models, unpriced, ttl, firstCtx } = st
   const h: Held = { adds: [], charges: [] }
@@ -1312,9 +1240,7 @@ export function pushText(fw: FileWalk, chunk: string): void {
        ones the reader takes a few hundred bytes off, and putting those back together first was
        four gigabytes of string built and thrown away. Only ever asked of the first piece -- a
        marker found in the middle of a line is a marker inside somebody's text. */
-    if (!fw.carry.length && fw.codex && fw.feed && codexFront(fw.codex, part, fw.feed))
-      fw.skipping = true
-    else if (!fw.carry.length && fw.grok && fw.feed && grokFront(fw.grok, part, fw.feed))
+    if (!fw.carry.length && fw.reader && fw.feed && fw.reader.front(part, fw.feed))
       fw.skipping = true
     else fw.carry.push(part)
   }
@@ -1337,6 +1263,7 @@ export function* stepFile(fw: FileWalk): Generator<void, void, void> {
   const feed = fw.feed
   if (!feed) return
   const st = fw.st
+  const reader = fw.reader
   for (;;) {
     /* Walked by index rather than `split("\n")`: a store is hundreds of megabytes, and the split
        builds an array of every line in the chunk before the first one is read. */
@@ -1369,27 +1296,15 @@ export function* stepFile(fw: FileWalk): Generator<void, void, void> {
       while (from < end && fw.buf.charCodeAt(from) <= 32) from++
       if (from < end) line = fw.buf.slice(from, end)
     }
-    if (line !== null) {
-      if (fw.codex) {
-        codexLine(fw.codex, line, feed)
-      } else if (fw.grok) {
-        grokLine(fw.grok, line, feed)
-      } else if (!claudeLine(line, feed)) {
-        st.badLines++
-      }
-    }
+    if (line !== null && reader && !reader.line(line, feed)) st.badLines++
     if (performance.now() >= fw.due) {
       yield
       fw.due = performance.now() + SLICE
     }
   }
-  if (fw.ended && fw.codex) {
-    codexEnd(fw.codex, feed)
-    fw.codex = null
-  }
-  if (fw.ended && fw.grok) {
-    grokEnd(fw.grok, feed)
-    fw.grok = null
+  if (fw.ended && fw.reader) {
+    fw.reader.end(feed)
+    fw.reader = null
   }
 }
 

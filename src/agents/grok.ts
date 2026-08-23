@@ -1,6 +1,8 @@
 /* Grok `updates.jsonl`, translated into the record shape the walk already reads. */
 
-import type { ContentBlock, TranscriptRecord, Usage } from "../engine.ts"
+import type { ContentBlock, Rate, TranscriptRecord, Usage } from "../engine.ts"
+import type { Agent, Reader } from "./index.ts"
+import { firstString, lines } from "./jsonl.ts"
 
 /** Companion jsonl files in a Grok session directory: they are not the billed conversation. */
 export const GROK_SIDECARS = new Set([
@@ -73,18 +75,6 @@ interface GrokLine {
   is_bash?: unknown
   btwSessionId?: unknown
   file_snapshots?: unknown
-}
-
-function* lines(text: string): Generator<string> {
-  for (let i = 0, n = text.length; i < n;) {
-    let end = text.indexOf("\n", i)
-    if (end === -1) end = n
-    let from = i
-    i = end + 1
-    while (from < end && text.charCodeAt(from) <= 32) from++
-    if (from === end) continue
-    yield text.slice(from, end)
-  }
 }
 
 const GROK_METHODS = new Set(["session/update", "_x.ai/session/update"])
@@ -416,23 +406,24 @@ export function grokFront(_s: GrokState, front: string, _out: Out): boolean {
   return SKIP_UPDATES.has(kind)
 }
 
-export function grokLine(s: GrokState, line: string, out: Out): void {
-  if (grokFront(s, line, out)) return
+/** One line of a session. `false` is a line that would not parse, which the bill owns up to. */
+export function grokLine(s: GrokState, line: string, out: Out): boolean {
+  if (grokFront(s, line, out)) return true
   let rec: GrokLine
   try {
     rec = JSON.parse(line) as GrokLine
   } catch {
-    return
+    return false
   }
-  if (!rec || typeof rec !== "object") return
+  if (!rec || typeof rec !== "object") return true
   const ts = stampOf(rec.timestamp)
   if (ts) s.stamp = ts
   const p = rec.params
-  if (!p || typeof p !== "object") return
+  if (!p || typeof p !== "object") return true
   const ctx = metaBag(p)?.totalTokens
   if (typeof ctx === "number" && ctx > 0) s.ctx = ctx
   const u = p.update
-  if (!u || typeof u !== "object") return
+  if (!u || typeof u !== "object") return true
   const kind = str(u.sessionUpdate)
   const model = str(metaBag(u)?.modelId)
   if (model) s.model = model
@@ -444,7 +435,7 @@ export function grokLine(s: GrokState, line: string, out: Out): void {
     emitPending(s, out)
     const text = textOf(u.content)
     if (text) s.user += text
-    return
+    return true
   }
 
   if (kind === "agent_thought_chunk" || kind === "agent_message_chunk") {
@@ -452,7 +443,7 @@ export function grokLine(s: GrokState, line: string, out: Out): void {
     const call = s.call
     if (call && call.blocks.some((b) => b.type === "tool_use")) closeCall(s)
     const text = textOf(u.content)
-    if (!text) return
+    if (!text) return true
     const cur = openCall(s)
     if (kind === "agent_thought_chunk") {
       const last = cur.blocks[cur.blocks.length - 1]
@@ -463,7 +454,7 @@ export function grokLine(s: GrokState, line: string, out: Out): void {
       if (last && last.type === "text") last.text = (last.text || "") + text
       else cur.blocks.push({ type: "text", text })
     }
-    return
+    return true
   }
 
   if (kind === "tool_call") {
@@ -471,7 +462,7 @@ export function grokLine(s: GrokState, line: string, out: Out): void {
     const cur = openCall(s)
     const id = str(u.toolCallId)
     cur.blocks.push({ type: "tool_use", id, name: toolName(u), input: argsOf(u) })
-    return
+    return true
   }
 
   if (kind === "tool_call_update") {
@@ -479,10 +470,10 @@ export function grokLine(s: GrokState, line: string, out: Out): void {
     if (s.call && s.call.blocks.some((b) => b.type === "tool_use")) closeCall(s)
     const id = str(u.toolCallId)
     const text = resultText(u)
-    if (!id || !text) return
+    if (!id || !text) return true
     const call = findCall(s, id)
     if (call) call.results.set(id, text)
-    return
+    return true
   }
 
   if (kind === "turn_completed") {
@@ -491,10 +482,53 @@ export function grokLine(s: GrokState, line: string, out: Out): void {
     if (u.usage) applyUsage(s, u.usage)
     emitPending(s, out)
   }
+  return true
 }
 
 export function grokEnd(s: GrokState, out: Out): void {
   emitUser(s, out)
   closeCall(s)
   emitPending(s, out)
+}
+
+/* ACP names the session in a field of its own, nested in the params rather than at the top of the
+   record -- the same spelling a transcript uses, so the same search finds it. */
+const SESSION = /"sessionId"\s*:\s*"([^"]+)"/
+
+/** $ per 1M tokens, as [input, output, cached]. Cached input is not a fixed fraction of input
+ *  here, so the third figure is the published cache-read price rather than a multiplier. */
+const rates: Record<string, Rate> = {
+  "grok-4.6": [2, 6, 0.5],
+  "grok-4.5": [2, 6, 0.3],
+  "grok-4.3": [1.25, 2.5],
+  "grok-4": [3, 15],
+  /* Ahead of `grok-4`, which the longest-prefix fallback would otherwise sell it at fifteen
+     times the output price. */
+  "grok-4-fast": [0.2, 0.5],
+  "grok-3-mini": [0.3, 0.5],
+  "grok-3": [3, 15],
+  "grok-4.1-fast": [0.2, 0.5],
+  "grok-4-1-fast": [0.2, 0.5],
+  "grok-code-fast-1": [0.2, 1.5],
+  "grok-code-fast": [0.2, 1.5],
+}
+
+export const grok: Agent = {
+  name: "Grok",
+  claims: isGrokSession,
+  sidecar: isGrokSidecar,
+  sidecarNames: GROK_SIDECARS,
+  session: (head) => firstString(head, SESSION),
+  open(head: string): Reader {
+    const s = grokOpen(head)
+    return {
+      front: (part, emit) => grokFront(s, part, emit),
+      line: (text, emit) => grokLine(s, text, emit),
+      end: (emit) => grokEnd(s, emit),
+    }
+  },
+  rates,
+  /** Its internal id for a published card. */
+  normalize: (id) => id.replace(/-build$/, ""),
+  stores: [{ home: ".grok", env: "GROK_HOME", dirs: ["sessions"] }],
 }
