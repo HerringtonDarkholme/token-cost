@@ -28,8 +28,8 @@ const EN = {
     light: "Light theme",
     system: "System theme",
     dark: "Dark theme",
-    /** The hint on a control that shows one option and walks to the next: what pressing does,
-     *  since which one is current is already the button's name. */
+    /** The hint on a control that shows one option and walks to the next: which is current is
+     *  already the button's name. */
     cycle: (next: string): string => `Press to switch to: ${next}`,
   },
   ttl: {
@@ -65,11 +65,10 @@ const EN = {
   /* the card's header */
   card: {
     eyebrow: "Cost attribution · Claude Code, Codex & Grok",
-    /** The browser tab, which the shell ships in English because the markup is written before
-     *  anyone has guessed anything. */
+    /** The browser tab, in English because the markup is written before anyone has guessed. */
     title: "Where the money went — Claude Code, Codex & Grok cost attribution",
-    /** Read rather than dropped: this line stands over the figure on every device, and a phone
-     *  has nothing to drop. Reading is what the page does with either way in. */
+    /** Read rather than dropped: this line stands over the figure on every device, and a phone has
+     *  nothing to drop. */
     nothingYet: "Nothing read yet",
     /** Said in the eyebrow when the bill came from the example rather than from a folder. */
     example: "Example data",
@@ -122,13 +121,12 @@ const EN = {
     breadcrumb: "Breadcrumb",
     all: "all",
     headMosaic: "Every line item · column width = share of bill · block height = share of column",
-    /* The same two claims, for the narrow window where the chart is turned on its side. Both
-       axes swap, so neither half of the sentence survives the rotation. */
+    /* The same two claims for the narrow window, where both axes swap and neither half of the
+       sentence survives the rotation. */
     headMosaicRows: "Every line item · row height = share of bill · block width = share of row",
     headSun: "Every line item · arc = share of the ring inside it · each ring one level deeper",
-    /* One line of the card's closing rule, in every language: the sentence that used to sit in
-       the middle -- carry cost tracks survival, not size -- is the footnotes' `compact` note
-       word for word, and saying it twice cost the German and the Japanese a second line. */
+    /* One line of the card's closing rule: the sentence that used to sit in the middle is the
+       footnotes' `compact` note word for word, and saying it twice cost two languages a line. */
     hoverIdle: (gen: string, carry: string): string =>
       `Accented block = prose the model wrote once for ${gen}, re-billed as input for ${carry} more. ` +
       "Hover any block for its line item.",
@@ -254,19 +252,16 @@ const EN = {
         Drop your {a}, {b} or {c} folder here
       </>
     ),
-    /** The heading on a device that probably cannot reach the folder. It says what the page does
-     *  rather than what to do next: a reader who has not been told what this is cannot be sent
-     *  anywhere. Where to go is the note at the foot of the card. */
+    /** The heading on a device that probably cannot reach the folder: it says what the page does
+     *  rather than what to do next. Where to go is the note at the foot of the card. */
     headingTouch: "Visualize your AI bill",
     lede: "Chart your AI bill: every tool, every subcommand, every dollar.",
-    /** The same line with the heading's words taken out of it, since the heading above now says
-     *  them -- and with where the numbers come from put in, which is the other half of what this
-     *  page is. */
+    /** The same line with the heading's words taken out, since the heading now says them, and with
+     *  where the numbers come from put in. */
     ledeTouch:
       "Every tool, every subcommand, every dollar, read out of your Claude Code, Codex or Grok sessions.",
     choose: "Choose folder",
-    /** The other way in, for a reader with no `~/.claude` to point at -- a phone, or a machine
-     *  Claude Code has never run on. */
+    /** The other way in, for a reader with no `~/.claude` to point at. */
     example: "Try an example",
     /** Over the command in the card, for the reader who never wanted a file dialog. */
     orTerminal: "Or from a terminal",
@@ -275,10 +270,8 @@ const EN = {
     cmdCopied: "Copied",
     hidden: "The folder is hidden",
     /** The help a phone gets in place of the keystrokes: the one step that gets this reader their
-     *  own numbers, and then the thing they can do without leaving the phone, because a note that
-     *  only sends the reader away leaves nothing to do here. An instruction, not a claim about
-     *  what the device has -- the page reads a pointer type, and cannot see whether the folder is
-     *  there. */
+     *  own numbers, then the thing they can do without leaving the phone. An instruction, not a
+     *  claim about the device -- the page reads a pointer type. */
     yours: "To chart your own",
     yoursBody: (
       <>
@@ -291,8 +284,8 @@ const EN = {
       `Not ${current}? Press for the ${next} route.`,
     reading: "Reading",
     privacy: "Parsed in this page · nothing is uploaded",
-    /** One line per platform, and it is the keystrokes rather than prose about them: this is
-     *  read with a file dialog already open on top of it. */
+    /** One line per platform, and the keystrokes rather than prose about them: this is read with a
+     *  file dialog already open on top of it. */
     how: {
       mac: (
         <>
@@ -383,16 +376,15 @@ const EN = {
       "Whoever opens it gets an empty card and drops their own transcripts in.",
   },
 
-  /* the page's own footer ---------- The name the page is signed with and the project it links to
-     are not words: they are what those things are called, and the same string in every language. */
+  /* the page's own footer -- the name the page is signed with is not a word: it is what that thing
+     is called, in every language. */
   colophon: {
     madeBy: (name: React.ReactNode): React.ReactNode => <>Made with ❤️ by {name}</>,
     source: "Source",
     book: "My book",
   },
 
-  /* the names the engine puts in the tree ---------- Keyed by the English name, which stays in
-     the data. */
+  /* the names the engine puts in the tree, keyed by the English name, which stays in the data. */
   labels: {
     all: "all",
     other: "other",
@@ -425,8 +417,7 @@ const EN = {
     "(no command parsed)": "(no command parsed)",
     "(no path parsed)": "(no path parsed)",
   } as Record<string, string>,
-  /** The two suffixes the engine hangs off a tool's own name when both directions cost real
-   *  money. */
+  /** The two suffixes the engine hangs off a tool's name when both directions cost real money. */
   suffix: { results: "results", callArgs: "call args" },
   /** The folded tail, which is a count as much as a word. */
   folded: (n: number): string => `other (${n} items)`,
@@ -631,8 +622,8 @@ const ZH: Dict = {
     yours: "想看自己的账单",
     yoursBody: (
       <>
-        {/* The break goes before the path, never after it: a line that starts with 。 puts a
-            space in front of a full stop. */}
+        {/* The break goes before the path, never after it: a line starting with 。 puts a space in
+            front of a full stop. */}
         在你运行 Claude Code、Codex 或 Grok 的那台机器上打开本页，然后选择{" "}
         <code>~/.claude/projects</code>、<code>~/.codex/sessions</code> 或{" "}
         <code>~/.grok/sessions</code>
@@ -1511,8 +1502,7 @@ const FR: Dict = {
       `Facturé · ${masked ? "montant masqué · " : ""}${ttl ? `TTL de cache ${ttl}` : "exact"}`,
     ask: [
       { w: "where", text: "Où" },
-      /* The same two words the answer ends on, so they carry the same slot and travel across the
-         line rather than fading out here and fading in there. */
+      /* The same two words the answer ends on, so they share a slot and travel across the line. */
       { w: "went", text: "est passé" },
       { w: "your", text: "votre" },
       { w: "money", text: "argent", em: true },
@@ -2182,9 +2172,8 @@ export function useT(): Dict {
 /** The languages, for the switcher. */
 export { LANGS }
 
-/* the names in the tree ---------- The engine's labels stay English inside the analysis: they
-   key the palette, they are what `state.path` carries into the shared link, and one of them is
-   what the mosaic and the sunburst test to find the block this page argues about. */
+/* the names in the tree -- the engine's labels stay English inside the analysis: they key the
+   palette, and `state.path` carries them into the shared link. */
 
 /** The two suffixes the engine hangs off a tool's own name when both directions cost real money. */
 const SUFFIXES: ReadonlyArray<[string, (t: Dict) => string]> = [
@@ -2208,8 +2197,8 @@ export function nodeName(t: Dict, n: CostNode): string {
 /** The group whose rows are programs rather than tools. */
 const SHELL = GROUPS.find((g) => g.id === "shell")?.name
 
-/** Whether a name is text off the reader's own machine -- `git status`, `*.ts`, a path -- and so
- *  is set as code rather than as prose. */
+/** Whether a name is text off the reader's own machine -- `git status`, a path -- and so is set as
+ *  code rather than as prose. */
 export function isCode(t: Dict, name: string, under: string | null, group: string): boolean {
   if (t.labels[name] !== undefined) return false
   if (under !== null && under !== group && under !== name) return true

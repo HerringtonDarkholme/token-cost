@@ -4,10 +4,8 @@ import { fileURLToPath } from "node:url"
 
 const root = fileURLToPath(new URL(".", import.meta.url))
 
-/** What each chunk is fetched *for*: the empty card owns the walk and the picker, the report owns
- *  the charts, and the share captions are six languages of prose nobody who does not click Share
- *  ever needs. A static import from anywhere else quietly moves one of these back into the entry,
- *  where every visit pays for it -- which looks like nothing until you read the chunk sizes. */
+/** What each chunk is fetched *for*. A static import from anywhere else moves one of these back
+ *  into the entry, where every visit pays for it. */
 const OWNED: Record<string, string[]> = {
   FaceIntake: [
     "ui/Upload.tsx",
@@ -60,12 +58,9 @@ function split(): Plugin {
   }
 }
 
-/* The deployed page, and the one build allowed to be more than one file: the card's two faces are
-   fetched apart, so a report the CLI handed over never downloads the transcript walk and a reader
-   who has yet to drop a folder never downloads the charts. `vite.standalone.config.ts` builds the
-   double-clickable single file instead.
-   `base` is root-absolute because `/report/shell-commands` is served the same document as `/`, and
-   a relative asset URL would be looked for one folder down. */
+/* The deployed page, and the one build allowed to be more than one file: the two faces are fetched
+   apart. `base` is root-absolute because `/report/shell-commands` is served the same document as
+   `/`, and a relative asset URL would be looked for one folder down. */
 export default defineConfig({
   root,
   base: "/",

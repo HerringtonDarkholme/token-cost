@@ -168,9 +168,8 @@ export function LedgerTable({ L }: { L: Ledger }): React.JSX.Element {
             <td className="lbl">{state.query ? t.table.matched : t.breakdown.reconciled}</td>
             <td className="v">{amt(L.recon)}</td>
             <td className="p">{(reconShare * 100).toFixed(reconShare < 0.1 ? 2 : 1)}%</td>
-            {/* The sentence lives in `.reconline` directly below, which is where it has to
-                live anyway -- the panels view has no table to put a footer in -- so printing
-                it here as well was the same paragraph twice, ten pixels apart. */}
+            {/* The sentence lives in `.reconline` directly below, which is where it has to live
+                anyway -- the panels view has no table to put a footer in. */}
             <td colSpan={2} className="n" />
           </tr>
         </tfoot>

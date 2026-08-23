@@ -1,6 +1,5 @@
-/* One context carrying everything every part of the report needs: the analysis, the dataset for
-   the current TTL lens, the view state, the palette, the focused subtree, and the two formatters
-   whose behaviour changes when amounts are hidden. */
+/* One context carrying what every part of the report needs: the analysis, the dataset for the
+   current lens, the view state, the palette, the focus, and the two formatters. */
 
 import { createContext, useCallback, useContext, useMemo } from "react"
 import type { Analysis, Dataset } from "../core/engine.ts"

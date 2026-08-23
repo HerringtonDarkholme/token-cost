@@ -50,8 +50,7 @@ function subscribe(fn: () => void): () => void {
 }
 
 /** Fetch a face unless it is already in hand. The promise is kept rather than the fetch repeated,
- *  because the two callers race on every turn: the page drawing the face, and the App holding the
- *  turn until it is there. */
+ *  because two callers race on every turn: the page drawing the face, and the App awaiting it. */
 export function loadFace(kind: FaceKind): Promise<void> {
   if (held[kind]) return Promise.resolve()
   return (loading[kind] ??= fetchFace(kind))
@@ -63,9 +62,8 @@ async function fetchFace(kind: FaceKind): Promise<void> {
   announce()
 }
 
-/** The face the page is not showing, once the browser has nothing better to do: a turn is one
- *  click away in either direction, and a card that turns to an empty slot is worse than a chunk
- *  fetched and never used. */
+/** The face the page is not showing, once the browser is idle: a turn is one click away, and a
+ *  card that turns to an empty slot is worse than a chunk fetched and never used. */
 export function prefetchFace(kind: FaceKind): void {
   onIdle(() => void loadFace(kind))
 }

@@ -1,5 +1,4 @@
-/* The card's empty face: take files from a picker or a drop, read them in the page, hand them to
-   the engine. */
+/* The card's empty face: files from a picker or a drop, read here, handed to the engine. */
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import {
@@ -42,8 +41,7 @@ function WindowsMark(): React.JSX.Element {
   )
 }
 
-/** A penguin, which is the one of the three that has to be *drawn* rather than traced: body,
- *  eyes, beak, feet, and nothing else, because every further line closes up at this size. */
+/** A penguin, drawn rather than traced: every further line closes up at this size. */
 function TuxMark(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -55,8 +53,7 @@ function TuxMark(): React.JSX.Element {
   )
 }
 
-/* The three names are not translated, because they are not words: macOS, Windows and Linux are
-   what the platforms call themselves in every language the page speaks. */
+/* Not translated: macOS, Windows and Linux are what the platforms call themselves everywhere. */
 const PLATFORMS: ReadonlyArray<{ value: Os; label: string; mark: React.JSX.Element }> = [
   { value: "mac", label: "macOS", mark: <AppleMark /> },
   { value: "win", label: "Windows", mark: <WindowsMark /> },
@@ -90,9 +87,7 @@ function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JS
   const t = useT()
   const at = PLATFORMS.findIndex((p) => p.value === os)
   const next = PLATFORMS[(at + 1) % PLATFORMS.length]
-  /* `t-tt-host` carries the hint's placement, and where it lands is a question of room -- see
-     `.howto .t-tt`. Beside the chip where there is width for it, under the block where there is
-     not, and never over the instruction the chip chooses. */
+  /* `t-tt-host` carries the hint's placement, which is a question of room -- see `.howto .t-tt`. */
   return (
     <span className="t-tt-host">
       <button
@@ -101,8 +96,8 @@ function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JS
         aria-describedby={tip}
         onClick={() => onPick(next.value)}
       >
-        {/* Mark and word swap together, as one face: the platform is one fact, and a logo that
-            changed a beat before its name would read as two controls arguing. */}
+        {/* Mark and word swap as one face: a logo changing a beat before its name reads as two
+            controls. */}
         <span className="osname">
           <TextSwap token={os}>
             <span className="osface">
@@ -111,8 +106,7 @@ function OsSwitch({ os, onPick }: { os: Os; onPick: (v: Os) => void }): React.JS
             </span>
           </TextSwap>
         </span>
-        {/* The mark that is about the control rather than about any platform: a chevron is what
-            says "there are others behind this". Same glyph recipe, at the size a caret wants. */}
+        {/* A chevron is what says "there are others behind this". */}
         <svg className="glyph oscaret" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
           <path d="m3.6 6.2 4.4 4.4 4.4-4.4" />
         </svg>
@@ -130,10 +124,8 @@ function guessOs(): Os {
   return "linux"
 }
 
-/** A reader who is probably not at the machine they run Claude Code on. Touch as the *only*
- *  pointer is what says phone or tablet rather than a laptop with a touchscreen -- a guess about
- *  the device, which is all the page has: it cannot see whether a `~/.claude` is there. Taken
- *  once, because pointer hardware does not change under a reader the way an orientation does. */
+/** A reader probably not at the machine they run Claude Code on: touch as the *only* pointer
+ *  says phone rather than a laptop with a touchscreen. */
 const HANDHELD: boolean =
   typeof matchMedia === "function" &&
   matchMedia("(pointer: coarse)").matches &&
@@ -148,13 +140,12 @@ interface Picked {
   handle?: FileSystemFileHandle
 }
 
-/** Claude Code names a project's folder after the directory it ran in, separators and all
- *  flattened to dashes: `-Users-me-code-thing` on a mac or a Linux box, `C--Users-me-code-thing`
- *  on Windows. */
+/** Claude Code flattens a project's directory to dashes: `-Users-me-code-thing`, or
+ *  `C--Users-me-code-thing` on Windows. */
 const PROJECT_DIR = /^-|^[A-Za-z]--/
 
-/** Codex names a session file for the roll it is, and keeps them in dated folders under
- *  `~/.codex/sessions` -- so either the folder above or the file's own name identifies the store. */
+/** Codex keeps rolls in dated folders under `~/.codex/sessions`, so the folder above or the
+ *  file's own name identifies the store. */
 const CODEX_DIR = /^(sessions|archived_sessions)$/
 const ROLLOUT = /^rollout-/
 
@@ -170,8 +161,7 @@ export interface Origin {
   store: Store
 }
 
-/** Judge the pick from the paths alone, so the page never has to ask the reader where they just
- *  were. */
+/** Judge the pick from the paths alone, so the page never asks the reader where they just were. */
 export function originOf(paths: readonly string[]): Origin {
   const roots = new Set(paths.map((p) => (p.includes("/") ? p.slice(0, p.indexOf("/")) : "")))
   const claude = paths.some((p) => {
@@ -192,17 +182,15 @@ export function originOf(paths: readonly string[]): Origin {
     const dirs = segs.slice(0, -1)
     return dirs.some((s, i) => s === ".grok" && dirs[i + 1] === "sessions")
   })
-  /* One name for a pick that turned out to hold more than one, and the page's own store is the
-     one to give: the message it feeds only has to name somewhere the reader has heard of. */
+  /* A pick holding more than one store is named by the page's own: the message it feeds only has
+     to name somewhere the reader has heard of. */
   const store: Store = claude ? "claude" : codex ? "codex" : grok ? "grok" : null
   return { root: roots.size === 1 && !roots.has("") ? [...roots][0] : null, store }
 }
 
-/** Walk a folder handed over by `showDirectoryPicker`. Depth-first, the whole tree, because a
- *  transcript sits two levels down from the store: `projects/<project>/<session>.jsonl`.
- *  `getFile()` is asked for every leaf rather than only the `.jsonl` ones, and that is not
- *  waste: it hands back a lazy handle, not the bytes, and it is what lets the count of *what was
- *  in the folder* survive down to the message that has to say the folder held no transcripts. */
+/** Walk a picked folder depth-first, because a transcript sits two levels down at
+ *  `projects/<project>/<session>.jsonl`. Every leaf is asked for its handle, which is lazy, so
+ *  what the folder held survives to the message that says it held no transcripts. */
 async function walkDir(dir: FileSystemDirectoryHandle, at: string, out: Picked[]): Promise<void> {
   for await (const kid of dir.values()) {
     const path = `${at}/${kid.name}`
@@ -211,11 +199,10 @@ async function walkDir(dir: FileSystemDirectoryHandle, at: string, out: Picked[]
   }
 }
 
-/** One dropped item, taken as a handle rather than as an entry: a folder is walked the same way a
- *  picked one is, so a transcript arriving this way carries the handle its read needs. */
+/** A dropped item taken as a handle rather than an entry, so a transcript carries the handle its
+ *  read needs. */
 export async function pickHandle(h: FileSystemHandle, out: Picked[]): Promise<void> {
-  /* `kind` is what tells the two apart at runtime, and the cast is the type system being told the
-     same thing: `FileSystemHandle` is not a union the check can narrow. */
+  /* `kind` tells the two apart at runtime; the cast tells the type system the same. */
   if (h.kind === "directory") await walkDir(h as FileSystemDirectoryHandle, h.name, out)
   else {
     const f = h as FileSystemFileHandle
@@ -237,8 +224,8 @@ function walkEntry(entry: FileSystemEntry, out: Picked[]): Promise<void> {
     if (entry.isFile) {
       ;(entry as FileSystemFileEntry).file(
         (f) => {
-          /* The entry's path rather than the file's: a `File` handed over by the drop API has an
-             empty `webkitRelativePath`, and `fullPath` is rooted at the folder that was dropped. */
+          /* The entry's path rather than the file's: a dropped `File` has an empty
+             `webkitRelativePath`. */
           out.push({ file: f, path: entry.fullPath.replace(/^\//, "") || f.name })
           res()
         },
@@ -268,8 +255,8 @@ function vars(v: Record<string, string | number>): React.CSSProperties {
   return v as React.CSSProperties
 }
 
-/** How long a name takes to write, in milliseconds, when the folder is being read faster or
- *  slower than a person can follow. */
+/** How long a name takes to write, in milliseconds, when the folder reads faster than a person
+ *  can follow. */
 const MIN_WRITE = 55
 const MAX_WRITE = 260
 
@@ -282,24 +269,17 @@ const NAMES = 24
 /** How often the count is allowed to repaint. */
 const PAINT = 60
 
-/** How long the walk waits for a frame before deciding none is coming. Long enough that a frame
- *  always wins the race while the tab is on screen, short enough that the one frame still pending
- *  when the reader changed tabs does not hold the walk up. */
+/** How long the walk waits for a frame before deciding none is coming. */
 const UNDRAWN = 60
 
-/** Hand the thread back until the next frame. The frame is what the walk is sharing the thread
- *  with, so it is the thing to wait for: `scheduler.yield` resumes ahead of ordinary tasks by
- *  design, which starves the interval the header's figure is sampled on, and `setTimeout` is
- *  floored at four milliseconds once one timer is scheduled from inside another. Off screen there
- *  is no frame to leave room for and none arrives either, so the walk keeps the thread rather than
- *  waiting on a clock a hidden tab has throttled to one tick a second. */
+/** Hand the thread back until the next frame, which is what the walk is sharing it with:
+ *  `scheduler.yield` starves the interval the header's figure is sampled on, and `setTimeout` is
+ *  floored at 4ms once nested. Off screen no frame arrives, so the walk keeps the thread. */
 function handBack(): Promise<void> {
   if (document.hidden || typeof requestAnimationFrame !== "function") return Promise.resolve()
   return new Promise<void>((r) => {
     /* oxlint-disable promise/no-multiple-resolved -- one resolver on two clocks is a race with a
-       single winner rather than two resolutions, and the winner calls off the loser. The timer is
-       for the frame that was already pending when the tab went behind another, which will not
-       arrive until it comes back -- and without it the walk stops there dead. */
+       single winner, and the timer covers the frame a hidden tab will not deliver. */
     const settle = (): void => {
       cancelAnimationFrame(frame)
       clearTimeout(timer)
@@ -330,27 +310,23 @@ interface Run {
 
 /** The transcripts, written out as they are read. */
 function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
-  /* The prompt is a row like any other, so it counts: what the panel shows is the tail of the
-     column with the cursor on the bottom line. */
+  /* The prompt counts as a row: the panel shows the tail of the column, cursor on the bottom
+     line. */
   const roll = Math.max(0, run.lines.length + 1 - SHOWN)
   const width = String(run.total).length
   return (
     <>
-      {/* The verb stands where "The folder is hidden" stood, in the same mono caps on the same
-          line, and there is only one of it now: reading and pricing are one walk, so a label
-          that changed halfway would be describing two things that are not two. The count beside
-          it is not announced: it changes hundreds of times, and a live region that says every
-          one of them is a live region nobody can use. */}
+      {/* One verb, because reading and pricing are one walk. The count is not announced: it changes
+          hundreds of times, and a live region that says every one is unusable. */}
       <div className="foundhead">
         <span className="foundlbl">{t.intake.reading}</span>
-        {/* Padded rather than left to grow, so a count on its way to three digits does not shunt
-            the line about underneath itself. `white-space: pre` is what keeps the padding. */}
+        {/* Padded rather than grown, so a third digit does not shunt the line beneath it;
+            `white-space: pre` is what keeps the padding. */}
         <span className="foundnum">
           {`${String(run.done).padStart(width, " ")} / ${run.total}`}
         </span>
       </div>
-      {/* Keyed on the pick, so a second folder starts a fresh column rather than sliding the last
-          one's names out of the way. */}
+      {/* Keyed on the pick, so a second folder starts a fresh column. */}
       <div className="foundbox">
         <div className="filelist">
           <div
@@ -358,8 +334,7 @@ function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
             key={run.id}
             style={{
               transform: `translateY(calc(var(--file-row) * -${roll}))`,
-              /* The column travels in the time the line that pushed it took to arrive, so the
-                 scroll and the writing keep the same pace whatever that pace turns out to be. */
+              /* The column travels in the time the line that pushed it took to arrive. */
               transitionDuration: `${Math.min(run.lines.at(-1)?.ms ?? MIN_WRITE, MAX_SLIDE)}ms`,
             }}
           >
@@ -372,8 +347,7 @@ function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
                     className="filecover"
                     style={{
                       animationDuration: `${line.ms}ms`,
-                      /* Characters rather than `length`: a name is text, and text is not code
-                         units. */
+                      /* Characters rather than `length`: text is not code units. */
                       animationTimingFunction: `steps(${[...line.name].length})`,
                     }}
                   />
@@ -390,22 +364,19 @@ function Reading({ run, t }: { run: Run; t: Dict }): React.JSX.Element {
   )
 }
 
-/** One transcript, however it is going to be produced: a file off the disk, or a line of the
- *  example built on demand. Never as one string -- a rollout can run past what a JS string holds,
- *  and Chrome answers `text()` on one of those with an empty string rather than an error, which
- *  drops the file out of the bill without saying so. */
+/** One transcript, never as one string: a rollout can run past what a JS string holds, and
+ *  Chrome answers `text()` on one of those with an empty string rather than an error. */
 export interface Source {
   name: string
-  /** Anything that changes when the file does. With the name, this is what tells one session's
-   *  transcript from a longer copy of the same session. */
+  /** Anything that changes when the file does; with the name, this tells one session's
+   *  transcript from a longer copy of it. */
   size: number
   /** The bytes as text, a chunk at a time. */
   chunks: () => AsyncIterable<string>
 }
 
-/** The `File` beside the handle is a snapshot from the listing, minutes stale by the time the read
- *  reaches it, and Chrome rejects the read with `NotReadableError` if a live session appended in
- *  between -- so where there is a handle the bytes are taken from a fresh one. */
+/** The `File` beside a handle is a stale snapshot, and Chrome fails the read with
+ *  `NotReadableError` if a live session appended -- so the bytes come from a fresh one. */
 export function pickedFile(p: Picked): Promise<File> {
   return p.handle ? p.handle.getFile() : Promise.resolve(p.file)
 }
@@ -414,8 +385,7 @@ export function pickedFile(p: Picked): Promise<File> {
 export async function* chunkPicked(p: Picked): AsyncGenerator<string> {
   const file = await pickedFile(p)
   const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader()
-  /* oxlint-disable no-await-in-loop -- pulling the chunks in turn is the point of the loop: the
-     whole file at once is what this exists to avoid. */
+  /* oxlint-disable no-await-in-loop -- pulling the chunks in turn is the point of the loop. */
   try {
     for (;;) {
       const { value, done } = await reader.read()
@@ -428,21 +398,19 @@ export async function* chunkPicked(p: Picked): AsyncGenerator<string> {
   /* oxlint-enable no-await-in-loop */
 }
 
-/** The corpus one transcript at a time: a store is a live directory, so one that will not read is
- *  counted rather than allowed to end the walk. `onFile` answers whether it got any bytes at all,
- *  which is the only thing that makes a transcript skipped rather than short. */
+/** The corpus one transcript at a time: a store is a live directory, so one that will not read
+ *  is counted rather than allowed to end the walk. */
 export async function readEach(
   files: readonly Source[],
   onFile: (f: Source, i: number) => Promise<boolean>,
-  /** Asked before each transcript: `false` leaves the rest of the corpus unread. A second pick
-   *  supersedes the first, and the first has a folder's worth of reading still ahead of it. */
+  /** Asked before each transcript: `false` leaves the rest unread, which is how a second pick
+   *  supersedes the first. */
   alive: () => boolean = () => true,
 ): Promise<{ skipped: number; firstErr: Error | null }> {
   let skipped = 0
   let firstErr: Error | null = null
-  /* oxlint-disable no-await-in-loop -- reading one transcript at a time is the point of the loop
-     rather than an oversight in it. `Promise.all` over the corpus holds the whole folder at once,
-     which for a real store is gigabytes. */
+  /* oxlint-disable no-await-in-loop -- one transcript at a time is the point; `Promise.all` over a
+     real store holds gigabytes. */
   for (const [i, f] of files.entries()) {
     if (!alive()) break
     let got = false
@@ -457,8 +425,7 @@ export async function readEach(
   return { skipped, firstErr }
 }
 
-/** Two sheets, the back one drawn only where the front does not cover it: `fill: none` means
- *  a second full rectangle would show its lines straight through the first. */
+/** Two sheets, the back one clipped: `fill: none` would show its lines through the front. */
 function CopyMark(): React.JSX.Element {
   return (
     <svg className="glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -477,12 +444,10 @@ function TickMark(): React.JSX.Element {
   )
 }
 
-/** What the terminal reader runs, in one place because the button copies the same string the
- *  paragraph prints. */
+/** One place, because the button copies the string the paragraph prints. */
 const CMD = "npx token-billing"
 
-/** Copies the command, and says so for a moment. Falls back to nothing on a browser with no
- *  clipboard: the command is right there to select by hand. */
+/** Copies the command, and says so for a moment. A browser with no clipboard gets nothing. */
 function CopyCmd(): React.JSX.Element {
   const t = useT()
   const [done, setDone] = useState(false)
@@ -513,8 +478,8 @@ function CopyCmd(): React.JSX.Element {
         })()
       }}
     >
-      {/* A mark rather than a word: the row is centred, and the three languages that spell
-          "copied" long enough to be a sentence were the ones moving the command about. */}
+      {/* A mark rather than a word: three of the languages spell "copied" long enough to move the
+          command about. */}
       <TextSwap token={done ? "done" : "idle"}>{done ? <TickMark /> : <CopyMark />}</TextSwap>
     </button>
   )
@@ -551,8 +516,7 @@ export function Intake({
         if (picked) await handle(picked)
         return
       } catch (e) {
-        /* Closing the dialog is not a failure and gets no message -- the same silence a
-           cancelled file input leaves. */
+        /* A closed dialog is not a failure, and gets the silence a cancelled file input gets. */
         if ((e as DOMException).name === "AbortError") return
       }
     }
@@ -563,9 +527,8 @@ export function Intake({
     const files = picked.filter(
       (p) => p.file.name.endsWith(".jsonl") && !SIDECAR_NAMES.has(p.file.name),
     )
-    /* Judged before anything is read, and kept for whatever has to be said afterwards: the two
-       ways this can come to nothing are both questions about the folder, and the folder is
-       standing right here. */
+    /* Judged before anything is read and kept for afterwards: both ways this comes to nothing are
+       questions about the folder. */
     const where = originOf(picked.map((p) => p.path))
     if (!files.length) {
       stop(
@@ -588,14 +551,12 @@ export function Intake({
     )
   }
 
-  /** The example, walked down the same path a folder takes -- same reading column, same engine,
-   *  same turn of the card -- because a demo that took a shortcut would be demonstrating the
-   *  shortcut. */
+  /** The example walked down the same path a folder takes, because a demo that took a shortcut
+   *  would be demonstrating the shortcut. */
   async function example(): Promise<void> {
     await walkFiles(
       sampleFiles().map((f) => {
-        /* Built at the read rather than at the pick, the way a folder's transcripts arrive one at
-           a time -- which is what gives the column something to draw. */
+        /* Built at the read rather than at the pick, so the column has something to draw. */
         let text = ""
         const once = (): string => (text ||= f.build())
         return {
@@ -614,26 +575,21 @@ export function Intake({
   }
 
   async function walkFiles(files: Source[], where: Origin, sample: boolean): Promise<void> {
-    /* The pick answers the note, so the note goes: what stands in its place is the folder being
-       read, a name at a time. */
+    /* The pick answers the note, so the note goes. */
     setErr(null)
     const id = ++picks.current
-    /* Empty, and up before a byte has been read: the panel is the answer to the pick, and the
-       first file is not always quick. */
+    /* Up before a byte is read: the panel is the answer to the pick. */
     setRun({ id, done: 0, total: files.length, lines: [] })
-    /* Back to zero with the panel, not with the first priced file: a second pick has to start
-       its count where the first one started, or the figure would appear to carry over. */
+    /* Back to zero with the panel, or a second pick's figure would look like it carried over. */
     sofar.current = 0
     setBusy(true)
 
-    /** Whether this pick is still the one the card is waiting on. Everything below asks before it
-     *  writes anything down, because a second pick can arrive in the middle of the first and the
-     *  first would otherwise finish over the top of it. */
+    /** Whether this pick is still the one the card waits on: a second can arrive mid-walk, and
+     *  the first would otherwise finish over the top of it. */
     const alive = (): boolean => picks.current === id
 
-    /* The walk is driven from here rather than handed the corpus, which is the whole shape of
-       this: it takes one file at a time and one slice of a file at a time, so the page holds one
-       transcript instead of the whole folder, and gives the frame back inside the big ones. */
+    /* Driven from here rather than handed the corpus: one file and one slice at a time, so the page
+       holds one transcript instead of the folder. */
     const lines: Line[] = []
     const every = Math.max(1, Math.ceil(files.length / NAMES))
     let wrote = performance.now()
@@ -661,27 +617,24 @@ export function Intake({
     }
 
     const w = openWalk()
-    /* A transcript that will not read is counted inside, so what is left for the `catch` is the
-       walk itself coming apart -- which has to end with a message rather than with the column
-       sitting there. */
+    /* A transcript that will not read is counted inside, so the `catch` is the walk coming
+       apart. */
     const read = await readEach(
       files,
       async (f, i) => {
         const fw = openFile(w, f.name, f.size)
         let got = false
         let broke: Error | null = null
-        /* oxlint-disable no-await-in-loop -- the awaits are the point of these loops: one is the
-           next chunk arriving, the other is the frame the caret needs. */
-        /** Walk what has arrived, giving the frame back whenever the walk has held it long
-         *  enough. `false` once this pick has been superseded and there is no reason to go on. */
+        /* oxlint-disable no-await-in-loop -- the awaits are the point: the next chunk, and the
+           frame the caret needs. */
+        /** Walk what has arrived, giving the frame back when the walk has held it long enough.
+         *  `false` once this pick has been superseded. */
         const drain = async (): Promise<boolean> => {
           const steps = stepFile(fw)
           for (;;) {
             const done = steps.next().done
-            /* Left where the header can find it, on every slice rather than on a beat: this is two
-               adds and a multiply, and the figure is polled by whoever is drawing it -- so a
-               rollout big enough to take several slices counts up through them instead of standing
-               still. */
+            /* Left where the header can find it on every slice, so a rollout big enough to take
+               several counts up through them instead of standing still. */
             sofar.current = billedSoFar(w)
             if (done) return true
             await handBack()
@@ -690,8 +643,8 @@ export function Intake({
         }
         try {
           const it = f.chunks()[Symbol.asyncIterator]()
-          /* One chunk in flight while the last one is walked: reading is the disk's work and
-             walking is this thread's, and taken strictly in turn each waits out the other. */
+          /* One chunk in flight while the last is walked: reading is the disk's work, walking is
+             this thread's. */
           let ahead = it.next()
           for (;;) {
             const next = await ahead
@@ -702,8 +655,8 @@ export function Intake({
             if (!(await drain())) return got
           }
         } catch (e) {
-          /* A store is a live directory. A transcript that moved out from under the read leaves
-             what it had already given rather than taking the folder down with it. */
+          /* A store is a live directory: a transcript that moved out from under the read leaves
+             what it had already given. */
           broke = e as Error
         }
         endText(fw)
@@ -729,9 +682,8 @@ export function Intake({
 
     let data: Analysis, scanned: Scanned
     try {
-      /* The one place the whole corpus is spoken for at once, and it walks no transcripts: the
-         densities are fitted, the dispatchers are judged, and everything the read held back is
-         scored against them. */
+      /* The one place the whole corpus is spoken for at once, and it walks nothing: the
+         densities are fitted, and everything the read held back is scored against them. */
       const closed = closeWalk(w)
       scanned = closed.scanned
       data = report(scanned, closed.alloc)
@@ -750,18 +702,15 @@ export function Intake({
       )
       return
     }
-    /* Handed over only once the walk is done and scored, so the card's turn plays against a free
-       main thread rather than against the tail of the work. */
+    /* Handed over once the walk is scored, so the card's turn plays against a free main thread. */
     onData(data, sample)
   }
 
   async function onDrop(e: React.DragEvent): Promise<void> {
     e.preventDefault()
     setOver(false)
-    /* Everything the drop is carrying, read off the event before the first `await`: the item list
-       and its files are only good for the duration of the handler. Both APIs are asked at once
-       because which one answers is the browser's business -- Chrome hands over a handle, and the
-       rest hand over an entry whose `File` is a snapshot the read cannot refresh. */
+    /* Read off the event before the first `await`, since the item list only lives for the handler.
+       Both APIs are asked because which one answers is the browser's business. */
     const items = [...(e.dataTransfer?.items ?? [])]
     const handles = items.map((i) =>
       typeof i.getAsFileSystemHandle === "function"
@@ -789,8 +738,7 @@ export function Intake({
     await handle(out)
   }
 
-  /* Which of the two carries the weight is the device's answer, so both are written once and the
-     order and the emphasis are decided below. */
+  /* Both are written once; which of them carries the weight is decided below. */
   const folderBtn = (
     <button
       key="folder"
@@ -840,46 +788,24 @@ export function Intake({
         void onDrop(e)
       }}
     >
-      {/* Two bands: the invitation on the line the report's picture takes, the privacy note on the
-          rule that closes the card.
-
-          There were three. The lede stood on the strip's line at the top, which mirrored the
-          report's own three bands and read, on the empty face, as an orphan: a centred sentence
-          under a left-aligned title, then a hundred pixels of nothing before the thing it was
-          introducing. It belongs to the ask, so it now stands with it. */}
+      {/* Two bands: the invitation on the line the report's picture takes, the privacy note on
+          the rule that closes the card. */}
       <div className="invite">
-        {/* The ask is the folder, not the files. `.jsonl` is a detail of the format that a reader
-            has no reason to know, and asking for files put them in a picker with a hidden dotfile
-            to defeat and dozens of identically-named transcripts to multi-select; asking for the
-            one folder is a single pick that catches everything under it. Loose files dragged in
-            still work -- the filter above does not care how they arrived -- there is just no
-            longer a button that recommends it. */}
-        {/* Where a folder is unlikely to be droppable, the heading names the page instead of asking
-            for something the reader cannot hand over -- being sent to a desktop is only worth
-            reading once you know what is waiting there, and that note is at the foot of the
-            card. */}
+        {/* The ask is the folder, not the files: one pick catches everything under it, and
+            `.jsonl` is a detail no reader needs. Loose files dragged in still work. */}
+        {/* Where a folder is unlikely to be droppable, the heading names the page instead of
+            asking for something the reader cannot hand over. */}
         <h2>
           {HANDHELD ? t.intake.headingTouch : t.intake.heading("Claude Code", "Codex", "Grok")}
         </h2>
-        {/* What pressing the button gets you, in one line, and it took five tries to get down to
-            one. It was the method first -- per-request billing, re-billed context, the definition
-            of carry cost -- which is the right paragraph in the wrong place: it argued for numbers
-            to a reader who had not seen any. Then it was a promise and a row of three things you
-            get, one of which ("by project, by session") the engine does not do: nothing here
-            groups by project, and sessions are counted rather than broken out. Then it opened
-            "Drop the folder in and", which is what the heading directly above it now says. Then it
-            spent its first three words on grammar -- "The bill comes back…" -- before saying
-            anything at all.
-            What is left is a verb, the thing, and the three sizes the report actually resolves to.
-            One line that fits on one line: a subtitle that wraps is a paragraph. */}
+        {/* A verb, the thing, and the three sizes the report resolves to. One line that fits on
+            one line: a subtitle that wraps is a paragraph. */}
         <p className="lede">{HANDHELD ? t.intake.ledeTouch : t.intake.lede}</p>
-        {/* Two ways in rather than one. The folder is the real one and keeps the weight, but it
-            is only open to a reader sitting at the machine Claude Code runs on -- on a phone
-            there is no `~/.claude` to point at, and the page as it stood had nothing to show
-            them at all. The example is the same report drawn from invented transcripts. */}
+        {/* Two ways in: the folder is the real one, but a phone has no `~/.claude` to point at,
+            so the example is the same report drawn from invented transcripts. */}
         <div className="picks">{HANDHELD ? [exampleBtn, folderBtn] : [folderBtn, exampleBtn]}</div>
-        {/* The third way in, for a reader who is already at a prompt: the same engine, run where
-            the transcripts are. Not on a handheld, which has no terminal to run it from. */}
+        {/* The third way in, for a reader already at a prompt. Not on a handheld, which has no
+            terminal. */}
         {HANDHELD ? null : (
           <div className="cmdrow">
             <span className="howlbl">{t.intake.orTerminal}</span>
@@ -887,65 +813,44 @@ export function Intake({
             <CopyCmd />
           </div>
         )}
-        {/* And the way in, in the card rather than under it. This used to stand in the help below
-            the fold, which assumed the reader would go looking: `.claude` is a dotfile, so the
-            picker they are about to open hides the folder this page just asked for, and a reader
-            who cannot get there never sees a report at all. It is one line because only one
-            platform's line applies -- theirs is picked for them, and the switch is for when the
-            guess is wrong. */}
-        {/* One box, two faces, and only ever one of them on show. The pair is stacked in a single
-            grid cell rather than swapped in and out of the flow: they have to cross -- one leaving
-            upward as the other arrives from below -- and two things that take turns in the flow
-            cannot cross, they shove. What does move is the box's height, which grows into the
-            taller job as they pass. See `.swap`. */}
+        {/* The way in, in the card rather than in the help below it: `.claude` is a dotfile, so
+            the picker hides the folder this page just asked for. */}
+        {/* One box, two faces, stacked in one grid cell rather than swapped through the flow --
+            they have to cross, and two things taking turns in the flow shove instead. See
+            `.swap`. */}
         <div
           className="swap"
           data-face={busy ? "files" : "how"}
-          /* How tall the panel is, in rows, handed to the stylesheet as the number the markup
-             already had to count in. */
+          /* How tall the panel is, in rows, handed to the stylesheet. */
           style={vars({ "--file-rows": SHOWN })}
         >
           <div className="howto" data-on={busy ? "0" : "1"}>
-            {/* Two rows, rather than one row of label, sentence and switch run together: the switch
-                decides *which* instruction is drawn, so it belongs above the line it governs, not
-                inline with it where it reads as the end of the sentence.
-
-                No box around it any more. Sunk panel, hairline, rule between the rows -- three
-                pieces of chrome for two lines of help, sitting inside a card that is itself a
-                frame, which made the way in look like a second thing to decide about rather than
-                the answer to the heading above it. What separates it now is the space around it.
-
-                No path in the label: it is set in mono caps, which would print a dotfile's name
-                as `.CLAUDE`, and the path is already the loudest thing in the heading above. Why
-                the folder is hidden is in the help below the card; what a reader stuck at a
-                dialog needs is the keystrokes. */}
-            {/* On a phone the same slot says where the reader's own transcripts are instead:
-                keystrokes for a file dialog are no use until they are at the machine. */}
+            {/* Two rows: the switch decides *which* instruction is drawn, so it stands above
+                the line it governs rather than reading as the end of it. No path in the label
+                -- it is set in mono caps, which would print a dotfile as `.CLAUDE`. */}
+            {/* On a phone the same slot says where the reader's own transcripts are: keystrokes
+                for a file dialog need the machine. */}
             <div className="howhead">
               <span className="howlbl">{HANDHELD ? t.intake.yours : t.intake.hidden}</span>
               {HANDHELD ? null : <OsSwitch os={os} onPick={setOs} />}
             </div>
-            {/* Keyed on the platform, so switching plays the same swap the report's figures do
-                rather than substituting the words underneath the reader. Inside the paragraph
-                rather than around it: `TextSwap` is a span, and a span may not hold a `<p>`. */}
+            {/* Keyed on the platform, so switching plays the swap the report's figures do.
+                Inside the paragraph rather than around it: `TextSwap` is a span, and a span may
+                not hold a `<p>`. */}
             <p>
               {HANDHELD ? t.intake.yoursBody : <TextSwap token={os}>{t.intake.how[os]}</TextSwap>}
             </p>
           </div>
-          {/* The other face. Mounted from the first pick onward rather than only while the work
-              runs, because a face that is unmounted the moment it stops being current has nothing
-              left on screen to play its exit -- `data-on` is what shows it, `data-busy` what makes
-              it look busy. */}
+          {/* Mounted from the first pick onward: a face unmounted the moment it stops being
+              current has nothing left on screen to play its exit. */}
           {run ? (
             <div className="found" data-on={busy ? "1" : "0"} data-busy={busy ? "1" : "0"}>
               <Reading run={run} t={t} />
             </div>
           ) : null}
         </div>
-        {/* Errors only, now that the progress is narrated by the list's own head -- which is why
-            this line is set in the accent throughout rather than colouring itself in when
-            something goes wrong. It keeps its ground either way: an empty line here is what stops
-            the group jumping when a pick comes back with something to say. */}
+        {/* Errors only, now that the progress is narrated by the list's own head. It keeps its
+            ground either way -- an empty line here is what stops the group jumping. */}
         <div className="status">{err}</div>
       </div>
       <input
@@ -956,8 +861,8 @@ export function Intake({
         directory=""
         className="hidden"
         onChange={(e) => {
-          /* `webkitRelativePath` is what a folder pick adds over a file pick, and it is the
-             whole reason the page can tell `projects` from `Downloads` without asking. */
+          /* `webkitRelativePath` is what a folder pick adds over a file pick, and how `projects`
+             is told from `Downloads`. */
           void handle(
             [...(e.target.files ?? [])].map((f) => ({
               file: f,
@@ -971,9 +876,8 @@ export function Intake({
   )
 }
 
-/** The help that stands under the empty card, where the breakdown and the footnotes stand under
- *  a full one -- so it holds the same ground: two columns on the same rule, across the width of
- *  the shell. */
+/** The help under the empty card, on the same rule the breakdown and the footnotes take under a
+ *  full one. */
 export function Where(): React.JSX.Element {
   const t = useT()
   return (

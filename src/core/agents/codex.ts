@@ -1,5 +1,4 @@
-/* Codex rollouts, translated into the record shape the walk already reads, so one engine prices
-   every store. */
+/* Codex rollouts, translated into the records the walk already reads. */
 
 import type { Block, Rate, Spend, Turn } from "../engine.ts"
 import { imageTokens } from "./image.ts"
@@ -42,8 +41,8 @@ interface CodexLine {
   payload?: CodexPayload
 }
 
-/* Structural, never a check on `originator`: that field is the client's own name for itself, and
-   every editor driving `codex app-server` writes a different one into the same format. */
+/* Structural, never a check on `originator`: every editor driving `codex app-server` writes its
+   own name into the same format. */
 const CODEX_TYPES = new Set(["session_meta", "turn_context", "response_item", "event_msg"])
 
 /** Whether this file is a Codex rollout rather than a Claude Code transcript. */
@@ -70,14 +69,12 @@ export function isCodexRollout(text: string): boolean {
 const num = (v: unknown): number => (typeof v === "number" && v > 0 ? v : 0)
 const str = (v: unknown): string => (typeof v === "string" ? v : "")
 
-/** How far into a line the envelope's own keys can reach: a timestamp, an ordinal on the newer
- *  versions, a type, then the payload. */
+/** How far into a line the envelope's keys reach: timestamp, ordinal, type, then the payload. */
 const ENVELOPE = 320
 const PAYLOAD = '"payload":{'
 
-/** A string value out of the envelope of a line nothing has parsed. The envelope holds only the
- *  keys a rollout puts before its payload, none of whose values carry an escape, so a plain search
- *  cannot land inside something nested or stop short of the end of a value. */
+/** A string value out of the envelope of a line nothing has parsed. No envelope value carries an
+ *  escape, so a plain search cannot land inside something nested. */
 function envelopeValue(env: string, key: string): string {
   const open = `"${key}":"`
   const at = env.indexOf(open)
@@ -87,9 +84,8 @@ function envelopeValue(env: string, key: string): string {
   return end === -1 ? "" : env.slice(from, end)
 }
 
-/** One string value out of an unparsed line: the span of its own literal, handed to `JSON.parse`
- *  on its own. Only where `key` is the first key at `at`, because a search further in could find
- *  the same name nested inside a value. */
+/** One string value out of an unparsed line, handed to `JSON.parse` on its own. Only where `key`
+ *  is the first key at `at`: a search further in could find the same name nested in a value. */
 function quoted(line: string, at: number, key: string): string | null {
   const open = `"${key}":"`
   if (!line.startsWith(open, at)) return null
@@ -108,33 +104,30 @@ function quoted(line: string, at: number, key: string): string | null {
   return null
 }
 
-/* A rollout returns a screenshot inside the tool output, as a base64 data URL running to tens of
-   megabytes. This is the shape it writes, and anything else falls through to the parse. */
+/* A screenshot arrives inside the tool output as a base64 data URL running to tens of megabytes;
+   anything else falls through to the parse. */
 const SHOT_AT = '"output":[{"type":"input_image","image_url":"'
 
-/** How far into such a line the reader looks: past the envelope, and far enough into the picture
- *  for the header that gives its size -- a PNG says so in its first two dozen bytes, and what is
- *  handed on gets scrubbed character by character, so a generous window is not a free one. */
+/** How far in the reader looks: past the envelope and into the picture's header, which a PNG
+ *  writes in its first two dozen bytes. */
 const SHOT_LOOK = 1 << 13
 
-/** A tool output that is a screenshot rather than text: the line's timestamp, and enough of the
- *  front of the image to read its dimensions off. `null` for every other line and for one shaped
- *  in a way this cannot read, both of which go on to be parsed whole. */
+/** A tool output that is a screenshot: the timestamp, and enough of the picture to read its
+ *  size. `null` for anything else, which goes on to be parsed whole. */
 function screenshot(line: string): { stamp: string; data: string } | null {
   const look = line.length > SHOT_LOOK ? line.slice(0, SHOT_LOOK) : line
   const at = look.indexOf(SHOT_AT)
   if (at === -1) return null
   const from = at + SHOT_AT.length
-  /* Base64 carries no quote, so the first one after the URL closes it -- and where the picture is
-     longer than the window there is none, which is what the prefix is for. */
+  /* Base64 carries no quote, so the first one after the URL closes it -- and a picture longer
+     than the window has none, which is what the prefix is for. */
   let end = look.indexOf('"', from)
   if (end === -1) end = look.length
   return { stamp: envelopeValue(look.slice(0, at), "timestamp"), data: look.slice(from, end) }
 }
 
-/** A compaction's timestamp and message, taken off the front of the line. `null` for every other
- *  line and for a compaction shaped in a way this cannot read, both of which go on to be parsed
- *  whole. */
+/** A compaction's timestamp and message off the front of the line. `null` for anything else,
+ *  which goes on to be parsed whole. */
 function compaction(line: string): { stamp: string; message: string } | null {
   const head = line.length > ENVELOPE ? line.slice(0, ENVELOPE) : line
   const at = head.indexOf(PAYLOAD)
@@ -146,10 +139,8 @@ function compaction(line: string): { stamp: string; message: string } | null {
 }
 
 /** What has to be known before the first line is priced: a rollout can bill a request before it
- *  writes down which model made it, and it says whose session it is only at the top. Stops at the
- *  first model, which a rollout names within its first few lines -- and where the head handed over
- *  does not reach one, `codexLine` picks it up off the `turn_context` that opens the turn, which a
- *  rollout writes before the count that bills it. */
+ *  names the model, and says whose session it is only at the top. Stops at the first model, with
+ *  `codexLine` picking it up off a later `turn_context` where the head does not reach one. */
 function ahead(text: string): { model: string; sidechain: boolean } {
   let model = "",
     sidechain = false
@@ -166,8 +157,8 @@ function ahead(text: string): { model: string; sidechain: boolean } {
   return { model, sidechain }
 }
 
-/** OpenAI counts cached tokens inside `input_tokens`, and has no cache TTL to choose -- so the
- *  writes are declared as the short ones, where the report's TTL toggle cannot move them. */
+/** OpenAI counts cached tokens inside `input_tokens` and has no TTL to choose, so the writes are
+ *  declared short, where the report's toggle cannot move them. */
 function spendOf(u: CodexUsage): Spend {
   const inp = num(u.input_tokens)
   const cached = Math.min(num(u.cached_input_tokens), inp)
@@ -193,8 +184,7 @@ function blocksOf(content: unknown): Block[] {
     if (!b || typeof b !== "object") continue
     const c = b as { type?: string; text?: string; image_url?: string }
     if (c.type === "input_image")
-      /* Sized off its own header where it carries one, so a thumbnail is not charged as a
-         full-page capture. */
+      /* Sized off its own header, so a thumbnail is not charged as a full-page capture. */
       out.push({
         kind: "image",
         chars: 0,
@@ -206,12 +196,11 @@ function blocksOf(content: unknown): Block[] {
   return out
 }
 
-/* The newest shell tool takes JavaScript rather than a command line, so the command has to be
-   lifted back out of the source it was written into. */
+/* The newest shell tool takes JavaScript, so the command is lifted back out of the source. */
 const JS_CMD = /"?\bcmd"?\s*:\s*("(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)/g
 
-/** The commands a sandbox script runs, and the script with those literals taken out of it -- so
- *  the call is labelled by what it ran and still sized by everything that was sent. */
+/** The commands a sandbox script runs, and the script without those literals -- labelled by what
+ *  it ran, still sized by everything that was sent. */
 function execArgs(src: string): Record<string, unknown> {
   const cmds: string[] = []
   const rest = src.replace(JS_CMD, (all, lit: string) => {
@@ -254,18 +243,16 @@ function argsOf(p: CodexPayload): Record<string, unknown> {
   return {}
 }
 
-/** How many records the reader holds while it waits to be told which model made them. A rollout
- *  usually names one in its first line or two, and where it does not this is what stops the wait
- *  from becoming the whole file. */
+/** How many records the reader holds while waiting to be told the model. A rollout usually names
+ *  one in its first lines; this stops the wait becoming the whole file. */
 const HELD_MAX = 4096
 
-/** Where a rollout stands part way through: what it has said about the session, and the two halves
- *  of a request it is holding until the line that bills them. */
+/** Where a rollout stands part way through: what it said about the session, and the two halves
+ *  of a request it holds until the line that bills them. */
 export interface CodexState {
   model: string
   sidechain: boolean
-  /* What the assistant produced, and the tool output it drew -- held because a rollout writes the
-     token count last. */
+  /* What the assistant produced and the output it drew, held because the token count comes last. */
   blocks: Block[]
   results: Block[]
   stamp: string
@@ -276,9 +263,8 @@ export interface CodexState {
   prevOut: number
   prevWrite: number
   prevReason: number
-  /** Records made before the rollout named the model that prices them, `null` once it has. Two of
-   *  a real store's thousand rollouts bill a request tens of megabytes before they name one, which
-   *  is far too deep to hold the file open for. */
+  /** Records made before the rollout named the model that prices them, `null` once it has: two
+   *  of a real store's thousand bill tens of megabytes first. */
   held: Turn[] | null
 }
 
@@ -301,8 +287,8 @@ export function codexOpen(head: string): CodexState {
   }
 }
 
-/** What the walk reads. A rollout is read straight through into one of these rather than into a
- *  generator per line, because a big one has a record every few hundred bytes. */
+/** What the walk reads. Straight into one of these rather than a generator per line, because a
+ *  big rollout has a record every few hundred bytes. */
 type Out = (turn: Turn) => void
 
 /** Let the backlog go, with the model it was waiting for written into it. */
@@ -316,8 +302,7 @@ function release(s: CodexState, out: Out): void {
   }
 }
 
-/** One record on its way to the walk, or into the backlog if there is still no model to price it
- *  with. */
+/** One record on its way to the walk, or into the backlog while there is no model to price it. */
 function give(s: CodexState, turn: Turn, out: Out): void {
   const held = s.held
   if (!held) {
@@ -329,12 +314,11 @@ function give(s: CodexState, turn: Turn, out: Out): void {
   if (held.length > HELD_MAX) release(s, out)
 }
 
-/** The billed turn, then the output it drew -- the order a transcript writes them in, which is
- *  what keeps a tool result out of the context of the request that called for it. */
+/** The billed turn, then the output it drew -- the order that keeps a tool result out of the
+ *  context of the request that called for it. */
 function flush(s: CodexState, u: CodexUsage, out: Out): void {
   const reasoning = num(u.reasoning_output_tokens)
-  /* Codex encrypts its reasoning but still counts it, so the block is sized by the count rather
-     than by text there is none of. */
+  /* Codex encrypts its reasoning but still counts it, so the block is sized by the count. */
   if (reasoning > 0) s.blocks.push({ kind: "reasoning", chars: 0, tokens: reasoning })
   const blocks = s.blocks,
     results = s.results
@@ -355,8 +339,8 @@ function flush(s: CodexState, u: CodexUsage, out: Out): void {
   if (results.length) give(s, { at: s.stamp, by: "user", blocks: results }, out)
 }
 
-/** The payload's own type, where the payload names it first -- which is how a rollout writes an
- *  event and a response item. Empty where it does not, and then the parse decides. */
+/** The payload's own type, where the payload names it first. Empty otherwise, and then the parse
+ *  decides. */
 const TYPE = '"type":"'
 function payloadType(head: string, at: number): string {
   const from = at + PAYLOAD.length
@@ -377,9 +361,9 @@ const onCount: Handler = (s, _p, out) => {
   const info = _p.info
   if (!info) return
   const total = info.total_token_usage
-  /* A rollout can write the same event twice, and the running total is what tells a repeat from a
-     request. Without one there is nothing to compare, and counting a rare repeat is the better
-     error: the alternative drops every request after the first. */
+  /* A rollout can write the same event twice, and the running total is what tells a repeat from
+     a request. Counting a rare repeat is the better error: the alternative drops every request
+     after the first. */
   if (total) {
     const cum = num(total.total_tokens)
     if (s.prevTotal !== null && cum === s.prevTotal) return
@@ -461,9 +445,8 @@ const onWebSearch: Handler = (s, p) => {
   })
 }
 
-/* One list rather than two: these keys are what `read` consults to decide whether a line is worth
-   parsing at all, so a payload handled here is read and one that is absent is put down where it
-   lies. Nearly a third of what a real store still parses is records nothing below asks for. */
+/* One list rather than two: these keys are what decide whether a line is worth parsing at all, and
+   nearly a third of what a real store parses is records nothing below asks for. */
 const EVENTS = new Map<string, Handler>([
   ["token_count", onCount],
   ["mcp_tool_call_end", onMcp],
@@ -478,8 +461,7 @@ const ITEMS = new Map<string, Handler>([
   ["web_search_call", onWebSearch],
 ])
 
-/** One line of a rollout, as the transcript records it would have been. `false` is a line that
- *  would not parse, which the bill owns up to. */
+/** One line of a rollout. `false` is a line that would not parse, which the bill owns up to. */
 export function codexLine(s: CodexState, line: string, out: Out): boolean {
   const parsed = read(s, line, out)
   /* The line that named the model is the line the backlog was waiting for. */
@@ -487,19 +469,17 @@ export function codexLine(s: CodexState, line: string, out: Out): boolean {
   return parsed
 }
 
-/** The records the reader needs only the front of, which are also the two biggest a rollout
- *  writes: a compaction, whose rewritten prefix is a third of a real store's bytes and which
- *  nothing here reads, and a screenshot, of which only the header saying how big the picture is
- *  matters. `true` when the front was enough and the rest of the line can go unread -- which is
- *  what lets a line spanning chunks be read without being put back together. */
+/** The records only the front is needed of, which are the two biggest a rollout writes: a
+ *  compaction, whose rewrite is a third of a real store's bytes and which nothing reads, and a
+ *  screenshot, of which only the size header matters. `true` leaves the rest of the line unread. */
 export function codexFront(s: CodexState, front: string, out: Out): boolean {
   const head = front.length > ENVELOPE ? front.slice(0, ENVELOPE) : front
   const at = head.indexOf(PAYLOAD)
   if (at <= 0) return false
   const kind = envelopeValue(head.slice(0, at), "type")
   if (kind === "compacted") {
-    /* The walk has to be told a compaction happened or it will read the rewrite as content that
-       arrived; what the rewrite says is nothing to do with the bill. */
+    /* The walk has to be told a compaction happened; what the rewrite says is nothing to the
+       bill. */
     const cut = compaction(front)
     if (!cut) return false
     if (cut.stamp) s.stamp = cut.stamp
@@ -533,8 +513,8 @@ function read(s: CodexState, line: string, out: Out): boolean {
     const kind = envelopeValue(env, "type")
     if (kind === "event_msg" || kind === "response_item") {
       const sub = payloadType(head, at)
-      /* Nothing below asks for this one, so it is put down where it lies -- `JSON.parse` builds
-         every string in a record before anything gets to ignore them. */
+      /* Put down where it lies: `JSON.parse` builds every string in a record before anything can
+         ignore them. */
       if (sub && !(kind === "event_msg" ? EVENTS : ITEMS).has(sub)) {
         const ts = envelopeValue(env, "timestamp")
         if (ts) s.stamp = ts
@@ -580,9 +560,8 @@ function read(s: CodexState, line: string, out: Out): boolean {
   return true
 }
 
-/** A session read mid-flight ends with a turn nothing billed: it is still context, so it is still
- *  held, and the walk charges it nothing. Whatever was waiting on a model that never came goes out
- *  here too, unpriced, which is what the bill has to admit to. */
+/** A session read mid-flight ends with a turn nothing billed: still context, so still held and
+ *  charged nothing. Whatever waited on a model that never came goes out here unpriced. */
 export function codexEnd(s: CodexState, out: Out): void {
   if (s.blocks.length) {
     give(s, { at: s.stamp, by: "model", model: s.model, blocks: s.blocks }, out)
@@ -596,7 +575,7 @@ export function codexEnd(s: CodexState, out: Out): void {
 }
 
 /** $ per 1M tokens, as [input, output]. Cached input is a tenth of input on every card OpenAI
- *  publishes, which is the engine's default, so only the two ends are listed. */
+ *  publishes, which is the engine's default. */
 const rates: Record<string, Rate> = {
   "gpt-5": [1.25, 10],
   "gpt-5-mini": [0.25, 2],

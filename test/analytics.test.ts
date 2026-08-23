@@ -27,9 +27,8 @@ ok(scrub(`${B}/report/?q=acme#t=dark`) === `${B}/report`, "the query and the has
 ok(!scrub(`${B}/#d=H4sIAAAA`)?.includes("d="), "a report handed over by the CLI never rides along")
 ok(scrub("not a url at all") === null, "an address that will not parse reports nothing at all")
 
-/* The shape Vercel's ingest will take: anything short of a whole address comes back a 400 and the
-   view is dropped on the floor, so the two faces are checked for the front of one and not just the
-   back. */
+/* The shape Vercel's ingest takes: anything short of a whole address comes back a 400, so the two
+   faces are checked for the front of one as well as the back. */
 ok(/^https?:\/\//.test(scrub(`${B}/`) || ""), "the empty card goes out as a whole address")
 ok(/^https?:\/\//.test(scrub(`${B}/report/git`) || ""), "and so does the report")
 

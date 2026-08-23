@@ -1,12 +1,11 @@
-/* The report's view model: everything that turns an `Analysis` into the rows, columns and
-   numbers the components draw, with no React and no DOM in sight. */
+/* The report's view model: an `Analysis` turned into the rows, columns and numbers the components
+   draw, with no React and no DOM. */
 
 import type { Analysis, Dataset, GroupId, Insights } from "./engine.ts"
 import { tag } from "./i18n.ts"
 import type { PostCopy } from "./post-copy.ts"
 
-/* Every level of the tree -- group, item, child, and the synthetic "other" row folding produces
-   -- is drawn by the same components, so they share one shape. */
+/* Every level of the tree is drawn by the same components, so they share one shape. */
 export interface CostNode {
   name: string
   cost: number
@@ -31,8 +30,7 @@ export const maxCost = (list: CostNode[] | null | undefined): number =>
   list && list.length ? Math.max(...list.map((x) => x.cost || 0)) : 0
 
 /* Both formatters ask `i18n` for the current tag rather than taking one, because they are called
-   by name from inside JSX at some fifteen sites and threading a language through all of them
-   would put a fact about the toolbar into the arithmetic. */
+   by name from inside JSX at some fifteen sites. */
 const fmt = (digits: number): Intl.NumberFormat =>
   new Intl.NumberFormat(tag(), {
     style: "currency",
@@ -63,8 +61,8 @@ export function fold(
   sorted.forEach((n, i) => (i < FOLD_MAX && n.cost >= parentCost * FOLD_MIN ? keep : rest).push(n))
   if (rest.length)
     keep.push({
-      /* The name is an identifier here, not a label: it keys the hover, the view-transition name
-         and the drill path, all of which have to survive a change of language. */
+      /* The name is an identifier here, not a label: it keys the hover, the transition name and the
+         drill path. */
       name: "other",
       cost: +rest.reduce((s, n) => s + n.cost, 0).toFixed(2),
       children: null,
@@ -80,8 +78,7 @@ export function branches(node: CostNode | null | undefined): boolean {
   return k.length > 1 || (k.length === 1 && (k[0].items || k[0].children || []).length > 1)
 }
 
-/** The same question, answered with the list: the children worth drawing as a level of their
- *  own, or null. */
+/** The same question, answered with the list: the children worth drawing, or null. */
 export function kidsOf(node: CostNode | null | undefined): CostNode[] | null {
   if (!node || !branches(node)) return null
   return node.items || node.children || null
@@ -89,9 +86,8 @@ export function kidsOf(node: CostNode | null | undefined): CostNode[] | null {
 
 /* palette */
 
-/** Colour follows the group's stable ID from the engine, in the engine's declared order -- so a
- *  group keeps its hue when you drill in, switch view or change the TTL lens, and a dataset
- *  containing tools this file has never heard of still colours consistently. */
+/** Colour follows the group's stable id in the engine's declared order, so a hue survives a
+ *  drill, a switch of view and a change of TTL lens. */
 export interface Palette {
   hue(group: string | null | undefined): string
   short(name: string): string | undefined
@@ -119,10 +115,9 @@ export interface Focus {
   groupName: string | null
 }
 
-/** A node name as it goes into the address. The names are prose -- "Tools · content read in",
- *  "assistant prose (generated)" -- and percent-escapes are not something to hand a reader.
- *  What goes is the punctuation and the spacing; letters are kept whatever their script, since a
- *  transcript is full of paths and commands this page did not choose the alphabet of. */
+/** A node name as it goes into the address. The punctuation and spacing go; letters stay
+ *  whatever their script, since a transcript is full of paths this page did not choose the
+ *  alphabet of. */
 export function slug(name: string): string {
   return (
     name
@@ -132,9 +127,8 @@ export function slug(name: string): string {
   )
 }
 
-/** And back, against the tree on show: the slug drops the case and the punctuation, so the names
- *  it could have come from are the only place it can be read. One that names nothing at this
- *  level ends the path rather than being carried as a name no view will find. */
+/** And back, against the tree on show, since the slug dropped the case and the punctuation. One
+ *  that names nothing at this level ends the path. */
 export function pathOf(d: Dataset, slugs: string[]): string[] {
   const g = d.groups.find((x) => slug(x.name) === slugs[0])
   if (!g) return []
@@ -180,11 +174,11 @@ export interface SunBranch {
   name: string
   group: string
   cost: number
-  /** Line items under this sector *before* folding, so the legend can say how many there really
-   *  are rather than how many survived the fold. */
+  /** Line items under this sector *before* folding, so the legend says how many there really
+   *  are. */
   items: number
-  /** True for the synthetic tail row: it stands for many line items, and saying it has none
-   *  underneath would read as "this is one thing" when it is the opposite. */
+  /** True for the synthetic tail row, which stands for many line items rather than for one
+   *  thing. */
   folded: boolean
   arcs: SunArc[]
 }
@@ -208,8 +202,8 @@ export function sunburst(focus: Focus, rings: number = SUN_RINGS): SunBranch[] {
   let at = 0
 
   for (const n of top) {
-    /* Colour is the group's, at every depth -- the whole branch is one hue getting lighter
-       outward, so a ring reads as "more detail about this" and not as new information. */
+    /* Colour is the group's at every depth, so a ring reads as more detail rather than as new
+       information. */
     const group = focus.groupName || n.name
     const arcs: SunArc[] = []
 
@@ -225,8 +219,8 @@ export function sunburst(focus: Focus, rings: number = SUN_RINGS): SunBranch[] {
       if (ring + 1 >= rings || span < SUN_MIN_SPLIT) return
       const kids = fold(kidsOf(node) || [], node.cost)
       if (!kids.length) return
-      /* Scaled by what the children actually sum to, so the ring fills its parent's sweep even
-         where rounding leaves the two a cent apart. */
+      /* Scaled by what the children sum to, so the ring fills its parent's sweep despite
+         rounding. */
       const kidShare = shareIn(kids)
       let a = a0
       for (const k of kids) {
@@ -261,8 +255,7 @@ export interface LedgerRow {
   key: string
   open: boolean
   hasKids: boolean
-  /** The hover key for this row, built the way the charts build theirs: `group›item` for a
-   *  top-level row and `group›item›child` below it. */
+  /** The hover key, built the way the charts build theirs: `group›item`, and the child under it. */
   hkey: string
   /** What this row hangs under, or null at the top level. */
   under: string | null
@@ -301,8 +294,8 @@ export function ledger(
       const g = depth === 0 && !at.groupName ? n.name : inherit
       const kids = kidsOf(n)
       const key = g + "›" + n.name + "›" + depth
-      /* The disclosure key above is this table's own and carries the depth; the hover key is
-         shared with the charts and carries the path, which is why they are not one string. */
+      /* The disclosure key is this table's own and carries the depth; the hover key is shared
+         with the charts and carries the path. */
       const hkey = parent ? `${g}›${parent}›${n.name}` : `${g}›${n.name}`
       const match = !q || n.name.toLowerCase().includes(q)
       const kidMatch = kids
@@ -343,8 +336,7 @@ export const POST_MAX = 280
 /** The characters X counts double: CJK ideographs, kana, hangul and the fullwidth forms. */
 const WIDE = /[ᄀ-ᇿ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/
 
-/** X bills a link at 23 characters however long it is, so the ceiling is measured the way the
- *  composer measures it rather than on the raw string. */
+/** X bills a link at 23 characters however long it is, so the ceiling is measured its way. */
 export const postLength = (s: string): number =>
   [...s.replace(/https?:\/\/\S+/g, "x".repeat(23))].reduce(
     (n, ch) => n + (WIDE.test(ch) ? 2 : 1),
@@ -403,9 +395,8 @@ export const PUBLIC_PROGS = new Set([
   "zsh",
 ])
 
-/** Tools a caption may name out loud, for the same reason and with a sharper edge: an MCP tool
- *  is displayed as `server · tool`, and the server is the reader's own -- often the employer's
- *  name, or a product that has not shipped. */
+/** Tools a caption may name out loud: an MCP tool displays as `server · tool`, and the server is
+ *  often the reader's employer. */
 export const PUBLIC_TOOLS = new Set([
   "Agent",
   "Bash",
@@ -438,8 +429,7 @@ export const PUBLIC_TOOLS = new Set([
   "get_command_or_subagent_output",
 ])
 
-/** What a leaf is vouched for by, ignoring the direction suffix the engine adds when a tool
- *  earns two rows. */
+/** What a leaf is vouched for by, ignoring the direction suffix a two-row tool earns. */
 export const vouched = (gid: GroupId, name: string): boolean =>
   gid === "shell"
     ? PUBLIC_PROGS.has(name)
@@ -463,8 +453,7 @@ export interface Facts {
   /** The shell half of the same list: programs, biggest first. */
   progs: CostNode[]
   typed: CostNode | null
-  /** How many times the model's prose was re-billed as input for every dollar spent generating
-   *  it. */
+  /** How many times the model's prose was re-billed as input per dollar spent generating it. */
   carry: number
   /** The insight lines, for the captions that quote one of them on its own. */
   ins: Insights
@@ -478,8 +467,7 @@ export interface Facts {
   sayable: (cost: number) => boolean
   /** A share, or null where it rounds away to nothing. */
   pct: (cost: number) => string | null
-  /** A cost divided n ways -- always null when covered, because a per-request figure is money
-   *  whatever the toolbar says. */
+  /** A cost divided n ways -- null when covered, since a per-request figure is money either way. */
   per: (cost: number, n: number) => string | null
 }
 
@@ -530,16 +518,15 @@ export interface Draft {
   cta: string
 }
 
-/** The variants, each returning null when the data cannot support it honestly rather than
- *  printing a hole. The first six carry one phrasing; the styles added after them carry two or
- *  three, so a style that keeps coming up does not arrive in the same words twice. */
+/** The variants, each returning null where the data cannot support it honestly. The later styles
+ *  carry two or three phrasings, so a repeat does not arrive in the same words. */
 const VARIANTS: ((f: Facts) => Draft | Draft[] | null)[] = [
   /* A. The tool question. */
   (f) => {
     const [a, b] = f.tools
     if (!a) return null
-    /* Covered, the scope has nowhere good to sit: "12% of it over 31 days" reads as a rate
-       rather than as a share of one bill, and the image carries the span anyway. */
+    /* Covered, the scope reads as a rate rather than a share, and the image carries the span
+       anyway. */
     return f.c.a({
       name: a.name,
       amt: f.amt(a.cost),
@@ -564,8 +551,7 @@ const VARIANTS: ((f: Facts) => Draft | Draft[] | null)[] = [
     })
   },
 
-  /* C. The agent framing, and the one that is always viable: it asks nothing of the shape of the
-     tree, so there is never a dataset with no caption to pick. */
+  /* C. The agent framing, and the one always viable: it asks nothing of the shape of the tree. */
   (f) => {
     const typedShare = f.typed ? share(f.typed.cost, f.d.total) : null
     return f.c.c({
@@ -594,8 +580,7 @@ const VARIANTS: ((f: Facts) => Draft | Draft[] | null)[] = [
     })
   },
 
-  /* F. The receipt: a statement where the others ask, so the rotation is not five questions in a
-     trench coat. */
+  /* F. The receipt: a statement where the others ask. */
   (f) => {
     const top = f.d.groups[0]
     if (!top || !(f.d.total > 0)) return null
@@ -635,8 +620,7 @@ const VARIANTS: ((f: Facts) => Draft | Draft[] | null)[] = [
     })
   },
 
-  /* I. The ratio between the typing and everything the typing drags in -- the one figure that
-     says the same thing covered as it does open, because it carries no unit. */
+  /* I. The typing against everything the typing drags in -- the one figure that carries no unit. */
   (f) => {
     if (!f.typed || !(f.perTyped >= 4) || !isFinite(f.perTyped)) return null
     return f.c.i({
@@ -717,14 +701,13 @@ const VARIANTS: ((f: Facts) => Draft | Draft[] | null)[] = [
 /** A draft as the composer will receive it, trimmed to fit. */
 function assemble(draft: Draft, home?: string | null): string {
   const link = home ? [`${draft.cta}: ${home}`] : []
-  /* Down to the hook alone, which for a one-line draft is the whole caption: stopping at two
-     would send something that already fits to the truncator to have an ellipsis put on it. */
+  /* Down to the hook alone: stopping at two sends something that already fits to the truncator. */
   for (let keep = draft.lines.length; keep >= 1; keep--) {
     const out = [...draft.lines.slice(0, keep), ...link].join("\n\n")
     if (postLength(out) <= POST_MAX) return out
   }
-  /* Nothing left to drop: the hook itself is over the ceiling, which takes a leaf name long
-     enough that no sentence built around it would have fitted. */
+  /* Nothing left to drop: the hook itself is over the ceiling, which takes a very long leaf
+     name. */
   const [hook] = draft.lines
   const room = POST_MAX - (link.length ? postLength(link[0]) + 2 : 0)
   return [hook.slice(0, Math.max(0, room - 1)).trimEnd() + "…", ...link].join("\n\n")
@@ -735,17 +718,15 @@ export function postVariants(
   d: Dataset,
   pctOnly: boolean,
   home: string | null | undefined,
-  /** The sentences to write them in, handed over rather than picked here: the captions are six
-   *  languages of prose that only the Share button ever reads, so they are fetched on the click
-   *  instead of riding into the entry chunk with the arithmetic. */
+  /** The sentences to write them in, handed over rather than picked here: six languages of prose
+   *  that only the Share button reads, so they are fetched on the click. */
   c: PostCopy,
 ): string[] {
   const f = factsOf(d, pctOnly, c)
   return VARIANTS.flatMap((v) => v(f) || []).map((draft) => assemble(draft, home))
 }
 
-/** The caption that travels with the shared image, drawn at random from the ones this dataset
- *  supports. */
+/** The caption for the shared image, drawn at random from the ones this dataset supports. */
 export function postText(
   d: Dataset,
   pctOnly: boolean,

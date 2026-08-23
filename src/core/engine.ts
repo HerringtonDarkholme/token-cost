@@ -1,12 +1,10 @@
-/* Cost attribution engine. What it walks is a stream of records; which agent's transcript those
-   records were read out of is a question for `agents/`, and nothing here asks it. */
+/* Cost attribution engine: a stream of records, whose agent wrote them being a question for
+   `agents/` that nothing here asks. */
 
 import { AGENTS, agentFor, type Reader } from "./agents/index.ts"
 import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
 
-/* data in -- What the caller hands us, and the one record shape every agent's reader hands over.
-   No agent's own spelling reaches past this: what a store calls a field, and what it nests inside
-   what, is its reader's business. */
+/* data in -- one record shape, which every agent's reader translates its own spelling into. */
 
 /** One uploaded transcript: a filename and its raw JSONL text. */
 export interface RawFile {
@@ -14,9 +12,8 @@ export interface RawFile {
   text: string
 }
 
-/** What one request was billed, in tokens. The five input figures are disjoint -- they sum to the
- *  context the request carried -- and the writes are split by the life the agent asked for, with
- *  `writeUnknown` for an agent that did not say. */
+/** What one request was billed. The five input figures are disjoint, and the writes are split by
+ *  the life the agent asked for. */
 export interface Spend {
   fresh: number
   cached: number
@@ -26,25 +23,24 @@ export interface Spend {
   out: number
 }
 
-/** Where a piece of a turn came from, which is what decides the density it is sized with and the
- *  row it lands in. */
+/** Where a piece of a turn came from, which decides the density it is sized with. */
 export type BlockKind = "text" | "reasoning" | "call" | "result" | "image" | "document"
 
 /** One piece of a turn. */
 export interface Block {
   kind: BlockKind
-  /** What carrying it costs in characters, measured by the reader -- whose format is the only
-   *  thing that knows what counts as its content. */
+  /** What carrying it costs in characters, measured by the reader whose format knows what
+   *  counts. */
   chars: number
-  /** What it is worth where the agent counted it instead of leaving it to be measured: reasoning
-   *  a store bills without recording, and a picture, are both counted rather than read. */
+  /** What it is worth where the agent counted it instead of leaving it to be measured:
+   *  unrecorded reasoning, and pictures. */
   tokens?: number
   /** The text itself, for the blocks the walk has to read to see whose words they are. */
   text?: string
   /** The tool, for a call or the result of one. */
   tool?: string
-  /** The MCP server it came from, where the agent said one -- how that is spelled on disk is the
-   *  reader's business, not the walk's. */
+  /** The MCP server, where the agent said one; how that is spelled on disk is the reader's
+   *  business. */
   server?: string
   /** The id a call will be answered by, and the call a result answers. */
   id?: string
@@ -52,8 +48,7 @@ export interface Block {
   input?: unknown
 }
 
-/** One record of a session: what the model produced, or what went into its context from the other
- *  side. */
+/** One record of a session: what the model produced, or what entered its context. */
 export interface Turn {
   /** ISO timestamp, where the agent recorded one. */
   at?: string
@@ -65,8 +60,8 @@ export interface Turn {
   blocks: Block[]
   /** A request a subagent made rather than the session itself. */
   subagent?: boolean
-  /** This turn rewrote the context rather than adding to it: a compaction. Deltas across it are
-   *  not calibration data. */
+  /** This turn rewrote the context rather than adding to it, so deltas across it are not
+   *  calibration. */
   compacted?: boolean
   /** Content the harness produced, not the person at the keyboard. */
   harness?: boolean
@@ -74,18 +69,19 @@ export interface Turn {
 
 /* pricing -- A rate card, not a model whitelist. */
 
-/** $ per 1M tokens, as [input, output], with an optional cached-input price. Omitted cache uses
- *  `CACHE_READ_MULT` times input, which is what Anthropic and OpenAI publish. */
+/** $ per 1M tokens as [input, output], with an optional cached price; omitted uses
+ *  `CACHE_READ_MULT` times input. */
 export type Rate = [input: number, output: number, cached?: number]
 
-/* Every agent's card in one table, because a model id is priced by what it is rather than by
-   which transcript it turned up in -- two agents billing the same model bill it the same. */
+/* Every agent's card in one table: a model id is priced by what it is, not by whose transcript it
+   turned up in. */
 export const RATES: Record<string, Rate> = Object.assign(
   {},
   ...AGENTS.map((a) => a.rates),
 ) as Record<string, Rate>
 
-/* Last resort before giving up: a word in the id implies a rate, per the agent that published it. */
+/* Last resort before giving up: a word in the id implies a rate, per the agent that published
+   it. */
 const TIERS: ReadonlyArray<readonly [RegExp, Rate]> = AGENTS.flatMap((a) => a.tiers ?? [])
 
 /** Which cache-write multiplier a TTL implies. */
@@ -99,8 +95,7 @@ export function setRates(partial: Record<string, Rate>): void {
   RESOLVED.clear()
 }
 
-/** Strip the decorations a release date, a context window or a cloud reseller adds, so one card
- *  serves all. What only one agent's ids carry, that agent strips. */
+/** Strip the decorations a date, a context window or a reseller adds, so one card serves all. */
 export function normalizeModel(id: unknown): string {
   let m = String(id || "")
     .toLowerCase()
@@ -121,8 +116,7 @@ export interface RateResolution {
   id: string
 }
 
-/* A corpus asks this once per request and answers it with a handful of distinct ids, so the
-   regex chain in `normalizeModel` runs once per id instead. Cleared when the rates change. */
+/* Asked once per request and answered from a handful of distinct ids. Cleared when rates change. */
 const RESOLVED = new Map<string, RateResolution>()
 
 export function resolveRate(model: unknown): RateResolution {
@@ -136,8 +130,7 @@ export function resolveRate(model: unknown): RateResolution {
 
 function resolve(raw: string): RateResolution {
   if (!raw) return { rate: null, basis: "missing", id: raw }
-  /* An id in angle brackets is an agent naming something it did itself -- a record it wrote with
-     no API call behind it, which there is nothing to price. */
+  /* An id in angle brackets is the agent naming its own record: no API call, nothing to price. */
   if (raw.startsWith("<")) return { rate: null, basis: "synthetic", id: raw }
   const id = normalizeModel(raw)
   const exact = RATES[id]
@@ -151,8 +144,7 @@ function resolve(raw: string): RateResolution {
   return { rate: null, basis: "unpriced", id }
 }
 
-/* shell interpretation -- The sets below are the shell language, not a taste list: POSIX special
- * builtins and reserved words. */
+/* shell interpretation -- the sets below are the shell language rather than a taste list. */
 const KEYWORDS = new Set([
   "for",
   "while",
@@ -248,9 +240,8 @@ export function splitSegments(cmd: string): string[] {
   const segs: string[] = []
   let i = 0,
     depth = 0
-  /* A segment is a slice of `cmd` rather than a buffer built a character at a time -- the
-     commands here run to kilobytes, and the only thing that ever leaves a hole in one is the
-     `<<TAG` a heredoc is armed with. */
+  /* A segment is a slice of `cmd` rather than a buffer built a character at a time: these run to
+     kilobytes. */
   let start = 0,
     parts: string[] | null = null
   const take = (end: number): string => {
@@ -280,8 +271,8 @@ export function splitSegments(cmd: string): string[] {
       i++
       continue
     }
-    // `<<TAG` only *arms* a heredoc: the rest of THIS line is still part of the pipeline (`cat
-    // <<EOF | grep x`), and the body starts at the next newline.
+    // `<<TAG` only *arms* a heredoc: the rest of this line is still the pipeline, and the body
+    // starts at the next newline.
     if (c === 60 /* < */ && cmd.charCodeAt(i + 1) === 60 && cmd.charCodeAt(i + 2) !== 60) {
       let j = i + 2
       if (cmd[j] === "-") j++
@@ -377,9 +368,8 @@ export interface Segment {
 }
 
 export function resolveSegment(seg: string): Segment | null {
-  /* Words are taken one at a time rather than split out in advance: a segment can be a
-     kilobyte of arguments, and nothing past the program's first operand is ever read. Parens
-     separate words the way whitespace does. */
+  /* Words are taken one at a time: a segment can be a kilobyte of arguments, and nothing past the
+     program's first operand is read. */
   let at = 0
   const nextWord = (): string | null => {
     const n = seg.length
@@ -408,7 +398,7 @@ export function resolveSegment(seg: string): Segment | null {
     } // sudo/env/timeout/...
     if (KEYWORDS.has(w)) return null // control flow, not a command
     // A wrapper takes its own options before the command it execs: `timeout 5 kubectl`, `xargs -n1
-    // grep`, `nice -n10 cargo`. Skip flags and duration/count values.
+    // grep`. Skip flags and duration values.
     if (wrapped && (w.startsWith("-") || /^\d+(\.\d+)?[smhd]?$/.test(w))) continue
     break
   }
@@ -425,8 +415,7 @@ export function resolveSegment(seg: string): Segment | null {
   return { prog, verb, rank }
 }
 
-/** Every (program, candidate-verb) pair a Bash invocation contains -- the raw material the walk
- *  aggregates to learn which programs actually dispatch subcommands. */
+/** Every (program, candidate-verb) pair in a Bash invocation, which is what the walk aggregates. */
 export function shellCandidates(cmd: string): Segment[] {
   return splitSegments(cmd)
     .map(resolveSegment)
@@ -440,8 +429,8 @@ function pickSegment(cands: readonly Segment[]): Segment | null {
   return pick
 }
 
-/** Label an invocation: pick the segment doing real work, then apply the learned vocabulary to
- *  decide whether its second token is a subcommand. */
+/** Label an invocation: the segment doing real work, then the learned vocabulary on its second
+ *  token. */
 export function labelShell(
   cmd: string,
   dispatchers?: Set<string> | null,
@@ -514,8 +503,7 @@ export type Role = "preamble" | "harness" | "typed" | "assistant" | "tool" | "im
 export interface Bucket {
   role: Role
   tool?: string
-  /** The MCP server the tool came from, where it came from one. Held apart from the name because
-   *  each agent spells the pair its own way, and its reader is what knows how. */
+  /** The MCP server, held apart from the name because each agent spells the pair its own way. */
   server?: string
   dir?: "call" | "result"
   sub?: string | null
@@ -526,9 +514,8 @@ export interface Bucket {
 const keyOf = (r: Bucket): string =>
   [r.role, r.server || "", r.tool || "", r.dir || "", r.sub || "", r.kind || ""].join(" ")
 
-/** Harness-injected user content, identified structurally where the schema allows and by its own
- *  wrapper tag otherwise -- so an unfamiliar tag becomes its own row instead of being misfiled
- *  as something the human typed. */
+/** Harness-injected user content, by structure where the schema allows and by its wrapper tag
+ *  otherwise, so an unfamiliar tag becomes its own row. */
 const TAG_SPAN = /<([a-z][a-z0-9_-]*)>([\s\S]*?)<\/\1>/gi
 const TAG_OPEN = /^\s*<([a-z][a-z0-9_-]*)>/i
 
@@ -539,8 +526,7 @@ export interface UserSpan {
   chars: number
 }
 
-/** Split one user block into harness-injected spans and whatever is left, which is what the
- *  human actually typed. */
+/** Split a user block into harness-injected spans and whatever the human actually typed. */
 export function classifyUserBlock(text: string, turn?: Turn): UserSpan[] {
   if (turn && turn.compacted === true)
     return [{ role: "harness", sub: "compaction summary", chars: text.length }]
@@ -605,28 +591,24 @@ function readTool(input: unknown): ToolKey {
   return NO_KEY
 }
 
-/** How a tool is named in the report: an MCP tool by its server and itself, anything else by
- *  itself. */
+/** An MCP tool is named by its server and itself, anything else by itself. */
 const toolName = (tool: string, server: string): string => (server ? `${server} · ${tool}` : tool)
 
 /* the walk -- One pass. */
 
-/** How far in the id is looked for. Every record of a transcript carries one, so this window has
- *  either found it or there is none -- and a Codex rollout carries none at all, which unbounded
- *  cost a full read of the file to discover. */
+/** How far in the id is looked for: every record carries one, and a Codex rollout carries none
+ *  at all -- which unbounded cost a full read of the file. */
 const ID_WINDOW = 1 << 20
 
 /** A copy of `s` that no longer points at whatever it was cut out of. */
 const detach = (s: string): string => (" " + s).slice(1)
 
-/* Which programs dispatch subcommands is LEARNED, because any list of them is a list of one
- * author's toolchain. */
+/* Which programs dispatch subcommands is learned: any list of them is one author's toolchain. */
 const DISPATCH_MIN_CALLS = 5,
   DISPATCH_MIN_COVERAGE = 0.6,
   DISPATCH_MAX_RATIO = 0.5
 
-/** What the corpus turned out to be: how many files were worth reading, and the constants that
- *  could not be known until all of them had been. */
+/** What the corpus turned out to be: the files worth reading, and the constants only it settles. */
 export interface Scanned {
   filesUsed: number
   /** Files the bill could not read: no agent here wrote them, or no bytes came out of them. */
@@ -639,17 +621,15 @@ export interface Scanned {
   densityCalibrated: boolean
 }
 
-/** A bucket the walk has met, and the one thing about it the walk cannot settle: whether the
- *  word after a program is a subcommand or an operand, which is a question about the corpus
- *  rather than about the call. */
+/** A bucket the walk has met, plus the one thing it cannot settle: whether the word after a
+ *  program is a subcommand, which is a question about the corpus. */
 interface Slot {
   rec: Bucket
   /** The candidate subcommand, or `null` where there is no question to answer. */
   verb: string | null
 }
 
-/** Content that entered a context, held until there is a density to size it with: which slot it
- *  belongs to, how much of it there was, and what that measurement is in. */
+/** Content that entered a context, held until there is a density to size it with. */
 interface Add {
   slot: number
   amt: number
@@ -768,25 +748,21 @@ function hold(
   h.adds.push({ slot, amt, cls })
 }
 
-/** A file the reader could not open, which the bill has to admit to rather than quietly leave
- *  out. */
+/** A file the reader could not open, which the bill admits to rather than leaving out. */
 export function skipFile(st: Walk): void {
   st.filesSkipped++
 }
 
-/** How long the walk may hold the thread before it offers it back, in milliseconds -- half a frame
- *  at 60 Hz, so a 300 MB rollout is a run of frames rather than a stall and each of those frames
- *  has time left in it to draw. */
+/** How long the walk may hold the thread, in milliseconds -- half a frame at 60 Hz, so a big
+ *  rollout is a run of frames rather than a stall. */
 const SLICE = 8
 
-/** A file the walk is part way through: what of it has arrived, and where the walk had got to when
- *  the bytes ran out. A store runs to gigabytes and a single rollout past what a string can hold,
- *  so the file arrives a chunk at a time and none of it is ever held whole. */
+/** A file part way through: what of it has arrived, and where the walk got to when the bytes ran
+ *  out. None of it is held whole -- one rollout can pass what a string holds. */
 export interface FileWalk {
   st: Walk
   name: string
-  /** Anything that changes when the file does -- its bytes, or its characters. Half of what tells
-   *  one session's transcript from a longer copy of the same session. */
+  /** Anything that changes when the file does; half of what tells a session from a longer copy. */
   size: number
   /** Held back until there is enough of the front to say what the file is. */
   head: string
@@ -797,12 +773,11 @@ export interface FileWalk {
   /** The chunk being walked, and how far into it the walk has got. */
   buf: string
   at: number
-  /** The front of a line that began in earlier chunks, in the pieces it arrived in. Joined once,
-   *  when the line ends -- a rollout has single lines of twenty megabytes, and growing one buffer
-   *  a chunk at a time copies the whole of it every time. */
+  /** The front of a line that began in earlier chunks, in the pieces it arrived in. Joined once:
+   *  growing one buffer instead copies twenty megabytes a chunk. */
   carry: string[]
-  /** Set where the front of a line was all the reader wanted: the rest of it is then read past
-   *  rather than collected, which on a real store leaves three and a half gigabytes unjoined. */
+  /** Set where the front of a line was all the reader wanted, so the rest is read past rather
+   *  than collected. */
   skipping: boolean
   /** Whichever agent wrote the file, part way through reading it. */
   reader: Reader | null
@@ -811,8 +786,8 @@ export interface FileWalk {
   feed: ((turn: Turn) => void) | null
 }
 
-/** Begin a file. Nothing is settled here -- which store wrote it, and whether it has been read
- *  already, are both questions about its front, which has not arrived yet. */
+/** Begin a file. Which store wrote it, and whether it is a repeat, are questions about a front
+ *  that has not arrived yet. */
 export function openFile(st: Walk, name: string, size: number): FileWalk {
   return {
     st,
@@ -832,18 +807,17 @@ export function openFile(st: Walk, name: string, size: number): FileWalk {
   }
 }
 
-/** The front of the file has arrived: settle whether it has been read before, which store wrote
- *  it, and open the accumulators the rest of it feeds. */
+/** The front has arrived: settle whether it was read before, who wrote it, and open the
+ *  accumulators. */
 function settle(fw: FileWalk): void {
   const st = fw.st
-  /* Only the window, however much of the front is in hand: every record of a transcript carries
-     the id, and a rollout carries none at all. */
+  /* Only the window: every record of a transcript carries the id, and a rollout carries none. */
   const head = fw.head.length > ID_WINDOW ? fw.head.slice(0, ID_WINDOW) : fw.head
   fw.opened = true
   fw.buf = fw.head
   fw.head = ""
-  /* Whose file this is, asked before anything else: a file no agent here wrote is not a transcript
-     that came out empty, and must not be counted as one. */
+  /* Whose file this is, asked first: a file no agent wrote is not a transcript that came out
+     empty. */
   const agent = agentFor(head)
   if (!agent) {
     st.filesSkipped++
@@ -858,8 +832,7 @@ function settle(fw: FileWalk): void {
     fw.buf = ""
     return
   }
-  /* An agent may write several jsonl files per session where only one of them is the billed
-     conversation; the rest must not count as transcripts that then show up empty. */
+  /* An agent may write several files per session where only one is the billed conversation. */
   if (agent.sidecar?.(head)) {
     fw.dropped = true
     fw.buf = ""
@@ -867,17 +840,15 @@ function settle(fw: FileWalk): void {
   }
   st.seen.add(id)
   st.filesUsed++
-  /* Every agent tells the same story in its own hand, so each one is read into the records this
-     walk already reads rather than given a walk of its own. */
+  /* Every agent tells the same story in its own hand, so each is read into these same records. */
   fw.reader = agent.open(head)
 
   const { verbs, S, billed, models, unpriced, ttl, firstCtx } = st
   const h: Held = { adds: [], charges: [] }
   st.held.push(h)
 
-  /* Per file, and thrown away with it: what the calibration is measuring across the interval
-     between two requests, what the tool calls in this session were called, and whether this
-     session has been counted yet. */
+  /* Per file, and thrown away with it: the calibration interval, this session's tool names, and
+     whether the session has been counted. */
   let prevTokens: number | null = null,
     prevOut = 0,
     codeChars = 0,
@@ -889,8 +860,7 @@ function settle(fw: FileWalk): void {
     { tool: string; server?: string; sub: string | null; verb: string | null; shell: boolean }
   >()
 
-  /* One turn, whichever agent's file it was read out of: every reader meets the walk here, and
-     the walk cannot tell which one it is talking to. */
+  /* One turn, whichever agent's file it came out of; the walk cannot tell which reader it is. */
   const feed = (turn: Turn): void => {
     if (typeof turn.at === "string") {
       const t = Date.parse(turn.at)
@@ -902,9 +872,8 @@ function settle(fw: FileWalk): void {
     const blocks = turn.blocks
 
     if (turn.by === "model") {
-      /* What the output was spent on, in characters. The reader measured each block as it read it,
-         so this is a sum rather than a second pass over the content -- and serialising a call's
-         arguments, which used to happen here and again below, happens once in the reader. */
+      /* What the output was spent on, in characters: the reader measured each block as it read
+         it, so this is a sum rather than a second pass. */
       let proseChars = 0,
         argsChars = 0
       for (const b of blocks) {
@@ -1043,9 +1012,8 @@ function settle(fw: FileWalk): void {
       // Compaction rewrites the prefix, so deltas across it are not calibration data.
       if (turn.compacted === true) dirty = true
       for (const b of blocks) {
-        /* Two questions of the same block, and they are not the same question: what it is worth is
-           which bucket it belongs to, what it is *for* here is whether it is text this file can
-           measure against the token delta. */
+        /* Two questions of the same block: which bucket it belongs to, and whether it is text
+           this file can measure against the token delta. */
         if (b.kind === "result") {
           codeChars += b.chars
           const t = (b.id ? toolOf.get(b.id) : undefined) || {
@@ -1086,8 +1054,8 @@ function settle(fw: FileWalk): void {
   fw.feed = feed
 }
 
-/** More of the file. Only ever called with the walk caught up on what came before, so what is left
- *  of the last chunk is the front of one line rather than a backlog. */
+/** More of the file. Only called with the walk caught up, so what is left is the front of a
+ *  line. */
 export function pushText(fw: FileWalk, chunk: string): void {
   if (fw.dropped || fw.ended) return
   if (!fw.opened) {
@@ -1095,14 +1063,13 @@ export function pushText(fw: FileWalk, chunk: string): void {
     if (fw.head.length >= ID_WINDOW) settle(fw)
     return
   }
-  /* Whatever is left of the last chunk is the front of a line this one finishes, so it is set
-     aside rather than grown into: the join happens once, when the line ends. */
+  /* What is left of the last chunk is the front of a line this one finishes: the join happens
+     once. */
   if (fw.at < fw.buf.length && !fw.skipping) {
     const part = fw.at ? fw.buf.slice(fw.at) : fw.buf
-    /* Offered from its front before it is collected: the biggest records a rollout writes are the
-       ones the reader takes a few hundred bytes off, and putting those back together first was
-       four gigabytes of string built and thrown away. Only ever asked of the first piece -- a
-       marker found in the middle of a line is a marker inside somebody's text. */
+    /* Offered from its front before it is collected: the biggest records are the ones the reader
+       takes a few hundred bytes off, and rejoining those first built four gigabytes of string.
+       Only ever the first piece -- a marker mid-line is a marker inside somebody's text. */
     if (!fw.carry.length && fw.reader && fw.feed && fw.reader.front(part, fw.feed))
       fw.skipping = true
     else fw.carry.push(part)
@@ -1111,25 +1078,21 @@ export function pushText(fw: FileWalk, chunk: string): void {
   fw.at = 0
 }
 
-/** No more of the file. A file shorter than the window is settled here rather than in `pushText`,
- *  and what is left in hand is a whole line rather than the front of one. */
+/** No more of the file. One shorter than the window is settled here rather than in `pushText`. */
 export function endText(fw: FileWalk): void {
   if (!fw.opened) settle(fw)
   fw.ended = true
 }
 
-/** Walk what has arrived, offering the thread back on a clock rather than on a count of records --
- *  because the two stores do not agree on what a record is, and a rollout can spend a whole slice
- *  on one of them. Returns once the lines in hand are walked, which is the point a caller may push
- *  more. */
+/** Walk what has arrived, offering the thread back on a clock rather than on a count of records:
+ *  a rollout can spend a whole slice on one record. */
 export function* stepFile(fw: FileWalk): Generator<void, void, void> {
   const feed = fw.feed
   if (!feed) return
   const st = fw.st
   const reader = fw.reader
   for (;;) {
-    /* Walked by index rather than `split("\n")`: a store is hundreds of megabytes, and the split
-       builds an array of every line in the chunk before the first one is read. */
+    /* Walked by index rather than `split("\n")`, which builds every line of the chunk up front. */
     let end = fw.buf.indexOf("\n", fw.at)
     if (end === -1) {
       if (!fw.ended) break
@@ -1137,9 +1100,8 @@ export function* stepFile(fw: FileWalk): Generator<void, void, void> {
       // Past the last newline with nothing more coming, so the rest of it is the last line.
       end = fw.buf.length
     }
-    /* Leading blanks are skipped by hand rather than trimmed: `JSON.parse` tolerates the
-       whitespace either side, so the only thing a `trim()` would settle is whether the line is
-       empty. */
+    /* Leading blanks skipped by hand rather than trimmed: `JSON.parse` tolerates whitespace
+       either side, so all a `trim()` would settle is whether the line is empty. */
     let line: string | null = null
     if (fw.skipping) {
       // The front of this one was all the reader wanted, so the rest of it goes unread.
@@ -1178,8 +1140,8 @@ export function drainFile(fw: FileWalk): void {
   while (!step.done) step = steps.next()
 }
 
-/** The whole of a file at once. `false` means it was a duplicate of one already read -- the answer
- *  goes back to the caller because the caller is the one keeping count of what it handed over. */
+/** The whole of a file at once. `false` is a duplicate of one already read, which the caller
+ *  counts. */
 export function walkOne(st: Walk, f: RawFile): boolean {
   const text = f.text || ""
   const fw = openFile(st, f.name, text.length)
@@ -1189,8 +1151,7 @@ export function walkOne(st: Walk, f: RawFile): boolean {
   return !fw.dropped
 }
 
-/* the score -- Spend the two constants: allocate every request's exact billed cost across the
- * content that was in its context. */
+/* the score -- allocate each request's billed cost across the content in its context. */
 
 /** Per-bucket cost accumulators. */
 export interface AccEntry {
@@ -1260,8 +1221,7 @@ function score(
   let preamble: number | null = null,
     at = 0
   /* The accumulator a slot spends into is found once and then held by slot number: every request
-     in the corpus pays into the same few, and the key is a string built to be unmistakable
-     rather than quick to hash. */
+     pays into the same few. */
   const entry = (slot: number): AccEntry => {
     let e = perSlot[slot]
     if (!e) {
@@ -1291,9 +1251,8 @@ function score(
     const body = Math.max(0, ch.ctxTokens - preamble)
     const k = mine > 0 ? body / mine : 0
     const pre = Math.min(preamble, ch.ctxTokens)
-    /* The shares are walked twice rather than listed once: the same multiply repeated is free
-       next to a pair of arrays per bucket per request, and summing the parts is not the same
-       arithmetic as reusing the body they came from. */
+    /* The shares are walked twice rather than listed once: a repeated multiply is free next to a
+       pair of arrays per bucket per request. */
     let denom = 0
     if (mine > 0) for (const v of ctx.values()) denom += v * k
     if (pre > 0) denom += pre
@@ -1325,8 +1284,7 @@ function score(
   }
 }
 
-/** Close the walk: judge which programs dispatch subcommands, fit the densities, and spend both
- *  on everything that was held back. */
+/** Close the walk: judge the dispatchers, fit the densities, spend both on what was held back. */
 export function closeWalk(st: Walk): { scanned: Scanned; alloc: Allocation } {
   const dispatchers = new Set<string>()
   for (const [prog, e] of st.verbs) {
@@ -1430,11 +1388,9 @@ export function price(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"): P
   }
 }
 
-/* the report -- Groups are defined by ROLE IN THE REQUEST CYCLE -- a structural property every
- * transcript has. */
+/* the report -- groups are defined by role in the request cycle, which every transcript has. */
 
-/* Re-exported so the nine stay one import away from everything that reads a report, whether or
-   not it also reads a transcript. */
+/* Re-exported so the nine stay one import away from anything that reads a report. */
 export { GROUPS, type GroupDef, type GroupId }
 
 /** A tool is shown as one row, or split into call/result rows, depending on whether BOTH
@@ -1467,8 +1423,7 @@ export interface TreeGroup {
   items: TreeItem[]
 }
 
-/** Figures the views quote, measured here so no view needs a hand-written list of "commands that
- *  read" versus "commands that write". */
+/** Figures the views quote, measured here so no view needs its own list of commands that read. */
 export interface Insights {
   fixed: number
   harness: number
@@ -1599,8 +1554,8 @@ export function buildTree(alloc: Allocation, ttlAssumption: TtlAssumption = "1h"
       for (const [sub, c] of t.subs) put(gid, disp, sub, c)
       put(gid, disp, "(no path parsed)", total - subTotal)
     } else if (Math.min(t.call, t.result) / total >= SPLIT_MIN_SHARE) {
-      // Both directions carry real money, so one merged row would hide the story -- and drilling a
-      // single-child row renders a degenerate 100% block.
+      // Both directions carry real money, and drilling a single-child row renders a degenerate
+      // block.
       put(gid, disp + " · results", null, t.result)
       put(gid, disp + " · call args", null, t.call)
     } else {
@@ -1674,8 +1629,7 @@ const OUT_NAMES: Record<string, string> = {
   "thinking-carried": "thinking blocks (re-billed as input)",
 }
 
-/* top level -- One scan, one allocation, then a priced tree per TTL assumption -- and the
- * assumption only affects the cache writes whose TTL the transcript omitted. */
+/* top level -- one scan, one allocation, then a priced tree per TTL assumption. */
 
 export interface ModelReport {
   id: string
@@ -1776,8 +1730,7 @@ export function report(scanned: Scanned, alloc: Allocation): Analysis {
   }
 }
 
-/** The whole thing in one call, for callers that already hold every file: the tests, and any
- *  script with a directory in hand. */
+/** The whole thing in one call, for callers that already hold every file. */
 export function analyze(rawFiles: RawFile[], _opts: AnalyzeOptions = {}): Analysis {
   const w = openWalk()
   for (const f of rawFiles) walkOne(w, f)

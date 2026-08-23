@@ -161,9 +161,8 @@ describe("chunkPicked", () => {
   })
 
   it("carries a character split across two chunks over the join", async () => {
-    /* The whole reason the bytes go through a decoder that holds state rather than one call per
-       chunk: where the pieces fall is the platform's business, and one of them will land inside a
-       character sooner or later. */
+    /* The whole reason the bytes go through a decoder that holds state: where the pieces fall is
+       the platform's business, and one will land inside a character sooner or later. */
     const p = {
       file: bytes([
         [0x63, 0x61, 0x66, 0xc3],

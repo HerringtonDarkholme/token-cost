@@ -175,8 +175,7 @@ function CloseMark(): React.JSX.Element {
 }
 
 /** One control in the panel, with the word for what it does beside it. Above the breakpoint both
- *  the wrapper and the word go away -- `display: contents` -- and the control is a plain item in
- *  the bar again, which is why there is one set of these rather than two. */
+ *  the wrapper and the word go away -- `display: contents` -- so there is one set of these. */
 function Tool({ label, children }: { label?: string; children: ReactNode }): React.JSX.Element {
   return (
     <div className="tool">
@@ -306,9 +305,8 @@ export function Toolbar({
             ) : null}
           </>
         ) : null}
-        {/* Inside the anchor rather than beside it: language and theme are the two controls that
-            exist before there is a bill and outlive any one of them, so they hold the same
-            ground on both faces of the card and everything else grows leftward past them. */}
+        {/* Inside the anchor rather than beside it: language and theme exist before there is a bill
+            and outlive any one of them, so everything else grows leftward past them. */}
         <Tool label={t.language}>
           <LangPicker />
         </Tool>

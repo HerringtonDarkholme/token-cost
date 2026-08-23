@@ -11,23 +11,10 @@ const STANDALONE = "cost-report.html"
    overwritten by a build that inlines everything into one file. */
 const OUT = "dist-standalone"
 
-/**
- * The deliverable is one file the reader opens by double-click, so the build has three
- * obligations Vite will not enforce on its own.
- *
- * 1. It must run from `file://`. A `<script type="module">` is fetched and linked under
- *    module rules, and on a null origin that is not something to gamble the whole
- *    deliverable on. Bundling to IIFE and dropping the `type`/`crossorigin` attributes
- *    leaves a classic inline script, which has no such constraints.
- * 2. That script has to run after the document exists. Vite hoists the bundle into
- *    `<head>`, which is harmless while it is a module — modules are deferred — and fatal
- *    the moment step 1 strips the `type`, because a classic inline script in `<head>`
- *    executes before `<body>` is parsed. So it is moved to the end of `<body>`, and the
- *    check below fails the build if it ever ends up back in the head.
- * 3. It must reach the network never. Everything is inlined already; this asserts it,
- *    so a stray external reference fails the build instead of silently shipping a page
- *    that leaks a request the moment someone opens it.
- */
+/** One file the reader opens by double-click, which Vite will not enforce on its own: it is
+ *  bundled to IIFE so no module rules apply on a null origin, the script is moved to the end of
+ *  `<body>` because a classic inline script in `<head>` runs before the body is parsed, and the
+ *  checks below fail the build if either slips or if anything external is left in the document. */
 function standalone(): Plugin {
   return {
     name: "standalone-html",
@@ -99,14 +86,12 @@ export default defineConfig({
     target: "es2022",
     cssCodeSplit: false,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
-    // Vite 8 bundles with Rolldown; `rollupOptions` still works but is deprecated.
-    // singlefile already forces `codeSplitting: false`, which subsumes
-    // `inlineDynamicImports` -- setting both makes Rolldown warn.
+    // singlefile already forces `codeSplitting: false`, which subsumes `inlineDynamicImports`;
+    // setting both makes Rolldown warn.
     rolldownOptions: {
       output: { format: "iife" },
       /* The faces are dynamic imports, which pulls in Vite's preload helper -- and that reads
-         `import.meta.url`, which an IIFE has no answer for. Harmless here and only here: with no
-         code splitting there is no chunk to preload, so the helper is dropped from the bundle. */
+         `import.meta.url`, which an IIFE has no answer for. Harmless with no chunk to preload. */
       onwarn(warning, warn) {
         if (warning.code === "EMPTY_IMPORT_META") return
         warn(warning)

@@ -79,7 +79,8 @@ interface GrokLine {
 
 const GROK_METHODS = new Set(["session/update", "_x.ai/session/update"])
 
-/** Whether this file is a Grok `updates.jsonl` rather than a Claude transcript or a Codex rollout. */
+/** Whether this file is a Grok `updates.jsonl` rather than a Claude transcript or a Codex
+ *  rollout. */
 export function isGrokSession(text: string): boolean {
   let seen = 0
   for (const line of lines(text)) {
@@ -106,15 +107,13 @@ export function isGrokSession(text: string): boolean {
   return false
 }
 
-/* Named for the loop that writes them, so no other store's records answer to one -- a plain
-   `system` or `user` is Claude Code's word too, and taking it as proof here dropped the
-   transcript. */
+/* Named for the loop that writes them, so no other store's records answer to one: a plain `system`
+   or `user` is Claude Code's word too, and taking it as proof dropped the transcript. */
 const EVENT_TYPES = new Set(["turn_started", "phase_changed", "loop_started", "first_token"])
 const OWN_KEYS = ["hunkId", "is_bash", "btwSessionId", "file_snapshots"]
 
-/** A jsonl file that lives next to `updates.jsonl` and must not be walked as a transcript. Only
- *  what Grok alone writes counts: a false yes here drops a priced transcript, and a false no
- *  costs one unbilled empty file. */
+/** A jsonl file beside `updates.jsonl` that must not be walked as a transcript. Only what Grok
+ *  alone writes counts: a false yes here drops a priced transcript. */
 export function isGrokSidecar(text: string): boolean {
   let seen = 0
   for (const line of lines(text)) {

@@ -41,9 +41,8 @@ export interface PostCopy {
   e: (p: { times: string; gen: string | null; carry: string }) => Draft
   f: (p: { total: string | null; scope: string; said: string; share: string }) => Draft
 
-  /* The styles below carry two or three phrasings each, drawn from the same flat list as the
-     six above: a style that survives its guard on most datasets would otherwise arrive in the
-     same words every time it came up. */
+  /* The styles below carry two or three phrasings each, so one that survives its guard on most
+     datasets does not arrive in the same words every time. */
 
   g: (p: {
     total: string | null

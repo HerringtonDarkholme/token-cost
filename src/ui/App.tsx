@@ -13,9 +13,8 @@ import { Page, type Dir } from "./Page.tsx"
 import { decodeImport, pendingImport } from "./transfer.ts"
 
 /** A view goes out under the name of the face it is, never the one in the address bar -- see
- *  `scrub`, which is where the reader's own line items are kept out of it. The `PROD` half of the
- *  guard beside it is what keeps the dev server and the suites off the network: unbuilt, the
- *  component fetches its debug script from a Vercel domain, and this page reaches nobody. */
+ *  `scrub`. The `PROD` half of the guard beside it keeps the dev server and the suites off the
+ *  network. */
 const rename = (event: BeforeSendEvent): BeforeSendEvent | null => {
   const url = scrub(event.url)
   return url === null ? null : { ...event, url }
@@ -27,8 +26,7 @@ function exitMs(): number {
 }
 
 /** Theme is an attribute on the root element, outside React's tree, because the stylesheet needs
- *  it above `body`. "system" removes the attribute rather than guessing a value -- that is the
- *  un-stamped state where `prefers-color-scheme` decides. */
+ *  it above `body`. "system" removes the attribute rather than guessing a value. */
 function useTheme(): void {
   const { theme } = useViewState()
   useEffect(() => {
@@ -38,9 +36,8 @@ function useTheme(): void {
   }, [theme])
 }
 
-/** And the language, on the same element and for the same reason: `lang` is above `body`, and it
- *  is not decoration -- a screen reader picks its voice from it, and the browser picks its
- *  hyphenation and its quotes. */
+/** And the language, on the same element: a screen reader picks its voice from `lang`, and the
+ *  browser its hyphenation and quotes. */
 function useLangAttr(): void {
   const { lang } = useViewState()
   const t = useT()
@@ -71,9 +68,8 @@ export function App(): React.JSX.Element {
     dir: "fwd",
     sample: false,
   })
-  /* A report is on its way out of the address bar, so the empty card is not what belongs on
-     screen -- and the folder-reading face is not what belongs on the network either. Held until
-     the bill lands, or until the decode comes back with nothing. */
+  /* A report is on its way out of the address bar, so neither face belongs yet. Held until the bill
+     lands, or until the decode comes back with nothing. */
   const [importing, setImporting] = useState(() => !!pendingImport())
   useTheme()
   useLangAttr()
@@ -89,46 +85,37 @@ export function App(): React.JSX.Element {
   /** Turn the card over to `next` -- inside a view transition where there is one, exit first
    *  where there is not. */
   const turnTo = useCallback((next: Analysis | null, dir: Dir, sample: boolean, home = false) => {
-    /* Cleared with the report rather than before it: the view state is what the departing face
-       is still being drawn from, and dropping the drill-down under it would reshape the picture
-       on its way out. */
+    /* Cleared with the report rather than before it: the departing face is still being drawn from
+       the view state. */
     const swap = (): void => {
       if (!next) resetState()
       setTurn({ data: next, leaving: false, dir, sample })
     }
 
     if (canTransition()) {
-      /* Up first and without tweening it, because the capture that is about to happen is of the
-         viewport: a smooth scroll still running when the snapshot is taken would be photographed
-         mid-flight, and a scroll *inside* the callback would move the ground the old and new
-         snapshots are being lined up against. */
+      /* Up first and without tweening it: the capture about to happen is of the viewport, and a
+         smooth scroll still running would be photographed mid-flight. */
       if (home) window.scrollTo({ top: 0, behavior: "auto" })
-      /* `data-turn` is which way the page is going, and it is also what tells the stylesheet
-         that the transition now starting is the turn rather than the breakdown filtering itself
-         -- the two want different things named and different things left alone. */
+      /* `data-turn` is which way the page is going, and what tells the stylesheet this transition
+         is the turn rather than the breakdown filtering itself. */
       transition(swap, { "data-turn": dir })
       return
     }
 
-    /* Before the exit, not after: the report is several screens taller than the empty card, so a
-       reset from down in the footnotes would otherwise shrink the document under a scroll
-       position the browser then has to clamp -- which reads as the page leaping, however well
-       the card itself tweens. */
+    /* Before the exit, not after: the report is several screens taller, so a reset from the
+       footnotes would shrink the document under a scroll position the browser then clamps. */
     if (home) window.scrollTo({ top: 0, behavior: reduced() ? "auto" : "smooth" })
     setTurn((t) => ({ ...t, leaving: true, dir }))
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(swap, exitMs())
   }, [])
 
-  /* The last bill read, kept so a Forward back into `/report` has something to show. Nothing else
-     can restore it: the address carries the view, but the transcripts came out of a folder this
-     page never gets to open twice. */
+  /* The last bill read, kept so a Forward back into `/report` has something to show: the
+     transcripts came out of a folder this page never gets to open twice. */
   const last = useRef<{ data: Analysis; sample: boolean } | null>(null)
 
-  /* The face is awaited before the card turns rather than inside the turn: a view transition
-     photographs the tree it is handed, and a face still on the network would be photographed
-     empty. The wait is a microtask wherever the prefetch got there first, which is everywhere the
-     reader had time to drop a folder. */
+  /* The face is awaited before the card turns rather than inside it: a view transition photographs
+     the tree it is handed, and a face still on the network would be photographed empty. */
   const onData = useCallback(
     (data: Analysis, sample: boolean) => {
       last.current = { data, sample }
@@ -137,10 +124,9 @@ export function App(): React.JSX.Element {
     [turnTo],
   )
 
-  /* A report the CLI dropped in the address rather than a folder dropped on the card. It was
-     lifted out of the hash before the first render -- see `takeImport` -- so what is left here is
-     the decode. Latched rather than left to the dependency list: StrictMode runs an effect twice
-     on mount, and turning the card over twice would push a second history entry. */
+  /* A report the CLI dropped in the address, lifted out of the hash before the first render -- see
+     `takeImport` -- so what is left here is the decode. Latched, because StrictMode runs an effect
+     twice and a second turn would push a second history entry. */
   const imported = useRef(false)
   useEffect(() => {
     const raw = pendingImport()
@@ -161,9 +147,8 @@ export function App(): React.JSX.Element {
     })()
   }, [onData])
 
-  /* Start over is a move home rather than an undo, so it goes forward to `/` and leaves the
-     report where it was: `history.back()` would have risen one drill level instead, since going
-     into a group is an entry of its own. */
+  /* Start over is a move home rather than an undo, so it goes forward to `/`: `history.back()`
+     would rise one drill level instead. */
   const onReset = useCallback(() => {
     void (async () => {
       await loadFace("intake")

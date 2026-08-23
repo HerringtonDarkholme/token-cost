@@ -1,6 +1,5 @@
-/* Every agent the bill reads, behind the one set of questions the walk asks all of them: which
-   files are yours, how do they read, what do your models cost. A fourth agent is a file in this
-   folder and a line in the list below -- the engine names none of them. */
+/* Every agent the bill reads, behind one set of questions: which files are yours, how do they
+   read, what do your models cost. */
 
 import type { Rate, Turn } from "../engine.ts"
 import { claude } from "./claude.ts"
@@ -10,11 +9,9 @@ import { grok } from "./grok.ts"
 /** Where a turn goes once a reader has one. */
 export type Emit = (turn: Turn) => void
 
-/** One file, part way read. Made per file, so a reader may hold whatever its format needs across
- *  the lines of one session and nothing wider. */
+/** One file, part way read: made per file, so a reader holds format state for one session only. */
 export interface Reader {
-  /** The front of a line, offered before the rest of it is collected: `true` where the front was
-   *  all this reader wanted, and the rest may go unread. */
+  /** The front of a line: `true` where that was all this reader wanted. */
   front(part: string, emit: Emit): boolean
   /** One whole line. `false` is a line that would not parse, which the bill owns up to. */
   line(text: string, emit: Emit): boolean
@@ -34,15 +31,14 @@ export interface Store {
 export interface Agent {
   /** How the bill names it. */
   name: string
-  /** Whether this agent wrote the file, judged from its front. Every claim is a positive test for
-   *  markers of its own format, so no agent is anyone else's fallback. */
+  /** Whether this agent wrote the file -- a positive test for its own markers, so no agent is
+   *  another's fallback. */
   claims(head: string): boolean
   /** A file in its session folder that is not the billed conversation. */
   sidecar?(head: string): boolean
   /** The names it gives those, for a caller that has the name before the bytes. */
   sidecarNames?: ReadonlySet<string>
-  /** Which session the file records, so two copies of one session are read once. Agents that name
-   *  no session are told apart by name and length instead. */
+  /** Which session the file records, so two copies of one session are read once. */
   session?(head: string): string | null
   open(head: string): Reader
   /** $ per 1M tokens for the models it bills. */
@@ -57,15 +53,13 @@ export interface Agent {
 
 export const AGENTS: readonly Agent[] = [claude, codex, grok]
 
-/** Which agent wrote this file, or null for one none of them did. Asked in list order, which
-   settles a file that somehow answers to two. */
+/** Which agent wrote this file, asked in list order so a file answering to two is settled. */
 export function agentFor(head: string): Agent | null {
   for (const a of AGENTS) if (a.claims(head)) return a
   return null
 }
 
-/** Every agent's sidecar names, for the callers that filter a folder listing before reading any
- *  of it. */
+/** Every agent's sidecar names, for callers that filter a listing before reading it. */
 export const SIDECAR_NAMES: ReadonlySet<string> = ((): ReadonlySet<string> => {
   const all = new Set<string>()
   for (const a of AGENTS) if (a.sidecarNames) for (const n of a.sidecarNames) all.add(n)

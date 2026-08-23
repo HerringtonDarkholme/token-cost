@@ -10,10 +10,8 @@ function Below(): React.JSX.Element {
   return (
     <>
       <Breakdown />
-      {/* Where the card's three figures go on a narrow window: they are what the thesis argues
-          *from*, and reading them costs a line each, so they wait until the reader has been
-          through the picture and the line items rather than standing between the bill and the
-          chart. */}
+      {/* Where the card's three figures go on a narrow window: reading them costs a line each, so they
+                  wait until the reader has been through the picture and the line items. */}
       {narrow ? <Strip only="figures" /> : null}
       <Footnotes />
     </>

@@ -1,24 +1,8 @@
-/* What a pageview is allowed to say. Kept apart from the component that sends one, because both
-   answers below are plain functions over strings and the suite that guards them runs under bare
-   `node`, where a `.tsx` would not parse. */
+/* What a pageview is allowed to say. */
 
-/** What the address carries that Vercel may not be told. Two things, and the second is the one
- *  worth spelling out: the drill path is built from the *reader's own* line-item names, so
- *  `/report/shell-commands/git` is harmless but the next one along is
- *  `/report/tools-content-read-in/acmeinternal-fetch-ledger` -- an in-house MCP server, named
- *  after somebody's employer. That is the exact class of name the share captions refuse to
- *  carry, and a pageview is no more entitled to it. The hash is the other: a report handed over
- *  by the CLI rides in it.
- *
- *  So a view is reported as the face it is -- the empty card, or the report -- and the drill
- *  below it is dropped. */
-/** It answers with one of exactly two addresses, and that is the point: a filter that rewrites what
- *  it recognises still ships whatever it failed to recognise, while a whitelist of the two faces
- *  the page actually has cannot emit a name it was never given.
- *
- *  The origin stays on the front because Vercel's ingest takes a whole address and nothing less --
- *  a bare `/report` comes back `body/o must match pattern "^https?://"`, a 400, and the view is
- *  never counted. An address that will not parse has no origin to keep, so it reports nothing. */
+/** The address minus what Vercel may not be told: the drill path is built from the reader's own
+ *  line-item names, and one of those is somebody's in-house MCP server. The origin rides along
+ *  because Vercel's ingest 400s a bare path. */
 export function scrub(url: string): string | null {
   try {
     const at = new URL(url)
@@ -29,11 +13,8 @@ export function scrub(url: string): string | null {
   }
 }
 
-/** Whether this copy of the page is the hosted one. Two answers to give, and neither is a guess:
- *  the standalone build is opened from disk, where there is no network to reach and a promise
- *  that it never does; and it is named `cost-report.html`, which is what tells it apart from the
- *  deployed page when somebody serves it themselves. `store.ts` reads the same `.html` to decide
- *  whether the address can hold a path at all. */
+/** Whether this copy is the hosted one: the standalone is opened from disk, or served under its
+ *  own `cost-report.html` name. */
 export function hosted(protocol: string, pathname: string): boolean {
   return /^https?:$/.test(protocol) && !/\.html?$/i.test(pathname)
 }

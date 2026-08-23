@@ -119,9 +119,8 @@ export function Cycle<T extends string>({
         aria-describedby={id}
         onClick={() => onPick(next.value)}
       >
-        {/* The face is held for the length of its own exit, so what leaves is the option that
-            was current rather than the one just picked -- the same swap the platform chip
-            uses, for the same reason: one fact changing, not two things arguing. */}
+        {/* The face is held for the length of its own exit, so what leaves is the option that was
+            current rather than the one just picked. */}
         <TextSwap token={value}>
           <span className="cycface">{cur.icon ?? cur.label}</span>
         </TextSwap>

@@ -57,16 +57,11 @@ const Sector = memo(function Sector({
 
   return (
     <g>
-      {/* This sector's fan, opening across its own width -- see `.sunfan` in the stylesheet.
-          A circle at half the radius stroked at the full width of it, so what the mask paints
-          is a wedge of the disc rather than a ring; `pathLength` restates its length as 360,
-          which puts the dash the stylesheet grows in degrees, the units the arcs are laid out
-          in. Turned to start where this sector starts, and a quarter turn back on top of that,
-          because a circle's own path begins at three o'clock and the ranking begins at twelve.
-
-          `userSpaceOnUse` rather than the default: the mask's region would otherwise be the
-          bounding box of the sector, and a thin sector's box is not the circle this is drawn
-          in. */}
+      {/* This sector's fan, opening across its own width -- see `.sunfan`. A circle at half the
+          radius stroked at the full width of it, so the mask paints a wedge rather than a ring;
+          `pathLength` restates its length as 360, so the dash grows in degrees. Turned to start
+          where the sector does, plus a quarter turn, since a circle's path begins at three o'clock.
+          `userSpaceOnUse` because a thin sector's bounding box is not this circle. */}
       <defs>
         <mask id={fan} maskUnits="userSpaceOnUse" x={-100} y={-100} width={200} height={200}>
           <circle
@@ -95,9 +90,8 @@ const Sector = memo(function Sector({
           const miss = !!q && !a.key.toLowerCase().includes(q)
           const dim = (anyHover && !on) || miss
           return (
-            /* The wedge and its dashed edge travel together on the arrival -- see `.sunwedge` in
-               the stylesheet, which grows each ring out of the hole a beat after the one inside
-               it. */
+            /* The wedge and its dashed edge travel together on the arrival -- see `.sunwedge`,
+               which grows each ring a beat after the one inside it. */
             <g key={a.key} className="sunwedge" data-ring={a.ring}>
               <path
                 className="sunarc"
@@ -150,9 +144,8 @@ function Core({
      translated copy would fade on a language change. */
   const kAt = h ? "h›" + (h.under ? h.under : h.group) : "r›" + focus.node.name
   const sAt = h ? "h›" + h.key : "r›" + focus.node.name
-  /* The amount twice over: a number for the rolling digits, text for the words beside them. Once
-     the dollars are covered the readout is a share of the whole bill -- the same figure `amt()`
-     writes -- and it rolls the same way rather than cutting to the next arc's. */
+  /* The amount twice over: a number for the rolling digits, text for the words beside them.
+     Covered, the readout is a share of the whole bill and rolls the same way. */
   const cost = h ? h.cost : rootCost
   const pctText = pct.toFixed(pct < 1 ? 2 : 1) + "%"
 
@@ -177,9 +170,8 @@ function Core({
             t.sun.lineItems(kids)
           )}
         </TextCross>
-        {/* Only the share crosses. The next arc's line is the same sentence with a different
-            number in it, and fading four identical words out and back in says nothing -- so
-            the words stay put and travel to wherever the arriving figure leaves them. */}
+        {/* Only the share crosses: the next arc's line is the same sentence with a different
+            number, and fading four identical words out and back says nothing. */}
         <span className="dim">
           {h
             ? t.sun.ofLabel(
@@ -283,9 +275,8 @@ export function Sunburst(): React.JSX.Element {
   /* Memoised for node identity, so a hover leaves the memoised sectors' props untouched. */
   const branches = useMemo(() => sunburst(focus), [focus])
 
-  /* "all" is the synthetic root the drill-down starts from, and it is said as "the bill" rather
-     than by its own name -- which is the one place the tree's identifier would read as a label
-     if it were printed. */
+  /* "all" is the synthetic root the drill starts from, said as "the bill" -- the one place the
+     tree's identifier would read as a label. */
   const label = focus.node.name === "all" ? t.strip.theBill : labelOf(t, focus.node.name)
   if (!branches.length) return <div className="sunempty">{t.sun.empty(label)}</div>
 
@@ -297,11 +288,9 @@ export function Sunburst(): React.JSX.Element {
           role="img"
           aria-label={t.sun.aria(branches.length, amt(rootCost))}
         >
-          {/* Sits under the arcs and catches everything they do not cover -- the margin
-              outside the outer ring, the corners of the box -- so sliding off an arc into
-              empty space is a pointer arriving somewhere unmarked, which is what drops the
-              highlight. `pointer-events` is spelled out because an unfilled shape is not
-              hit-tested, and an arrival nothing can see is an arrival nobody reports. */}
+          {/* Sits under the arcs and catches everything they do not cover, so sliding off an arc is
+              an arrival somewhere unmarked, which drops the highlight. `pointer-events` is spelled
+              out because an unfilled shape is not hit-tested. */}
           <rect x={-100} y={-100} width={200} height={200} fill="none" pointerEvents="all" />
           {branches.map((b, i) => (
             <Sector

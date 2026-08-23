@@ -31,9 +31,8 @@ const Panel = memo(function Panel({
   const dim = anyHover && !hit
   const maxKid = maxCost(kids)
 
-  /* Two different footers, and the difference matters: a panel with no children is a genuine
-     leaf, while one whose children sum short of it has been filtered by the query and must say
-     so rather than appear to under-count. */
+  /* Two different footers: a panel with no children is a genuine leaf, while one whose children sum
+     short has been filtered by the query and must say so. */
   const kidsAll = kidsOf(panel) || []
   const shown = kids.reduce((a, k) => a + k.cost, 0)
   const foot = !kidsAll.length
@@ -43,20 +42,13 @@ const Panel = memo(function Panel({
       : t.panels.shown(amt(shown), amt(panel.cost))
 
   /* Named for the filter transition -- see `vtName`. The key is the panel's identity rather than
-     its place in the grid, which is the whole point: a query that removes the third panel moves
-     the fourth into its slot, and a name that counted slots would morph one line item into a
-     different one. */
+     its place in the grid: a name that counted slots would morph one line item into another. */
   return (
     <div className="pan" style={vtName(key)}>
       <div className="pantop">
-        {/* The group's colour, as a bar standing beside the name rather than a rule under it.
-            Underlined, the name read as a link and the colour as its decoration; upright, the
-            colour is a label on the panel and the name is left as a name. The geometry is the
-            stylesheet's -- see `.pantop button`, which hangs the bar out into the panel's own
-            padding so the title stays flush with the bar and the rows beneath it. Handed down
-            as a custom property rather than as the border itself, because only the hue is the
-            data's: a width written here would be a width the padding that offsets it cannot
-            see. */}
+        {/* The group's colour as a bar beside the name rather than a rule under it, which read as a
+            link with the colour as its decoration. The geometry is the stylesheet's -- see `.pantop
+            button`. Handed down as a custom property, because only the hue is the data's. */}
         <button
           type="button"
           data-code={isCode(t, panel.name, null, gname) ? 1 : 0}

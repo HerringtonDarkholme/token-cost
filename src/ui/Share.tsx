@@ -10,10 +10,9 @@ import { download, snapshot } from "./snapshot.ts"
 
 const FILENAME = "where-the-money-went.png"
 
-/** The captions, which are six languages of prose and the only thing on the page that reads them
- *  is the button below: they are fetched rather than bundled, so a visit that shares nothing never
- *  pays for them. Kept once fetched, because the promise is what both the prefetch and the click
- *  wait on. */
+/** The captions, six languages of prose that only the button below reads: fetched rather than
+ *  bundled, so a visit that shares nothing never pays for them. The promise is kept, because both
+ *  the prefetch and the click wait on it. */
 let captions: Promise<typeof import("../core/post-copy.ts")> | null = null
 
 function loadCaptions(): Promise<typeof import("../core/post-copy.ts")> {
@@ -56,9 +55,8 @@ function useChartPng(): [Outcome | null, (then?: () => void | Promise<void>) => 
     }
     setAt("busy")
 
-    /* Started before the clipboard call and handed over unresolved: Safari only accepts a write
-       it can tie to the click, so the ClipboardItem has to be constructed with the promise
-       rather than with an image awaited first. */
+    /* Started before the clipboard call and handed over unresolved: Safari only accepts a write it
+       can tie to the click. */
     const png = snapshot(card)
 
     let done: Outcome

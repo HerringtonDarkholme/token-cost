@@ -7,9 +7,8 @@ import { isCode, labelOf, nodeName, useT } from "./copy.tsx"
 import { branches, fold, kidsOf, pctOf, type CostNode } from "../core/model.ts"
 import { hoverBind, useHover, useNarrow } from "./store.ts"
 
-/** How much of its parent a block has to be worth before its name is written on it. Two numbers
- *  because the axis changes: 7% of a column is a readable band of a chart that is tall, while 7%
- *  of a transposed row is fifteen pixels of one that is not. */
+/** How much of its parent a block must be worth before its name is written on it. Two numbers
+ *  because the axis changes: 7% of a tall column is readable, 7% of a transposed row is not. */
 const LABEL_MIN = { cols: 7, rows: 25 }
 
 /** A column's blocks: its children, or one block standing for the column itself when it has no

@@ -1,6 +1,5 @@
-/* Claude Code transcripts. What the walk reads is a turn, and this is where a record Claude Code
-   wrote on disk becomes one -- the nesting, the field names and the cache-TTL bookkeeping below are
-   this format's, and stop here. */
+/* Claude Code transcripts, turned into the turns the walk reads: the nesting, the field names and
+   the cache-TTL bookkeeping below are this format's, and stop here. */
 
 import type { Block, Rate, Spend, Turn } from "../engine.ts"
 import { imageTokens } from "./image.ts"
@@ -64,12 +63,12 @@ interface WireRecord {
 /** Its own field, at the top level of every record it writes. */
 const SESSION = /"sessionId"\s*:\s*"([^"]+)"/
 
-/** How far into the file the claim reads. A transcript opens with the editor's own state -- a
- *  mode, a permission, a file snapshot -- so the first message can be a dozen records in. */
+/** How far into the file the claim reads: a transcript opens with the editor's own state, so the
+ *  first message can be a dozen records in. */
 const CLAIM_LINES = 24
 
 /** Whether Claude Code wrote this file: a record keyed the way it keys every record, or one
- *  carrying the `message` no other agent's format writes. */
+ *  carrying the `message` no other format writes. */
 function claims(text: string): boolean {
   let seen = 0
   for (const line of lines(text)) {
@@ -90,8 +89,7 @@ function claims(text: string): boolean {
 
 /* --- reading it --- */
 
-/** Characters of billable content in a block, which for this format is a question about what the
- *  block nests. */
+/** Characters of billable content in a block, which for this format is a question about nesting. */
 function charsOf(block: unknown): number {
   if (typeof block === "string") return block.length
   if (Array.isArray(block)) return block.reduce<number>((n, b) => n + charsOf(b), 0)
@@ -144,8 +142,8 @@ function imageData(b: WireBlock): unknown {
   return src.data
 }
 
-/** What the request was billed. The two cache lives are recorded per request; where they do not add
- *  up to the total written, the total is the figure to trust. */
+/** What the request was billed. Where the two cache lives do not add up to the total written, the
+ *  total is the figure to trust. */
 function spendOf(u: Usage): Spend {
   const cw = u.cache_creation_input_tokens || 0
   const cc = u.cache_creation && typeof u.cache_creation === "object" ? u.cache_creation : null
@@ -176,8 +174,7 @@ function contentOf(content: unknown): unknown[] {
   return Array.isArray(content) ? content : []
 }
 
-/** What the model produced. Anything it did not write itself -- a stray string in the list -- is
- *  not output and is left out. */
+/** What the model produced. A stray string in the list is not output and is left out. */
 function modelBlocks(content: unknown[]): Block[] {
   const out: Block[] = []
   for (const raw of content) {
@@ -217,8 +214,8 @@ function userBlocks(content: unknown[]): Block[] {
   return out
 }
 
-/* A record that bills nothing and carries nothing still dates the session, so it goes over as a
-   turn with nothing in it rather than being dropped -- and they all share one empty list. */
+/* A record that bills nothing still dates the session, so it goes over as an empty turn rather
+   than being dropped -- and they all share one empty list. */
 const NONE: Block[] = []
 
 /** One record, as the turn the walk reads. */
@@ -246,7 +243,7 @@ function toTurn(rec: WireRecord): Turn {
 }
 
 /** One line of a transcript. `false` is a line that would not parse, which the bill counts rather
- *  than passes off as an empty record. */
+ *  than passing off as an empty record. */
 function readLine(text: string, emit: Emit): boolean {
   let rec: WireRecord | null = null
   try {

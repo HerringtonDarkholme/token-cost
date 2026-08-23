@@ -187,10 +187,8 @@ ok(
   `PNG dimensions read from header: ${JSON.stringify(dim)}`,
 )
 
-/* ================= 2. The example the page offers a reader with no folder to point it at. It is
-   transcript lines rather than a canned report, so it is only worth anything if the real walk
-   still finds in it what it finds in a real corpus -- and if it carries nothing off the machine
-   that generated it. */
+/* 2. The example the page offers a reader with no folder: transcript lines rather than a canned
+   report, so the real walk has to find in it what it finds in a real corpus. */
 console.log("\n== the example corpus ==")
 {
   const S = E.analyze(sampleCorpus())
@@ -221,9 +219,8 @@ console.log("\n== the example corpus ==")
   ok(E.analyze(sampleCorpus()).datasets["1h"].total === D.total, "and it is the same every time")
 }
 
-/* ================= 3. A Codex rollout, which is the other store's format and the same bill. The
-   figures are chosen so the total can be worked out by hand: gpt-5.4 bills $2.50 per 1M in, a
-   tenth of that for a cache read, and $15.00 per 1M out. */
+/* 3. A Codex rollout, the other store's format and the same bill. The figures are chosen so the
+   total can be worked out by hand. */
 console.log("\n== a Codex rollout ==")
 {
   const R: string[] = []
@@ -358,9 +355,8 @@ console.log("\n== a Codex rollout ==")
   ok(recon(D).length === 0, "it reconciles: " + (recon(D).join(" | ") || "clean"))
 }
 
-/* ================= 4. The two shortcuts the rollout reader takes, both of which have to agree
-   with the long way round: one reads a compaction off the front of the line rather than parsing
-   it, and one hands the thread back part way through a file. */
+/* 4. The two shortcuts the rollout reader takes, both of which have to agree with the long way
+   round: reading a compaction off the front, and handing the thread back mid-file. */
 console.log("\n== a rollout the reader takes shortcuts through ==")
 {
   const L = (o: unknown): string => JSON.stringify(o)
@@ -393,10 +389,8 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
       },
     })
 
-  /* == the compaction shortcut == A compaction as Codex writes one: a summary, and the rewritten
-     prefix that replaces everything before it. The prefix is what the shortcut declines to read,
-     and `keys` is what decides whether it can -- the shortcut only takes a summary that is the
-     payload's first key, and hands the rest to the full parse. */
+  /* == the compaction shortcut == A summary, and the rewritten prefix that replaces everything
+     before it. The shortcut only takes a summary that is the payload's first key. */
   const compacted = (summary: string, keys: string[]): string =>
     L({
       timestamp: "2026-06-02T00:00:00Z",
@@ -507,9 +501,8 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
     `and one put down early is short rather than wrong: ${money(part)}`,
   )
 
-  /* == the chunks == A store runs to gigabytes and a single rollout past what a string can hold,
-     so the file arrives in pieces. Where the pieces fall is the platform's business, and one of
-     them lands inside a line sooner or later. */
+  /* == the chunks == A store runs to gigabytes and one rollout past what a string can hold, so the
+     file arrives in pieces, and one of them lands inside a line sooner or later. */
   const inPieces = (text: string, every: number): number => {
     const w = E.openWalk()
     const fw = E.openFile(w, "rollout-long.jsonl", text.length)
@@ -531,9 +524,8 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
     `the same bill however the bytes are cut up: ${same.length}/${cuts.length} of ${cuts.join(", ")}`,
   )
 
-  /* == the screenshots == A rollout returns a picture as a base64 data URL inside the tool output,
-     and there are gigabytes of that in a real store. What it costs is what the picture is, not how
-     many characters it took to send. */
+  /* == the screenshots == A picture arrives as a base64 data URL inside the tool output. What it
+     costs is what the picture is, not how many characters it took to send. */
   const shotUrl = (w: number, h: number, filler: number): string => {
     const b = Buffer.alloc(24 + filler)
     b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)
@@ -609,9 +601,8 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
     `and a bigger picture is dearer than a smaller one: ${money(large.images)} against ${money(small.images)}`,
   )
 
-  /* Both shortcuts read a line off its front rather than out of the whole of it, so where a chunk
-     boundary falls decides whether the shortcut is available at all -- and it must not decide the
-     bill. */
+  /* Both shortcuts read a line off its front, so where a chunk boundary falls decides whether the
+     shortcut is available -- and it must not decide the bill. */
   const mixed = [
     ...top,
     billed(2000),
@@ -646,10 +637,9 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
       `${mixedSame.length}/${mixedCuts.length} of ${mixedCuts.join(", ")}`,
   )
 
-  /* == the records nothing asks for == Nearly a third of what a real store still parsed was
-     records the reader has no case for. The list of payloads it handles is now the list it
-     consults before parsing, so the two cannot drift -- and a payload absent from it has to leave
-     the bill exactly where it was. */
+  /* == the records nothing asks for == Nearly a third of what a real store parsed was records
+     the reader has no case for. The list it handles is the list it consults, so the two cannot
+     drift. */
   const noise = [
     L({
       timestamp: "2026-06-02T00:00:00Z",
@@ -681,10 +671,8 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
     `records nothing asks for leave the bill alone: ${money(totalOf(noisy))} either way`,
   )
 
-  /* == the model that arrives late == A rollout can bill requests before it says which model made
-     them, and two of a real store's thousand say so tens of megabytes in -- far past anything the
-     reader can hold the front of the file for. Those requests wait for the name rather than going
-     out unpriced. */
+  /* == the model that arrives late == A rollout can bill requests before it names the model, two of
+     a real store's thousand tens of megabytes in. Those requests wait for the name. */
   const late = [
     L({
       timestamp: "2026-06-01T00:00:00Z",
@@ -726,9 +714,8 @@ console.log("\n== a rollout the reader takes shortcuts through ==")
   )
 }
 
-/* ================= 5. A Grok session. Usage is one total per user prompt, split across the
-   model calls by the context size each one recorded. grok-4.5 bills $2.00 per 1M in, $0.30
-   cached, $6.00 per 1M out. */
+/* 5. A Grok session. Usage is one total per user prompt, split across the model calls by the
+   context each recorded. */
 console.log("\n== a Grok session ==")
 {
   const G: string[] = []

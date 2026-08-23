@@ -1,6 +1,5 @@
-/* The three transition primitives the page composes: a panel that slides into the region another
-   one left, a figure that rolls from the number it was to the number it is, and a line of copy
-   that swaps for a different line. */
+/* The three transition primitives the page composes: a panel that slides in, a figure that rolls
+   to its new number, and a line of copy that swaps for another. */
 
 import {
   useEffect,
@@ -41,9 +40,8 @@ function subscribeReduced(fn: () => void): () => void {
   return () => list.removeEventListener("change", fn)
 }
 
-/** The same answer, subscribed. The stylesheet re-answers the query the moment the reader
- *  changes the setting; anything deciding in JS has to be told, or it stays on whatever was true
- *  when it last rendered. */
+/** The same answer, subscribed: the stylesheet re-answers the query when the reader changes the
+ *  setting, and anything deciding in JS has to be told. */
 export function useReduced(): boolean {
   return useSyncExternalStore(subscribeReduced, reduced, reduced)
 }
@@ -128,9 +126,8 @@ const MONEY: Format = {
   maximumFractionDigits: 2,
 }
 
-/* A share is written the same way in every language here -- `amt()` and every `toFixed` beside it
-   print a dot and a bare `%` -- so the rolling one is pinned to match rather than localised into
-   a comma and a space the rest of the page's percentages would not have. */
+/* A share is written the same way in every language here -- a dot and a bare `%` -- so the rolling
+   one is pinned to match rather than localised. */
 const SHARE: Format = { minimumFractionDigits: 1, maximumFractionDigits: 1 }
 const SHARE_FINE: Format = { minimumFractionDigits: 2, maximumFractionDigits: 2 }
 
@@ -159,10 +156,8 @@ export function Figure({
       {share ? (
         <NumberFlow value={value} locales="en" format={value < 1 ? SHARE_FINE : SHARE} suffix="%" />
       ) : (
-        /* The locale as well as the format, because the two halves of the agreement with
-           `money()` are both locale-dependent: where the grouping separators fall and which
-           side the symbol sits on. Handed the tag rather than left to the browser's own
-           default, which is the reader's machine and not the page's language. */
+        /* The locale as well as the format, because both halves of the agreement with `money()` are
+           locale-dependent. Handed the tag rather than left to the reader's machine. */
         <NumberFlow value={value} locales={tagOf(lang)} format={MONEY} />
       )}
     </span>
@@ -226,8 +221,7 @@ export function TextCross({
   }, [gone])
 
   /* Measured on every commit rather than keyed on the token, because what has to travel is the
-   * layout*, and the box can be resized by copy that never changed -- a font arriving, the card
-   * being dragged narrower. */
+     layout*: the box can be resized by copy that never changed. */
   const box = useRef<HTMLSpanElement>(null)
   const wide = useRef<number | null>(null)
   useLayoutEffect(() => {
@@ -259,10 +253,9 @@ export function TextCross({
   )
 }
 
-/** Copy that says what just happened -- "Copy chart" becoming "Rendering…" becoming "Chart
- *  copied" in the same eight millimetres of toolbar, or the page's own heading changing tense
- *  when the bill arrives -- so the words are swapped rather than replaced: the old ones leave
- *  upward through a blur and the new ones arrive from below. */
+/** Copy that says what just happened -- "Copy chart" becoming "Rendering…" in the same eight
+ *  millimetres of toolbar -- so the words are swapped rather than replaced: the old leave upward
+ *  through a blur, the new arrive from below. */
 export function TextSwap({
   token,
   children,
@@ -280,9 +273,8 @@ export function TextSwap({
   const latest = useRef(children)
   latest.current = children
 
-  /* The language, in the same place and for the same reason as the token above: during the
-     render, because the words have to be the new words in the commit rather than one frame after
-     it. */
+  /* The language, in the same place and for the same reason as the token above: during the render,
+     so the words are the new words in the commit. */
   const drawn = useRef(lang)
   if (drawn.current !== lang) {
     drawn.current = lang
@@ -290,9 +282,8 @@ export function TextSwap({
     if (token === shown.token) setShown({ token, body: latest.current })
   }
 
-  /* Inside a capture the words have to be the new words before the swap callback returns: the
-     browser photographs the DOM as it stands, and copy held back for its own exit is copy
-     photographed unchanged -- the heading would morph into itself. */
+  /* Inside a capture the words have to be the new words before the swap callback returns, or the
+     heading is photographed unchanged and morphs into itself. */
   if (isCapturing() && token !== shown.token) {
     setShown({ token, body: children })
     setPhase("")
@@ -308,9 +299,8 @@ export function TextSwap({
     return () => clearTimeout(t)
   }, [token, shown.token])
 
-  /* `is-enter-start` puts the new copy below its resting place with the transition suspended, so
-     it needs the reflow before the class comes off again -- that read is what makes the return a
-     transition rather than a second jump. */
+  /* `is-enter-start` puts the new copy below its resting place with the transition suspended, so it
+     needs the reflow before the class comes off again. */
   useLayoutEffect(() => {
     if (phase !== "enter") return
     void el.current?.offsetHeight

@@ -1,6 +1,5 @@
-/* Every reachable view state, rendered into a real DOM. The point of this suite is unchanged
-   from the string-matching one it replaces: drive the report through each state and assert the
-   output is sane. */
+/* Every reachable view state, rendered into a real DOM: drive the report through each state and
+   assert the output is sane. */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { act } from "react"
@@ -96,8 +95,7 @@ function expectClean(): void {
   expect(container.querySelector(".mosaicwrap, .sun")).not.toBeNull()
 
   /* `flatten` in `snapshot.ts` replaces every `[data-snaptext]` element with a span holding that
-     attribute's text, so anything wearing the marker is promising it has nothing else worth
-     drawing. */
+     attribute's text, so the marker promises there is nothing else worth drawing. */
   for (const el of container.querySelectorAll("[data-snaptext]"))
     expect(el.children, `${el.className} would lose its contents to the snapshot`).toHaveLength(0)
 }
@@ -151,9 +149,8 @@ describe("view states", () => {
     }
   })
 
-  /* `isCode` decides which names are set in the mono face, and it decides it from where the
-     engine put the row rather than from what the string looks like -- so what it actually marks
-     is worth pinning against a real tree. */
+  /* `isCode` decides which names are set in the mono face from where the engine put the row rather
+     than from what the string looks like, so what it marks is worth pinning against a real tree. */
   it("only the names off the reader's machine are set as code", () => {
     const named = (code: boolean): string[] =>
       Array.from(container.querySelectorAll(`[data-code="${code ? 1 : 0}"]`), (e) =>
@@ -247,8 +244,7 @@ describe("interaction", () => {
   })
 
   /* The stylesheet does the turning, but two things it cannot reach have to turn with it: the
-     caption naming both axes, and the gutter, which has to lead in the markup rather than be
-     pulled left by `order` -- a name read before its row should be tabbed to before it too. */
+     caption naming both axes, and the gutter, which has to lead in the markup. */
   it("a phone gets the mosaic on its side, and a caption that says so", () => {
     const width = (w: number): void =>
       act(() => {
@@ -378,9 +374,8 @@ describe("interaction", () => {
     expect(container.querySelectorAll('path.sunarc[data-on="1"]')).toHaveLength(0)
   })
 
-  /* The breakdown reports a hover the same way the charts do, so it has to drop one the same
-     way: the readout is shared, and a highlight left standing after the pointer has moved on
-     describes a row nobody is looking at. */
+  /* The breakdown reports a hover the way the charts do, so it has to drop one the same way: the
+     readout is shared. */
   it("leaving the breakdown drops the highlight, panels or table", () => {
     const out = (): Element | null => container.querySelector(".reconline")
 
@@ -401,9 +396,8 @@ describe("interaction", () => {
     expect(container.querySelector('tbody tr[data-on="1"]')).toBeNull()
   })
 
-  /* The dead space *inside* a view is the case a per-container clear cannot see, and the panels
-     are full of it: card padding, the price beside a panel's title, the bar under it, a footer,
-     the gaps in the grid. */
+  /* The dead space *inside* a view is the case a per-container clear cannot see, and the panels are
+     full of it: card padding, the price beside a title, the bar, a footer, the grid gaps. */
   it("the highlight drops in a view's own dead space, not just on the way out", () => {
     const item = container.querySelector(".pi")
     pointerTo(container.querySelector(".reconline"), item)
@@ -447,9 +441,8 @@ describe("interaction", () => {
     expect(container.querySelectorAll('.col[data-dim="0"]')).toHaveLength(1)
   })
 
-  /* `startsWith` on the key alone let a sibling whose name is a prefix of another's read as
-     hovered -- `docker` lighting up under `docker-compose`, `pip` under `pip3`. The separator is
-     what makes the test a path test rather than a string test. */
+  /* `startsWith` on the key alone let a sibling whose name is a prefix of another's read as hovered
+     -- `pip` under `pip3`. The separator is what makes this a path test. */
   it("a hover inside one column does not light the column whose name it starts with", () => {
     const first = container.querySelector<HTMLElement>(".col .colhead")
     pointerTo(container.querySelector(".hoverbar"), first)
@@ -490,9 +483,8 @@ describe("interaction", () => {
     expect(container.querySelector(".total")?.textContent).toBe(real)
   })
 
-  /* The corpus records the TTL of every cache write, which is what a transcript written by any
-     recent Claude Code does -- so there is nothing left for the assumption to assume, and the
-     switch that reprices it is not offered at all. */
+  /* The corpus records the TTL of every cache write, so there is nothing for the assumption to
+     assume and the switch that reprices it is not offered. */
   it("the TTL switch is absent when the transcripts left it nothing to reprice", () => {
     expect(data.ttlTokens.unknown).toBe(0)
     expect(byLabel("button", "5m")).toBeNull()
@@ -531,9 +523,8 @@ describe("interaction", () => {
     expect(container.querySelectorAll(".cycbtn")).toHaveLength(1)
   })
 
-  /* The pressed state of a segmented control is a pill that travels, so the thing to assert is
-     that every such control has exactly one of them and that adding it did not cost the buttons
-     their names -- the pill is decoration, and says so. */
+  /* The pressed state of a segmented control is a pill that travels, so what is asserted is one
+     pill per control, and that adding it did not cost the buttons their names. */
   it("every lens switch carries one pill, and its options still read as buttons", () => {
     for (const seg of container.querySelectorAll(".seg.t-tabs")) {
       expect(seg.querySelectorAll(".t-tabs-pill")).toHaveLength(1)
@@ -544,9 +535,8 @@ describe("interaction", () => {
     expect(byLabel(".t-tab", "Table")).not.toBeNull()
   })
 
-  /* The controls whose face is a symbol -- the eye over the dollars, the one theme glyph -- say
-     what they do in a hint, and the hint has to be the words a screen reader gets as well as the
-     ones a pointer gets. */
+  /* The controls whose face is a symbol say what they do in a hint, and the hint has to be the
+     words a screen reader gets as well. */
   it("a control drawn as a symbol is named, and its hint describes it", () => {
     const tips = new Map(
       [...container.querySelectorAll('[role="tooltip"]')].map((t) => [t.id, t] as const),
@@ -683,14 +673,12 @@ describe("the card's two faces", () => {
     expect(box.querySelector(".total")?.textContent).toBe("$0.00")
     expect(box.querySelector(".total")?.getAttribute("data-empty")).toBe("1")
     /* One way to a folder, and it is the folder rather than the files: `webkitdirectory` is what
-       makes a file input a folder picker, and asking for files instead meant a hidden dotfile to
-       defeat and dozens of identically-named transcripts to multi-select. */
+       makes a file input a folder picker. */
     const inputs = [...box.querySelectorAll(".dropzone input")]
     expect(inputs).toHaveLength(1)
     expect(inputs[0].getAttribute("webkitdirectory")).toBe("")
-    /* Two buttons, and only the folder is the primary one: the example is there for a reader who
-       has no `~/.claude` to point at -- a phone -- and must not read as the recommended route for
-       one who does. */
+    /* Two buttons, and only the folder is the primary one: the example is for a reader with no
+       `~/.claude` to point at, and must not read as the recommended route. */
     const picks = [...box.querySelectorAll<HTMLButtonElement>(".picks .btn")]
     expect(picks).toHaveLength(2)
     expect(picks[0].classList.contains("primary")).toBe(true)
@@ -711,10 +699,9 @@ describe("the card's two faces", () => {
     const before = tip!.textContent
     act(() => sw!.click())
     expect(tip!.textContent).not.toBe(before)
-    /* Two controls, and the theme switch is the last one in the bar: it is the anchor everything
-       else grows leftward from, so it must not have anything to its right. Below the breakpoint
-       the same set is the panel's rows read top to bottom, which is why the order is counted in
-       `.tool` rather than in the bar's own children. */
+    /* Two controls, and the theme switch is last in the bar: it is the anchor everything else grows
+       leftward from. Below the breakpoint the same set is the panel's rows, which is why the order
+       is counted in `.tool`. */
     const bar = [...box.querySelectorAll(".tools > .tool")]
     expect(bar.at(-1)?.querySelector(".seg:not(.langseg)")).not.toBeNull()
     expect(bar.at(-2)?.querySelector(".langseg")).not.toBeNull()
@@ -778,10 +765,9 @@ describe("the card's two faces", () => {
       expect(box.querySelector(".status")?.textContent).toBe("")
     })
 
-    /* And what a pick does to the card: the note about the hidden folder is help for a dialog
-       that has closed, so the transcripts take its place in the same box -- and give it back
-       when the folder turns out to be the wrong one, because a reader who has to pick again
-       needs the route rather than the names of the files that failed. */
+    /* And what a pick does to the card: the note about the hidden folder is help for a dialog that
+       has closed, so the transcripts take its place -- and give it back on a bad folder, since a
+       reader who has to pick again needs the route. */
     it("puts the transcripts where the way in was, and takes them back on a bad folder", async () => {
       let open!: () => void
       const gate = new Promise<void>((ready) => {
@@ -868,9 +854,8 @@ describe("the card's two faces", () => {
     /* Four, not five: the corpus records every cache write's TTL, so the switch that reprices
        the unrecorded ones has nothing to offer and is not drawn. */
     expect(box.querySelectorAll(".toolbar .t-grow")).toHaveLength(4)
-    /* And the stagger still counts outward from the anchor without a gap in it. Sorted, not read
-       in document order: the mask is drawn in the bar rather than in the panel, so the document
-       no longer runs the same way the bar does. */
+    /* And the stagger still counts outward from the anchor without a gap. Sorted, not read in
+       document order: the mask is drawn in the bar rather than in the panel. */
     expect(
       [...box.querySelectorAll(".toolbar .t-grow")].map((s) => s.getAttribute("data-i")).sort(),
     ).toEqual(["0", "1", "2", "3"])
@@ -879,9 +864,8 @@ describe("the card's two faces", () => {
     ).not.toBeNull()
   })
 
-  /* Below the breakpoint the bar is a panel behind one button. Which of the two shapes is drawn
-     is the stylesheet's business, so what is checked here is the part that is not: the state the
-     button and the panel agree on, and every control still being in exactly one place. */
+  /* Below the breakpoint the bar is a panel behind one button. Which shape is drawn is the
+     stylesheet's business; what is checked here is the state the two agree on. */
   it("the bar folds into one button, and the panel it opens holds every control", () => {
     turn(data)
     const burger = box.querySelector<HTMLButtonElement>(".burger")!
@@ -891,9 +875,8 @@ describe("the card's two faces", () => {
     expect(tools.getAttribute("data-open")).toBe("0")
     expect(box.querySelector(".scrim")?.getAttribute("data-open")).toBe("0")
 
-    /* One set of controls, not two: every control the bar holds is inside the panel element, so
-       there is no second copy to fall out of step with this one. Scoped to the bar because the
-       card runs its own switches off the same `.seg`. */
+    /* One set of controls, not two: every control the bar holds is inside the panel element. Scoped
+       to the bar, because the card runs its own switches off the same `.seg`. */
     for (const sel of [".linkish", ".freshbtn", ".langsel"])
       expect(box.querySelectorAll(".toolbar " + sel).length, `${sel} outside the panel`).toBe(
         box.querySelectorAll(".tools " + sel).length,

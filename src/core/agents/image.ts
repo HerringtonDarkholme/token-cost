@@ -1,8 +1,7 @@
 /* Reading a picture, for the readers that meet one. */
 
-/* A picture is billed by its size on screen rather than by the bytes it arrives as, so a reader
-   sizes one by reading its header -- the alternative, taken once, billed a screenshot as a million
-   characters of text. */
+/* A picture is billed by its size on screen rather than by the bytes it arrives as: reading the
+   header instead of the text billed a screenshot as a million characters. */
 const IMAGE_FALLBACK = 1500,
   IMAGE_CAP = 1600
 function b64Bytes(data: unknown, limit: number): Uint8Array | null {

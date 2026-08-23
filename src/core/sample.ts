@@ -1,6 +1,5 @@
-/* The example: a corpus nobody typed, for a reader with no transcripts of their own to point the
-   page at. It is written as transcript lines rather than as a finished `Analysis`, so the example
-   is priced by the same walk a real folder gets and cannot drift away from it. */
+/* The example: a corpus nobody typed, written as transcript lines rather than as a finished
+   `Analysis`, so it is priced by the same walk a real folder gets. */
 
 import type { RawFile } from "./engine.ts"
 
@@ -427,9 +426,8 @@ function session(seed: number, reqs: number, startedAt: number, boost: string | 
   return lines.join("\n")
 }
 
-/** How the nine sessions differ: how long they ran, when, and what the work mostly reached for.
- *  The lengths are what set the thesis -- prose is re-billed once per later request in the same
- *  session, so a corpus of short sessions would argue the opposite of what a real one does. */
+/** How the nine sessions differ. The lengths are what set the thesis -- prose is re-billed once
+ *  per later request in the same session, so short sessions would argue the opposite. */
 const SESSIONS: ReadonlyArray<[reqs: number, day: number, hour: number, boost: string | null]> = [
   [95, 0, 9, "Bash"],
   [62, 0, 15, "Read"],

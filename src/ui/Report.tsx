@@ -24,8 +24,8 @@ const charts = (t: Dict): ReadonlyArray<SegOption<ViewState["chart"]>> => [
   { value: "sun", label: t.chart.sunburst },
 ]
 
-/* Written once rather than closed over per render: a pick is a write to the store, which is a
-   module away, so neither switch needs anything from the component around it. */
+/* Written once rather than closed over per render: a pick is a write to the store, a module
+   away. */
 const pickView = (view: ViewState["view"]): void => {
   disarmHover()
   setState({ view })
@@ -50,8 +50,8 @@ function Crumbs(): React.JSX.Element {
       >
         {t.chart.all}
       </button>
-      {/* The crumb is a node name, which stays English in the state so the link keeps
-          working across a change of language -- translated here, on the way out. */}
+      {/* The crumb is a node name, English in the state so the link survives a change of language,
+          translated here on the way out. */}
       {state.path.map((p, i) => (
         <span key={p}>
           <span className="sep">/</span>
@@ -71,11 +71,9 @@ function Crumbs(): React.JSX.Element {
   )
 }
 
-/** The thesis and the three figures that carry it -- which on a narrow window are rendered in two
- *  places rather than one: the sentence stays under the bill it is about, and the three figures
- *  it argues from go below the breakdown, where there is room to read them. `only` is which half
- *  this instance is drawing; unset, it draws both, which is every window wide enough to put them
- *  on one line. */
+/** The thesis and the three figures that carry it, rendered in two places on a narrow window: the
+ *  sentence stays under the bill, the figures go below the breakdown. `only` is which half this
+ *  instance draws; unset, it draws both. */
 export function Strip({ only }: { only?: "thesis" | "figures" }): React.JSX.Element {
   const { d, state, amt, reqs } = useReport()
   const t = useT()
@@ -167,11 +165,9 @@ function Find(): React.JSX.Element {
   return (
     <>
       <label htmlFor="q">{t.breakdown.find}</label>
-      {/* The browser's own suggestions are off because there is nothing here for them to be
-          right about: this box filters the line items of one bill, and what it offers instead
-          is whatever the reader last typed into a box called `q` on some other site.
-          Spellcheck goes with it -- the vocabulary is `mkdir`, `git diff` and tool names, and
-          every one of them would be underlined as a mistake. */}
+      {/* The browser's suggestions are off because there is nothing here for them to be right
+          about: this box filters the line items of one bill. Spellcheck goes with it -- the
+          vocabulary is `mkdir`, `git diff` and tool names. */}
       <input
         id="q"
         type="search"
@@ -190,8 +186,7 @@ function Find(): React.JSX.Element {
 export function Breakdown(): React.JSX.Element {
   const { d, state, amt } = useReport()
   const t = useT()
-  /* Memoised for its identity rather than its cost -- a ledger walk is microseconds, and the
-     memoised rows below it are what actually want a stable `L`. */
+  /* Memoised for its identity rather than its cost: the memoised rows below want a stable `L`. */
   const L = useMemo(
     () => ledger(d, state.path, state.open, state.query),
     [d, state.path, state.open, state.query],
@@ -260,8 +255,7 @@ export function Footnotes(): React.JSX.Element {
               data.ttlMeasuredShare != null
                 ? (data.ttlMeasuredShare * 100).toFixed(1) + "%"
                 : t.foot.unknownShare,
-              /* Model ids are not words -- they are what the API calls itself, and the same
-                 string in every language. */
+              /* Model ids are not words: they are what the API calls itself, in every language. */
               data.models && data.models.length ? data.models.map((m) => m.id).join(", ") : null,
             )}
           </li>
@@ -271,13 +265,12 @@ export function Footnotes(): React.JSX.Element {
   )
 }
 
-/** What the card holds once there is a bill to show: the thesis, the picture, and the two rules
- *  that frame it. */
+/** What the card holds once there is a bill: the thesis, the picture, and the rules that frame
+ *  it. */
 export function CardBody(): React.JSX.Element {
   const { state } = useReport()
   const t = useT()
-  /* The three figures leave the card at this width -- see `Strip`, and `Page`, which is where
-     they land. */
+  /* The three figures leave the card at this width -- see `Strip`, and `Page`, where they land. */
   const narrow = useNarrow()
   return (
     <>
@@ -292,17 +285,13 @@ export function CardBody(): React.JSX.Element {
         </span>
         <Crumbs />
       </div>
-      {/* Keyed on the chart, so the picture the switch asks for arrives rather than
-          appearing: a fresh panel mounts closed and slides up into the space the other
-          one left. The frame around it changes shape at the same time -- `.card` is 16/9
-          for the mosaic and 4/3 for the sunburst -- and `.t-resize` tweens that too, so
-          the whole card moves as one thing instead of snapping to a new height under a
-          picture that was already there. */}
+      {/* Keyed on the chart, so the picture the switch asks for arrives rather than appearing. The
+          frame changes shape at the same time -- 16/9 for the mosaic, 4/3 for the sunburst -- and
+          `.t-resize` tweens that too, so the card moves as one thing. */}
       <Reveal key={state.chart} className="chartslot">
         {state.chart === "sun" ? <Sunburst /> : <Mosaic />}
       </Reveal>
-      {/* The chart switch lives at the foot of the card, on the footnote's rule: it picks
-          the whole picture, so it sits below the picture rather than crowding the
+      {/* The chart switch sits at the foot of the card: it picks the whole picture, unlike the
           breadcrumb, which addresses one block inside it. */}
       <div className="cardfoot">
         <HoverBar />
@@ -312,8 +301,8 @@ export function CardBody(): React.JSX.Element {
   )
 }
 
-/** How the card's header describes the dataset: what the report covers, said in the eyebrow
- *  beside the words that are there whether or not a file has been dropped. */
+/** How the card's header describes the dataset, in the eyebrow beside the words that are always
+ *  there. */
 export function scopeOf(t: Dict, d: Dataset): string {
   return t.card.scope(count(d.sessions), d.days, count(d.requests))
 }

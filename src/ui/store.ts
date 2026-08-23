@@ -33,17 +33,14 @@ export interface ViewState {
   lang: Lang
 }
 
-/** The mosaic is nine columns wide with a name and two figures under each, and a phone cannot
- *  give it that -- so where the stylesheet stops laying the card out side by side, the sunburst
- *  is what the card opens on. Taken once, at the width the page loaded at: this is which picture
- *  to *start* with, and re-deciding it under a reader who has since picked the other one would
- *  be a rotation undoing their choice. */
+/** The mosaic wants nine columns with figures under each, and a phone cannot give it that, so a
+ *  narrow card opens on the sunburst. Taken once, at load: re-deciding it would undo a reader's
+ *  own pick. */
 const WIDE: boolean =
   typeof matchMedia === "function" ? !matchMedia("(max-width: 820px)").matches : true
 
-/** The narrowest band, and unlike `WIDE` this one is subscribed. The difference is what each is
- *  for: `WIDE` seeds a default the reader may then change, so re-answering it would undo their
- *  choice, while this decides where a block is rendered -- and a rotation has to move it. */
+/** The narrowest band, and unlike `WIDE` this one is subscribed: it decides where a block is
+ *  rendered, and a rotation has to move it. */
 const NARROW = "(max-width: 560px)"
 
 function narrow(): boolean {
@@ -81,8 +78,8 @@ export const getState = (): ViewState => state
 
 export function setState(patch: Partial<ViewState>): void {
   state = { ...state, ...patch }
-  /* The two number formatters are plain functions called by name from inside JSX, so they cannot
-     subscribe to anything. */
+  /* The two number formatters are plain functions called from inside JSX, so they cannot
+     subscribe. */
   noteLang(state.lang)
   listeners.forEach((fn) => fn())
 }
@@ -99,9 +96,8 @@ export function useViewState(): ViewState {
   return useSyncExternalStore(subscribe, getState, getState)
 }
 
-/* hover ---------- Deliberately its own slice rather than a field of `ViewState`. Hover changes
-   on every block the pointer crosses -- dozens per second during a sweep -- while nothing about
-   the shareable view depends on it. */
+/* hover -- its own slice rather than a field of `ViewState`: it changes dozens of times a second
+   during a sweep, and nothing shareable depends on it. */
 
 let hover: HoverTarget | null = null
 const hoverListeners = new Set<() => void>()
@@ -126,9 +122,8 @@ export function useHover(): HoverTarget | null {
   return useSyncExternalStore(subscribeHover, getHover, getHover)
 }
 
-/* hover, as the DOM reports it ---------- A view marks every element that stands for something
-   -- a block, a row, an arc -- and one handler on the shell reads the pointer against those
-   marks. */
+/* hover, as the DOM reports it: a view marks every element that stands for something, and one
+   handler on the shell reads the pointer against those marks. */
 
 /** Whether an arrival is allowed to set the hover at all. */
 let armed = true
@@ -140,7 +135,7 @@ export function disarmHover(): void {
 }
 
 /** Marks an element as standing for something, and reports it on movement, on enter and on
- *  focus, so tabbing through a view gives the same readout the pointer does. */
+ *  focus, so tabbing gives the readout the pointer does. */
 export function hoverBind(t: HoverTarget): {
   onMouseMove: () => void
   onMouseEnter: () => void
@@ -157,8 +152,7 @@ export function hoverBind(t: HoverTarget): {
     onMouseEnter: () => {
       if (armed) setHover(t)
     },
-    /* Focus is nobody's accident: it arrives by tab or by click, both of which are the reader
-       saying which thing they mean. */
+    /* Focus is nobody's accident: it arrives by tab or by click. */
     onFocus: on,
     "data-hoversrc": "",
   }
@@ -179,24 +173,19 @@ export const hoverClear: {
   },
 }
 
-/** Back to a clean slate, keeping the reader's theme and their language: both were chosen for
- *  the session, not for the file. */
+/** Back to a clean slate, keeping the theme and the language: both were chosen for the session. */
 export function resetState(): void {
-  /* Armed again rather than disarmed, which is the opposite of what the changes above do and for
-     the same reason they do it. */
+  /* Armed again rather than disarmed, for the reason the changes above are the other way round. */
   armed = true
   setHover(null)
   setState({ ...INITIAL, theme: state.theme, lang: state.lang })
 }
 
-/* URL state ---------- The address is in two halves, split by what Back is for. The path is where
-   the reader is -- the report, and the drill inside it -- so going into `shell` is a move the
-   browser can undo. The hash is the settings held on that location: TTL lens, which chart,
-   panels-or-table, query, whether amounts are hidden, the theme and the language. */
+/* URL state -- the address is in two halves, split by what Back is for: the path is where the
+   reader is, the hash the settings held on that location. */
 
-/** Where this copy lives, and whether it can hold a path at all: a page served as a file -- the
- *  standalone `cost-report.html`, on `file://` or over http -- has no origin that would serve
- *  `/report/shell` back, so there the address stays where it opened. */
+/** Whether this copy can hold a path at all: a page served as a file has no origin that would
+ *  serve `/report/shell` back. */
 function here(): string {
   return typeof location === "object" ? location.pathname : "/"
 }
@@ -205,9 +194,8 @@ function routed(): boolean {
   return !/\.html?$/i.test(here())
 }
 
-/** Read on every call rather than taken once at import: `/open` moves the address to the root it
- *  came in from before the first render, and a constant would have been fixed at `/open/` by then
- *  -- this module is imported long before that line runs. */
+/** Read on every call rather than taken once at import: `/open` moves the address before the
+ *  first render, and this module is imported long before that. */
 function root(): string {
   return (
     here()
@@ -232,14 +220,9 @@ export function readPath(pathname: string): { report: boolean; slugs: string[] }
   return { report: true, slugs: seg.slice(1, 3).map((s) => decodeURIComponent(s).toLowerCase()) }
 }
 
-/** The address applied whole, which is what a Back or a Forward needs: keys the new address does
- *  not carry go back to their defaults, since coming out of a view has to undo what going in
- *  added. The exceptions are the two the reader chose for the session rather than for the file,
- *  and the disclosure the address never carried.
- *
- *  The bill is passed in because the drill is slugs on the way out and names on the way back,
- *  and only the tree knows which name a slug stood for -- under the lens the same address names,
- *  since that is the tree the address was written from. */
+/** The address applied whole, which is what a Back needs: keys it does not carry go back to
+ *  their defaults, bar the two chosen for the session and the disclosure the address never held.
+ *  The bill is passed in because only the tree knows which name a slug stood for. */
 export function applyUrl(data: Analysis | null): void {
   const hash = readHash(location.hash)
   const d = data?.datasets[hash.ttl ?? INITIAL.ttl]
@@ -253,8 +236,8 @@ export function applyUrl(data: Analysis | null): void {
   })
 }
 
-/** The hash, split into its `key=value` pairs. Shared with `transfer.ts`, which reads the one
- *  key that is not a view setting. */
+/** The hash as `key=value` pairs. Shared with `transfer.ts`, which reads the one non-setting
+ *  key. */
 export function parseHash(hash: string): Record<string, string> {
   const h = (hash || "").replace(/^#/, "")
   const p: Record<string, string> = {}
@@ -282,15 +265,14 @@ export function readHash(hash: string): Partial<ViewState> {
 export function hashFor(s: ViewState): string {
   const parts: string[] = []
   if (s.ttl !== "1h") parts.push("ttl=" + s.ttl)
-  /* Against the guess rather than against a constant, for the reason `lang` is below: on a phone
-     the sunburst is where the page started, so it is the mosaic that is worth a key. */
+  /* Against the guess: on a phone the sunburst is where the page started, so the mosaic gets a
+     key. */
   if (s.chart !== INITIAL.chart) parts.push("c=" + s.chart)
   if (s.view !== "panels") parts.push("v=" + s.view)
   if (s.query) parts.push("q=" + encodeURIComponent(s.query))
   if (s.pctOnly) parts.push("u=pct")
   if (s.theme !== "system") parts.push("t=" + s.theme)
-  /* Against the guess rather than against a constant, which is the one place this differs from
-     every other key: `en` is not the default, *the reader's own browser* is. */
+  /* Against the guess rather than a constant: `en` is not the default, the reader's browser is. */
   if (s.lang !== GUESSED) parts.push("l=" + s.lang)
   return parts.length ? "#" + parts.join("&") : ""
 }

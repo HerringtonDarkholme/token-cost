@@ -47,9 +47,8 @@ function themeVars(css: string): string {
   return out
 }
 
-/** The frame's style is written into an XML attribute by hand, and the values going into it are
- *  CSS the page authored -- `--sans` alone is `"Helvetica Neue",Helvetica,…`, whose quotes would
- *  close the attribute and fail the parse. */
+/** The frame's style is written into an XML attribute by hand, and `--sans` alone carries quotes
+ *  that would close the attribute and fail the parse. */
 const attr = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 
