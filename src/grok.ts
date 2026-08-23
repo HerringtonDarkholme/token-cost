@@ -18,6 +18,7 @@ interface GrokUsage {
   inputTokens?: number
   outputTokens?: number
   cachedReadTokens?: number
+  /** Read by nobody: xAI counts the write inside `inputTokens` and prices it as input. */
   cacheCreationTokens?: number
   reasoningTokens?: number
   modelUsage?: Record<string, GrokUsage>
@@ -115,10 +116,15 @@ export function isGrokSession(text: string): boolean {
   return false
 }
 
-const CHAT_TYPES = new Set(["system", "user", "assistant", "reasoning", "tool_result"])
+/* Named for the loop that writes them, so no other store's records answer to one -- a plain
+   `system` or `user` is Claude Code's word too, and taking it as proof here dropped the
+   transcript. */
 const EVENT_TYPES = new Set(["turn_started", "phase_changed", "loop_started", "first_token"])
+const OWN_KEYS = ["hunkId", "is_bash", "btwSessionId", "file_snapshots"]
 
-/** A jsonl file that lives next to `updates.jsonl` and must not be walked as a transcript. */
+/** A jsonl file that lives next to `updates.jsonl` and must not be walked as a transcript. Only
+ *  what Grok alone writes counts: a false yes here drops a priced transcript, and a false no
+ *  costs one unbilled empty file. */
 export function isGrokSidecar(text: string): boolean {
   let seen = 0
   for (const line of lines(text)) {
@@ -133,9 +139,8 @@ export function isGrokSidecar(text: string): boolean {
     if ("message" in rec) return false
     if (typeof rec.method === "string" && GROK_METHODS.has(rec.method)) return false
     const t = rec.type
-    if (typeof t === "string" && (CHAT_TYPES.has(t) || EVENT_TYPES.has(t))) return true
-    if ("hunkId" in rec || "is_bash" in rec || "btwSessionId" in rec || "file_snapshots" in rec)
-      return true
+    if (typeof t === "string" && EVENT_TYPES.has(t)) return true
+    if (OWN_KEYS.some((k) => k in rec)) return true
   }
   return false
 }
@@ -194,16 +199,14 @@ function ahead(text: string): string {
   return ""
 }
 
-/** xAI counts cached tokens inside `inputTokens`, the same way OpenAI does. */
+/** xAI counts cached tokens inside `inputTokens`, the same way OpenAI does -- so the write is
+ *  already in there at the plain input price, and declaring it again would bill it twice. */
 function usageOf(u: GrokUsage): Usage {
   const inp = num(u.inputTokens)
   const cached = Math.min(num(u.cachedReadTokens), inp)
-  const write = num(u.cacheCreationTokens)
   return {
     input_tokens: inp - cached,
     cache_read_input_tokens: cached,
-    cache_creation_input_tokens: write,
-    cache_creation: { ephemeral_5m_input_tokens: write },
     output_tokens: num(u.outputTokens),
   }
 }
@@ -336,31 +339,29 @@ function share(total: number, weights: number[], i: number, used: number): numbe
  *  context size -- which is what `_meta.totalTokens` recorded as the call went out. */
 function applyUsage(s: GrokState, u: GrokUsage): void {
   const calls = s.pending
+  /* A turn whose only output was an update the walk skips still spent the prompt, so it gets a
+     call of its own to carry the usage rather than dropping it. */
+  if (!calls.length) calls.push({ blocks: [], results: new Map(), ctx: s.ctx, stamp: s.stamp })
   const n = calls.length
-  if (!n) return
   const model = modelFromUsage(u) || s.model
   if (model) s.model = model
   const inp = num(u.inputTokens)
   const cached = Math.min(num(u.cachedReadTokens), inp)
-  const write = num(u.cacheCreationTokens)
   const outTok = num(u.outputTokens)
   const reason = num(u.reasoningTokens)
   const weights = calls.map((c) => (c.ctx > 0 ? c.ctx : 1))
   let usedIn = 0,
     usedC = 0,
-    usedW = 0,
     usedO = 0,
     usedR = 0
   for (let i = 0; i < n; i++) {
     const c = calls[i]
     const iN = share(inp, weights, i, usedIn)
     const cN = share(cached, weights, i, usedC)
-    const wN = share(write, weights, i, usedW)
     const oN = share(outTok, weights, i, usedO)
     const rN = share(reason, weights, i, usedR)
     usedIn += iN
     usedC += cN
-    usedW += wN
     usedO += oN
     usedR += rN
     if (rN > 0) {
@@ -373,12 +374,7 @@ function applyUsage(s: GrokState, u: GrokUsage): void {
       message: {
         role: "assistant",
         model: s.model,
-        usage: usageOf({
-          inputTokens: iN,
-          cachedReadTokens: cN,
-          cacheCreationTokens: wN,
-          outputTokens: oN,
-        }),
+        usage: usageOf({ inputTokens: iN, cachedReadTokens: cN, outputTokens: oN }),
         content: c.blocks,
       },
     }

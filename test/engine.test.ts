@@ -842,11 +842,21 @@ console.log("\n== a Grok session ==")
   ok(E.isGrokSession(grokFile.text), "it is read as a Grok session rather than as a transcript")
   ok(!E.isGrokSession(lines[0]), "and a transcript is not")
   ok(!E.isCodexRollout(grokFile.text), "and it is not a Codex rollout")
-  ok(E.isGrokSidecar(chat.text), "chat_history is a sidecar")
-  ok(E.isGrokSidecar(events.text), "and so is events.jsonl")
+  ok(E.GROK_SIDECARS.has(chat.name), "chat_history is a sidecar, by the name both callers filter")
+  ok(E.isGrokSidecar(events.text), "and events.jsonl is one by what it holds")
   ok(!E.isGrokSidecar(grokFile.text), "the conversation log is not")
+  /* The reason the content test asks only what Grok alone writes: `system` is Claude Code's word
+     too, and a transcript that opens with one used to be dropped whole. */
+  ok(
+    !E.isGrokSidecar(
+      JSON.stringify({ type: "system", content: "hook ran", uuid: "u0", isMeta: true }) +
+        "\n" +
+        lines[0],
+    ),
+    "a transcript that opens with a `system` record is not a sidecar",
+  )
 
-  const C = E.analyze([grokFile, chat, events])
+  const C = E.analyze([grokFile, events])
   const D = C.datasets["1h"]
   ok(C.filesUsed === 1, `the sidecars are not counted as transcripts (${C.filesUsed})`)
   ok(C.requests === 3 && C.sessions === 1, `${C.requests} requests over ${C.sessions} session(s)`)
@@ -884,6 +894,58 @@ console.log("\n== a Grok session ==")
     "the reasoning still carries",
   )
   ok(recon(D).length === 0, "it reconciles: " + (recon(D).join(" | ") || "clean"))
+
+  /* What a turn charges, on its own, without the splitting in the way. */
+  const turn = (usage: Record<string, unknown>, out: string = "P".repeat(400)): E.Analysis => {
+    const T: string[] = []
+    const tl = (
+      sessionUpdate: string,
+      update: Record<string, unknown> = {},
+      meta: Record<string, unknown> = {},
+    ): number =>
+      T.push(
+        JSON.stringify({
+          timestamp: 1780000000,
+          method: "session/update",
+          params: { sessionId: "sess-t", update: { sessionUpdate, ...update }, _meta: meta },
+        }),
+      )
+    tl("user_message_chunk", {
+      content: { type: "text", text: "T".repeat(4000) },
+      _meta: { modelId: "grok-4.5" },
+    })
+    if (out) tl("agent_message_chunk", { content: { type: "text", text: out } }, { totalTokens: 1 })
+    else tl("plan", { entries: [{ content: "step" }] }, { totalTokens: 1 })
+    tl("turn_completed", { usage })
+    return E.analyze([{ name: "updates.jsonl", text: T.join("\n") }])
+  }
+
+  /* xAI counts the write inside `inputTokens`, so declaring it again billed it twice -- once as
+     input and once at Anthropic's 1.25x short-write surcharge. */
+  const W = turn({
+    inputTokens: 100000,
+    cachedReadTokens: 60000,
+    cacheCreationTokens: 40000,
+    outputTokens: 1000,
+  })
+  ok(
+    +W.datasets["1h"].total.toFixed(4) === 0.104,
+    `a cache write is input, billed once: ${money(W.datasets["1h"].total)} (want $0.1040)`,
+  )
+  ok(W.datasets["5m"].total === W.datasets["1h"].total, "and no TTL lens can move it")
+
+  /* The turn spent the prompt whether or not the walk could see what it produced. */
+  const K = turn({ inputTokens: 90000, outputTokens: 3000 }, "")
+  ok(
+    K.requests === 1 && +K.datasets["1h"].total.toFixed(3) === 0.198,
+    `a turn the walk skips past still bills: ${K.requests} request(s), ${money(K.datasets["1h"].total)}`,
+  )
+
+  const fast = E.resolveRate("grok-4-fast-reasoning")
+  ok(
+    fast.rate?.[0] === 0.2 && fast.rate?.[1] === 0.5,
+    `grok-4-fast is not grok-4: ${JSON.stringify(fast.rate)} [${fast.basis}]`,
+  )
 }
 
 /* ================= 6. */

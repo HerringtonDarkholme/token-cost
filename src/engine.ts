@@ -137,6 +137,9 @@ export const RATES: Record<string, Rate> = {
   "grok-4.5": [2, 6, 0.3],
   "grok-4.3": [1.25, 2.5],
   "grok-4": [3, 15],
+  /* Ahead of `grok-4`, which the longest-prefix fallback would otherwise sell it at fifteen
+     times the output price. */
+  "grok-4-fast": [0.2, 0.5],
   "grok-3-mini": [0.3, 0.5],
   "grok-3": [3, 15],
   "grok-4.1-fast": [0.2, 0.5],
