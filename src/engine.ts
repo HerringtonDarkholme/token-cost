@@ -7,7 +7,8 @@ import {
   codexOpen,
   isCodexRollout,
   type CodexState,
-} from "./codex.ts"
+} from "./agents/codex.ts"
+import { claudeLine, claudeSession } from "./agents/claude.ts"
 import { GROUPS, type GroupDef, type GroupId } from "./groups.ts"
 import {
   grokEnd,
@@ -17,12 +18,12 @@ import {
   isGrokSession,
   isGrokSidecar,
   type GrokState,
-} from "./grok.ts"
+} from "./agents/grok.ts"
 
 /* The engine is the one door onto every format, so the detectors are re-exported rather than left
    for a caller to reach past it for. */
-export { isCodexRollout } from "./codex.ts"
-export { isGrokSession, isGrokSidecar, GROK_SIDECARS } from "./grok.ts"
+export { isCodexRollout } from "./agents/codex.ts"
+export { isGrokSession, isGrokSidecar, GROK_SIDECARS } from "./agents/grok.ts"
 
 /* data in -- What the caller hands us, and the transcript shapes we read out of it. */
 
@@ -795,7 +796,6 @@ export function toolDisplay(tool: string): string {
 }
 
 /* the walk -- One pass. */
-const SESSION_RE = /"sessionId"\s*:\s*"([^"]+)"/
 
 /** How far in the id is looked for. Every record of a transcript carries one, so this window has
  *  either found it or there is none -- and a Codex rollout carries none at all, which unbounded
@@ -1029,8 +1029,7 @@ function settle(fw: FileWalk): void {
   fw.opened = true
   fw.buf = fw.head
   fw.head = ""
-  const m = SESSION_RE.exec(head)
-  const id = detach((m ? m[1] : fw.name) + "::" + fw.size)
+  const id = detach((claudeSession(head) || fw.name) + "::" + fw.size)
   if (st.seen.has(id)) {
     st.duplicatesDropped++
     fw.dropped = true
@@ -1375,14 +1374,8 @@ export function* stepFile(fw: FileWalk): Generator<void, void, void> {
         codexLine(fw.codex, line, feed)
       } else if (fw.grok) {
         grokLine(fw.grok, line, feed)
-      } else {
-        let rec: TranscriptRecord | null = null
-        try {
-          rec = JSON.parse(line) as TranscriptRecord
-        } catch {
-          st.badLines++
-        }
-        if (rec && typeof rec === "object") feed(rec)
+      } else if (!claudeLine(line, feed)) {
+        st.badLines++
       }
     }
     if (performance.now() >= fw.due) {

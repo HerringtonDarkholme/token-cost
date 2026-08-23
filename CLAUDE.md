@@ -45,6 +45,11 @@ the things that address it from outside: `index.html`, the three Vite configs, `
 `vercel.json`. The suites stay in `test/` as a peer of `src/` rather than inside it, because
 two of the three run as plain `node` scripts against a real transcript directory.
 
+`src/agents/` holds one file per store the bill reads — `claude.ts`, `codex.ts`, `grok.ts` — and
+nothing else. Each one turns its own transcript format into the records `engine.ts` walks; Claude
+Code's format *is* that record shape, so `claude.ts` is only the session id and the line parse.
+Pricing, the walk, the score and the tree stay in `engine.ts`, which is the one door onto all three.
+
 The formatter is oxfmt, and it owns everything under `src/`: run `pnpm format` and commit
 what it gives you rather than arguing with it in review. `pnpm check` runs `oxfmt --check`,
 so an unformatted file fails the gate. The markdown and `index.html` are left out — they are

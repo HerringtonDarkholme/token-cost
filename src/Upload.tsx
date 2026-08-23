@@ -15,7 +15,7 @@ import {
   type Analysis,
   type Scanned,
 } from "./engine.ts"
-import { GROK_SIDECARS } from "./grok.ts"
+import { GROK_SIDECARS } from "./agents/grok.ts"
 import { useT, type Dict, type Os } from "./copy.tsx"
 import { TextSwap } from "./Motion.tsx"
 import { sampleFiles } from "./sample.ts"

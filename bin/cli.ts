@@ -18,7 +18,7 @@ import {
   report,
   skipFile,
 } from "../src/engine.ts"
-import { GROK_SIDECARS } from "../src/grok.ts"
+import { GROK_SIDECARS } from "../src/agents/grok.ts"
 
 /** Where the report is read. The override is what lets `pnpm dev`, or a copy of the page someone
  *  hosts themselves, stand in for the deployed one -- which is how the hand-off gets tested

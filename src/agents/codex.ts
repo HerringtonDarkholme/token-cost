@@ -1,7 +1,7 @@
 /* Codex rollouts, translated into the record shape the walk already reads, so one engine prices
-   both stores. */
+   every store. */
 
-import type { ContentBlock, TranscriptRecord, Usage } from "./engine.ts"
+import type { ContentBlock, TranscriptRecord, Usage } from "../engine.ts"
 
 /** What a rollout's `token_count` event says it spent. */
 interface CodexUsage {

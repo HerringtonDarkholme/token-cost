@@ -1,6 +1,6 @@
 /* Grok `updates.jsonl`, translated into the record shape the walk already reads. */
 
-import type { ContentBlock, TranscriptRecord, Usage } from "./engine.ts"
+import type { ContentBlock, TranscriptRecord, Usage } from "../engine.ts"
 
 /** Companion jsonl files in a Grok session directory: they are not the billed conversation. */
 export const GROK_SIDECARS = new Set([
