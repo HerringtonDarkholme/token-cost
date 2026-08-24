@@ -341,7 +341,14 @@ export interface Slot {
 
 /** One slot in a sentence, refilled over and over: the slot is a window a line high, and what is
  *  in it is one strip -- the next thing rises into the window as the last is cut off leaving it. */
-export function WordCycle({ slots }: { slots: readonly Slot[] }): React.JSX.Element {
+export function WordCycle({
+  slots,
+  onFace,
+}: {
+  slots: readonly Slot[]
+  /** Which slot is up, for a line elsewhere on the page that has to say the same thing. */
+  onFace?: (at: number) => void
+}): React.JSX.Element {
   const { lang } = useViewState()
   const still = useReduced()
   const [at, setAt] = useState(0)
@@ -374,6 +381,10 @@ export function WordCycle({ slots }: { slots: readonly Slot[] }): React.JSX.Elem
     ro.observe(node)
     return () => ro.disconnect()
   }, [slots, lang])
+
+  useEffect(() => {
+    onFace?.(at)
+  }, [at, onFace])
 
   useEffect(() => {
     if (!rolling) return

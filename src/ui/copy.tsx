@@ -283,32 +283,27 @@ const EN = {
     /** One line per platform, and the keystrokes rather than prose about them: this is read with a
      *  file dialog already open on top of it. */
     how: {
-      mac: (
+      mac: (p) => (
         <>
           In the dialog press <kbd>⇧</kbd>
           <kbd>⌘</kbd>
           <kbd>.</kbd> to reveal hidden folders. Or <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> and paste <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> for
-          Codex, or <code>~/.grok/sessions</code> for Grok.
+          <kbd>G</kbd> and paste {p}.
         </>
       ),
-      win: (
+      win: (p) => (
         <>
-          Type <code>%USERPROFILE%\.claude\projects</code>,{" "}
-          <code>%USERPROFILE%\.codex\sessions</code> for Codex, or{" "}
-          <code>%USERPROFILE%\.grok\sessions</code> for Grok — into the dialog’s <em>Folder</em>{" "}
-          box, press <kbd>Enter</kbd>.
+          Type {p} into the dialog’s <em>Folder</em> box, press <kbd>Enter</kbd>.
         </>
       ),
-      linux: (
+      linux: (p) => (
         <>
           In the dialog press <kbd>Ctrl</kbd>
-          <kbd>L</kbd>, type <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> or{" "}
-          <code>~/.grok/sessions</code>, press <kbd>Enter</kbd>.
+          <kbd>L</kbd>, type {p}, press <kbd>Enter</kbd>.
         </>
       ),
-    } as Record<Os, React.ReactNode>,
+    } as Record<Os, (p: React.ReactNode) => React.ReactNode>,
     errNothing: "No files selected.",
     errNoJsonl: (root: React.ReactNode): React.ReactNode => (
       <>
@@ -620,28 +615,24 @@ const ZH: Dict = {
     reading: "正在读取",
     privacy: "在本页解析 · 不上传任何内容",
     how: {
-      mac: (
+      mac: (p) => (
         <>
           在对话框里按 <kbd>⇧</kbd>
           <kbd>⌘</kbd>
           <kbd>.</kbd> 显示隐藏文件夹。或者按 <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> 粘贴 <code>~/.claude/projects</code>，Codex 则是{" "}
-          <code>~/.codex/sessions</code>，Grok 则是 <code>~/.grok/sessions</code>。
+          <kbd>G</kbd> 粘贴 {p}。
         </>
       ),
-      win: (
+      win: (p) => (
         <>
-          在对话框的<em>文件夹</em>框里输入 <code>%USERPROFILE%\.claude\projects</code>（Codex 则是{" "}
-          <code>%USERPROFILE%\.codex\sessions</code>，Grok 则是{" "}
-          <code>%USERPROFILE%\.grok\sessions</code>），按 <kbd>Enter</kbd>。
+          在对话框的<em>文件夹</em>框里输入 {p}，按 <kbd>Enter</kbd>。
         </>
       ),
-      linux: (
+      linux: (p) => (
         <>
           在对话框里按 <kbd>Ctrl</kbd>
-          <kbd>L</kbd>，输入 <code>~/.claude/projects</code>、<code>~/.codex/sessions</code> 或{" "}
-          <code>~/.grok/sessions</code>，按 <kbd>Enter</kbd>。
+          <kbd>L</kbd>，输入 {p}，按 <kbd>Enter</kbd>。
         </>
       ),
     },
@@ -947,28 +938,24 @@ const JA: Dict = {
     reading: "読み込み中",
     privacy: "このページ内で解析 · 何もアップロードしません",
     how: {
-      mac: (
+      mac: (p) => (
         <>
           ダイアログで <kbd>⇧</kbd>
           <kbd>⌘</kbd>
           <kbd>.</kbd> を押すと隠しフォルダが表示されます。または <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> で <code>~/.claude/projects</code> を貼り付け。Codex なら{" "}
-          <code>~/.codex/sessions</code>、Grok なら <code>~/.grok/sessions</code>。
+          <kbd>G</kbd> で {p} を貼り付け。
         </>
       ),
-      win: (
+      win: (p) => (
         <>
-          ダイアログの<em>フォルダー</em>欄に <code>%USERPROFILE%\.claude\projects</code>（Codex
-          なら <code>%USERPROFILE%\.codex\sessions</code>、Grok なら{" "}
-          <code>%USERPROFILE%\.grok\sessions</code>）と入力し、<kbd>Enter</kbd> を押します。
+          ダイアログの<em>フォルダー</em>欄に {p} と入力し、<kbd>Enter</kbd> を押します。
         </>
       ),
-      linux: (
+      linux: (p) => (
         <>
           ダイアログで <kbd>Ctrl</kbd>
-          <kbd>L</kbd> を押し、<code>~/.claude/projects</code>、<code>~/.codex/sessions</code>、
-          <code>~/.grok/sessions</code> と入力して <kbd>Enter</kbd>。
+          <kbd>L</kbd> を押し、{p} と入力して <kbd>Enter</kbd>。
         </>
       ),
     },
@@ -1287,29 +1274,24 @@ const ES: Dict = {
     reading: "Leyendo",
     privacy: "Analizado en esta página · no se sube nada",
     how: {
-      mac: (
+      mac: (p) => (
         <>
           En el diálogo pulsa <kbd>⇧</kbd>
           <kbd>⌘</kbd>
           <kbd>.</kbd> para mostrar las carpetas ocultas. O <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> y pega <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> para
-          Codex, o <code>~/.grok/sessions</code> para Grok.
+          <kbd>G</kbd> y pega {p}.
         </>
       ),
-      win: (
+      win: (p) => (
         <>
-          Escribe <code>%USERPROFILE%\.claude\projects</code>,{" "}
-          <code>%USERPROFILE%\.codex\sessions</code> para Codex, o{" "}
-          <code>%USERPROFILE%\.grok\sessions</code> para Grok en el campo <em>Carpeta</em> del
-          diálogo y pulsa <kbd>Enter</kbd>.
+          Escribe {p} en el campo <em>Carpeta</em> del diálogo y pulsa <kbd>Enter</kbd>.
         </>
       ),
-      linux: (
+      linux: (p) => (
         <>
           En el diálogo pulsa <kbd>Ctrl</kbd>
-          <kbd>L</kbd>, escribe <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> o{" "}
-          <code>~/.grok/sessions</code> y pulsa <kbd>Enter</kbd>.
+          <kbd>L</kbd>, escribe {p} y pulsa <kbd>Enter</kbd>.
         </>
       ),
     },
@@ -1630,29 +1612,24 @@ const FR: Dict = {
     reading: "Lecture",
     privacy: "Analysé dans cette page · rien n’est envoyé",
     how: {
-      mac: (
+      mac: (p) => (
         <>
           Dans la boîte de dialogue, faites <kbd>⇧</kbd>
           <kbd>⌘</kbd>
           <kbd>.</kbd> pour révéler les dossiers masqués. Ou <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> puis collez <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>{" "}
-          pour Codex, ou <code>~/.grok/sessions</code> pour Grok.
+          <kbd>G</kbd> puis collez {p}.
         </>
       ),
-      win: (
+      win: (p) => (
         <>
-          Tapez <code>%USERPROFILE%\.claude\projects</code>,{" "}
-          <code>%USERPROFILE%\.codex\sessions</code> pour Codex, ou{" "}
-          <code>%USERPROFILE%\.grok\sessions</code> pour Grok — dans le champ <em>Dossier</em> de la
-          boîte de dialogue, puis <kbd>Entrée</kbd>.
+          Tapez {p} dans le champ <em>Dossier</em> de la boîte de dialogue, puis <kbd>Entrée</kbd>.
         </>
       ),
-      linux: (
+      linux: (p) => (
         <>
           Dans la boîte de dialogue, faites <kbd>Ctrl</kbd>
-          <kbd>L</kbd>, tapez <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> ou{" "}
-          <code>~/.grok/sessions</code>, puis <kbd>Entrée</kbd>.
+          <kbd>L</kbd>, tapez {p}, puis <kbd>Entrée</kbd>.
         </>
       ),
     },
@@ -1973,29 +1950,24 @@ const DE: Dict = {
     reading: "Lesen",
     privacy: "In dieser Seite ausgewertet · nichts wird hochgeladen",
     how: {
-      mac: (
+      mac: (p) => (
         <>
           Im Dialog <kbd>⇧</kbd>
           <kbd>⌘</kbd>
           <kbd>.</kbd> drücken, um versteckte Ordner zu zeigen. Oder <kbd>⇧</kbd>
           <kbd>⌘</kbd>
-          <kbd>G</kbd> und <code>~/.claude/projects</code> einfügen — für Codex{" "}
-          <code>~/.codex/sessions</code>, für Grok <code>~/.grok/sessions</code>.
+          <kbd>G</kbd> und {p} einfügen.
         </>
       ),
-      win: (
+      win: (p) => (
         <>
-          Tippe <code>%USERPROFILE%\.claude\projects</code> — für Codex{" "}
-          <code>%USERPROFILE%\.codex\sessions</code>, für Grok{" "}
-          <code>%USERPROFILE%\.grok\sessions</code> — in das Feld <em>Ordner</em> des Dialogs und
-          drücke <kbd>Enter</kbd>.
+          Tippe {p} in das Feld <em>Ordner</em> des Dialogs und drücke <kbd>Enter</kbd>.
         </>
       ),
-      linux: (
+      linux: (p) => (
         <>
           Im Dialog <kbd>Strg</kbd>
-          <kbd>L</kbd> drücken, <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> oder{" "}
-          <code>~/.grok/sessions</code> tippen, <kbd>Enter</kbd>.
+          <kbd>L</kbd> drücken, {p} tippen, <kbd>Enter</kbd>.
         </>
       ),
     },

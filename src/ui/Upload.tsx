@@ -1,6 +1,6 @@
 /* The card's empty face: files from a picker or a drop, read here, handed to the engine. */
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react"
 import {
   billedSoFar,
   closeWalk,
@@ -14,9 +14,9 @@ import {
   type Analysis,
   type Scanned,
 } from "../core/engine.ts"
-import { AGENT_FOLDERS, SIDECAR_NAMES } from "../core/agents/index.ts"
+import { AGENT_FOLDERS, SIDECAR_NAMES, type Folder } from "../core/agents/index.ts"
 import { useT, type Dict, type Os } from "./copy.tsx"
-import { TextSwap, WordCycle, type Slot } from "./Motion.tsx"
+import { TextSwap, useReduced, WordCycle, type Slot } from "./Motion.tsx"
 import { sampleFiles } from "../core/sample.ts"
 import { Tip } from "./Tip.tsx"
 
@@ -50,6 +50,37 @@ const ASKS: readonly Slot[] = AGENT_FOLDERS.map((f) => ({
     </code>
   ),
 }))
+
+/* The folder as this reader would have to type it into a dialog, which is the one place the
+   Windows spelling of a home directory is what they see. */
+function typed(f: Folder, os: Os): string {
+  const path = (f.head + f.brand + f.tail).replace(/\/$/, "")
+  return os === "win" ? `%USERPROFILE%\\${path.slice(2).replaceAll("/", "\\")}` : path
+}
+
+/* The same folder the heading is asking for, so the keystrokes and the ask never name two
+   different agents. A reader who has asked for stillness gets no cycle to follow, so they get the
+   list the heading gives them. */
+function Ask({ os, at, still }: { os: Os; at: number; still: boolean }): React.JSX.Element {
+  if (still) {
+    return (
+      <>
+        {AGENT_FOLDERS.map((f, i) => (
+          <Fragment key={f.name}>
+            {i ? ", " : ""}
+            <code>{typed(f, os)}</code>
+          </Fragment>
+        ))}
+      </>
+    )
+  }
+  const f = AGENT_FOLDERS[at] ?? AGENT_FOLDERS[0]
+  return (
+    <TextSwap token={f.name}>
+      <code>{typed(f, os)}</code>
+    </TextSwap>
+  )
+}
 
 /* The three platforms, each a mark and a word. */
 function AppleMark(): React.JSX.Element {
@@ -529,6 +560,8 @@ export function Intake({
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const [os, setOs] = useState<Os>(guessOs)
+  const [face, setFace] = useState(0)
+  const still = useReduced()
   const t = useT()
   const dirPicker = useRef<HTMLInputElement>(null)
   const picks = useRef(0)
@@ -827,7 +860,11 @@ export function Intake({
         {/* Where a folder is unlikely to be droppable, the heading names the page instead of
             asking for something the reader cannot hand over. */}
         {/* One folder at a time, taking turns, rather than a list that grows a comma per agent. */}
-        <h2>{HANDHELD ? t.intake.headingTouch : t.intake.heading(<WordCycle slots={ASKS} />)}</h2>
+        <h2>
+          {HANDHELD
+            ? t.intake.headingTouch
+            : t.intake.heading(<WordCycle slots={ASKS} onFace={setFace} />)}
+        </h2>
         {/* A verb, the thing, and the three sizes the report resolves to. One line that fits on
             one line: a subtitle that wraps is a paragraph. */}
         <p className="lede">{HANDHELD ? t.intake.ledeTouch : t.intake.lede}</p>
@@ -868,7 +905,13 @@ export function Intake({
                 Inside the paragraph rather than around it: `TextSwap` is a span, and a span may
                 not hold a `<p>`. */}
             <p>
-              {HANDHELD ? t.intake.yoursBody : <TextSwap token={os}>{t.intake.how[os]}</TextSwap>}
+              {HANDHELD ? (
+                t.intake.yoursBody
+              ) : (
+                <TextSwap token={os}>
+                  {t.intake.how[os](<Ask os={os} at={face} still={still} />)}
+                </TextSwap>
+              )}
             </p>
           </div>
           {/* Mounted from the first pick onward: a face unmounted the moment it stops being
