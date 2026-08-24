@@ -64,7 +64,7 @@ const EN = {
 
   /* the card's header */
   card: {
-    eyebrow: "Cost attribution · Claude Code, Codex & Grok",
+    eyebrow: "Cost attribution",
     /** The browser tab, in English because the markup is written before anyone has guessed. */
     title: "Where the money went — Claude Code, Codex & Grok cost attribution",
     /** Read rather than dropped: this line stands over the figure on every device, and a phone has
@@ -453,7 +453,7 @@ const ZH: Dict = {
     failed: "无法渲染图片",
   },
   card: {
-    eyebrow: "成本归因 · Claude Code、Codex 与 Grok",
+    eyebrow: "成本归因",
     title: "钱花到哪儿去了 — Claude Code、Codex 与 Grok 成本归因",
     nothingYet: "还没有读取任何记录",
     example: "示例数据",
@@ -776,7 +776,7 @@ const JA: Dict = {
     failed: "画像を描画できませんでした",
   },
   card: {
-    eyebrow: "コスト配分 · Claude Code、Codex、Grok",
+    eyebrow: "コスト配分",
     title: "お金はどこへ — Claude Code、Codex、Grok のコスト配分",
     nothingYet: "まだ何も読み込んでいません",
     example: "サンプルデータ",
@@ -1107,7 +1107,7 @@ const ES: Dict = {
     failed: "No se pudo generar la imagen",
   },
   card: {
-    eyebrow: "Atribución de costes · Claude Code, Codex y Grok",
+    eyebrow: "Atribución de costes",
     title: "En qué se fue el dinero — Atribución de costes de Claude Code, Codex y Grok",
     nothingYet: "Todavía no se ha leído nada",
     example: "Datos de ejemplo",
@@ -1449,7 +1449,7 @@ const FR: Dict = {
     failed: "Impossible de rendre l’image",
   },
   card: {
-    eyebrow: "Attribution des coûts · Claude Code, Codex et Grok",
+    eyebrow: "Attribution des coûts",
     title: "Où est passé l’argent — Attribution des coûts Claude Code, Codex et Grok",
     nothingYet: "Rien n’a encore été lu",
     example: "Données d’exemple",
@@ -1791,7 +1791,7 @@ const DE: Dict = {
     failed: "Bild konnte nicht gerendert werden",
   },
   card: {
-    eyebrow: "Kostenzuordnung · Claude Code, Codex und Grok",
+    eyebrow: "Kostenzuordnung",
     title: "Wohin das Geld geflossen ist — Claude-Code-, Codex- und Grok-Kostenzuordnung",
     nothingYet: "Noch nichts gelesen",
     example: "Beispieldaten",
