@@ -345,13 +345,10 @@ const EN = {
     handingOver: "What you are handing over",
     handingOverBody: (
       <>
-        One <code>.jsonl</code> file per session, in one folder per project, under{" "}
-        <code>~/.claude/projects/</code> — a dotfile, which is why every file picker hides it until
-        you ask for it by name. Codex keeps its own the same way: one <code>rollout-….jsonl</code>{" "}
-        per session, in dated folders under <code>~/.codex/sessions/</code>. Grok writes one{" "}
-        <code>updates.jsonl</code> per session under <code>~/.grok/sessions/</code>. Everything you
-        pick is combined into a single report, so pick one project’s folder if that is the bill you
-        want.
+        One <code>.jsonl</code> per session, under <code>~/.claude/projects/</code> (a folder per
+        project), <code>~/.codex/sessions/</code> or <code>~/.grok/sessions/</code>. Those are
+        dotfiles, so ask for them by name. Everything you pick becomes one report, so pick one
+        project’s folder if that is the bill you want.
       </>
     ),
     terminal: "Prefer the terminal?",
@@ -685,13 +682,10 @@ const ZH: Dict = {
     handingOver: "你交出去的是什么",
     handingOverBody: (
       <>
-        每个会话一个 <code>.jsonl</code> 文件，每个项目一个文件夹，都在{" "}
-        <code>~/.claude/projects/</code> 下面 ——
-        这是个点开头的隐藏目录，所以每个文件选择器都会藏起它，除非你指名要。Codex
-        也一样：每个会话一个 <code>rollout-….jsonl</code>，按日期分文件夹放在{" "}
-        <code>~/.codex/sessions/</code> 下面。Grok 每个会话一个 <code>updates.jsonl</code>，放在{" "}
-        <code>~/.grok/sessions/</code>{" "}
-        下面。你选的所有内容会合并成一份报告，所以如果你只想看某一个项目的账单，就只选那个项目的文件夹。
+        每个会话一个 <code>.jsonl</code> 文件：Claude 在 <code>~/.claude/projects/</code>{" "}
+        下按项目分文件夹，Codex 在 <code>~/.codex/sessions/</code>，Grok 在{" "}
+        <code>~/.grok/sessions/</code>
+        。都是点开头的隐藏目录，得指名要。你选的会合并成一份报告，所以只选你想看那个项目的文件夹。
       </>
     ),
     terminal: "更习惯用终端？",
@@ -1021,14 +1015,11 @@ const JA: Dict = {
     handingOver: "何を渡すことになるのか",
     handingOverBody: (
       <>
-        セッションごとに <code>.jsonl</code> ファイルが 1 つ、プロジェクトごとにフォルダが 1 つ、
-        <code>~/.claude/projects/</code> の下にあります — ドットファイルなので、名前で指定しない限り
-        どのファイル選択画面でも隠されています。Codex も同じで、セッションごとに{" "}
-        <code>rollout-….jsonl</code> が 1 つ、日付ごとのフォルダに分かれて{" "}
-        <code>~/.codex/sessions/</code> の下にあります。Grok はセッションごとに{" "}
-        <code>updates.jsonl</code> が 1 つ、<code>~/.grok/sessions/</code>{" "}
-        の下にあります。選んだものはすべて 1 つのレポートにまとめられるので、
-        特定のプロジェクトの請求が見たいなら、そのプロジェクトのフォルダだけを選んでください。
+        セッションごとに <code>.jsonl</code> が 1 つ。Claude は <code>~/.claude/projects/</code>{" "}
+        にプロジェクトごとのフォルダ、Codex は <code>~/.codex/sessions/</code>、Grok は{" "}
+        <code>~/.grok/sessions/</code>{" "}
+        の下です。どれもドットファイルなので、名前で指定してください。選んだものは 1
+        つのレポートにまとまるので、見たいプロジェクトのフォルダだけを選んでください。
       </>
     ),
     terminal: "ターミナルのほうが好み？",
@@ -1369,13 +1360,10 @@ const ES: Dict = {
     handingOver: "Qué estás entregando",
     handingOverBody: (
       <>
-        Un archivo <code>.jsonl</code> por sesión, en una carpeta por proyecto, bajo{" "}
-        <code>~/.claude/projects/</code> — un dotfile, y por eso todo selector de archivos lo oculta
-        hasta que lo pides por su nombre. Codex guarda las suyas igual: un{" "}
-        <code>rollout-….jsonl</code> por sesión, en carpetas por fecha bajo{" "}
-        <code>~/.codex/sessions/</code>. Grok escribe un <code>updates.jsonl</code> por sesión bajo{" "}
-        <code>~/.grok/sessions/</code>. Todo lo que elijas se combina en un único informe, así que
-        elige la carpeta de un solo proyecto si esa es la factura que quieres.
+        Un <code>.jsonl</code> por sesión, bajo <code>~/.claude/projects/</code> (una carpeta por
+        proyecto), <code>~/.codex/sessions/</code> o <code>~/.grok/sessions/</code>. Son dotfiles:
+        pídelos por su nombre. Todo lo que elijas se combina en un único informe, así que elige la
+        carpeta de un solo proyecto si esa es la factura que quieres.
       </>
     ),
     terminal: "¿Prefieres la terminal?",
@@ -1718,13 +1706,10 @@ const FR: Dict = {
     handingOver: "Ce que vous confiez",
     handingOverBody: (
       <>
-        Un fichier <code>.jsonl</code> par session, un dossier par projet, sous{" "}
-        <code>~/.claude/projects/</code> — un dotfile, et c’est pourquoi tout sélecteur de fichiers
-        le masque tant que vous ne le demandez pas par son nom. Codex range les siennes de même : un{" "}
-        <code>rollout-….jsonl</code> par session, dans des dossiers datés sous{" "}
-        <code>~/.codex/sessions/</code>. Grok écrit un <code>updates.jsonl</code> par session sous{" "}
-        <code>~/.grok/sessions/</code>. Tout ce que vous choisissez est réuni en un seul rapport,
-        donc choisissez le dossier d’un seul projet si c’est cette facture que vous voulez.
+        Un <code>.jsonl</code> par session, sous <code>~/.claude/projects/</code> (un dossier par
+        projet), <code>~/.codex/sessions/</code> ou <code>~/.grok/sessions/</code>. Ce sont des
+        dotfiles : demandez-les par leur nom. Tout ce que vous choisissez est réuni en un seul
+        rapport, donc choisissez le dossier d’un seul projet si c’est cette facture que vous voulez.
       </>
     ),
     terminal: "Vous préférez le terminal ?",
@@ -2067,13 +2052,11 @@ const DE: Dict = {
     handingOver: "Was du aus der Hand gibst",
     handingOverBody: (
       <>
-        Eine <code>.jsonl</code>-Datei pro Sitzung, ein Ordner pro Projekt, unter{" "}
-        <code>~/.claude/projects/</code> — ein Dotfile, weshalb jeder Dateidialog ihn versteckt, bis
-        du ihn beim Namen verlangst. Codex legt seine genauso ab: eine <code>rollout-….jsonl</code>{" "}
-        pro Sitzung, in Datumsordnern unter <code>~/.codex/sessions/</code>. Grok schreibt eine{" "}
-        <code>updates.jsonl</code> pro Sitzung unter <code>~/.grok/sessions/</code>. Alles, was du
-        wählst, wird zu einem Bericht zusammengeführt — wähle also den Ordner eines einzelnen
-        Projekts, wenn du dessen Rechnung willst.
+        Eine <code>.jsonl</code> pro Sitzung, unter <code>~/.claude/projects/</code> (ein Ordner pro
+        Projekt), <code>~/.codex/sessions/</code> oder <code>~/.grok/sessions/</code>. Alles
+        Dotfiles: verlange sie beim Namen. Alles, was du wählst, wird zu einem Bericht
+        zusammengeführt — wähle also den Ordner eines einzelnen Projekts, wenn du dessen Rechnung
+        willst.
       </>
     ),
     terminal: "Lieber im Terminal?",
