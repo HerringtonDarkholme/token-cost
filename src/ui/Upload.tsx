@@ -1,6 +1,15 @@
 /* The card's empty face: files from a picker or a drop, read here, handed to the engine. */
 
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react"
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import {
   billedSoFar,
   closeWalk,
@@ -58,28 +67,31 @@ function typed(f: Folder, os: Os): string {
   return os === "win" ? `%USERPROFILE%\\${path.slice(2).replaceAll("/", "\\")}` : path
 }
 
+/* Which folder the heading has up, read here rather than passed: `TextSwap` holds the sentence it
+   was handed until its own token changes, so an element inside it never sees a new prop. */
+const Face = createContext(0)
+
 /* The same folder the heading is asking for, so the keystrokes and the ask never name two
    different agents. A reader who has asked for stillness gets no cycle to follow, so they get the
    list the heading gives them. */
-function Ask({ os, at, still }: { os: Os; at: number; still: boolean }): React.JSX.Element {
+function Ask({ os, still }: { os: Os; still: boolean }): React.JSX.Element {
+  const t = useT()
+  const at = useContext(Face)
+  const said = (f: Folder): React.ReactNode => t.intake.pair(<code>{typed(f, os)}</code>, f.name)
   if (still) {
     return (
       <>
         {AGENT_FOLDERS.map((f, i) => (
           <Fragment key={f.name}>
             {i ? ", " : ""}
-            <code>{typed(f, os)}</code>
+            {said(f)}
           </Fragment>
         ))}
       </>
     )
   }
   const f = AGENT_FOLDERS[at] ?? AGENT_FOLDERS[0]
-  return (
-    <TextSwap token={f.name}>
-      <code>{typed(f, os)}</code>
-    </TextSwap>
-  )
+  return <TextSwap token={f.name}>{said(f)}</TextSwap>
 }
 
 /* The three platforms, each a mark and a word. */
@@ -908,9 +920,9 @@ export function Intake({
               {HANDHELD ? (
                 t.intake.yoursBody
               ) : (
-                <TextSwap token={os}>
-                  {t.intake.how[os](<Ask os={os} at={face} still={still} />)}
-                </TextSwap>
+                <Face.Provider value={face}>
+                  <TextSwap token={os}>{t.intake.how[os](<Ask os={os} still={still} />)}</TextSwap>
+                </Face.Provider>
               )}
             </p>
           </div>

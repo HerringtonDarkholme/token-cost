@@ -282,6 +282,13 @@ const EN = {
     privacy: "Parsed in this page · nothing is uploaded",
     /** One line per platform, and the keystrokes rather than prose about them: this is read with a
      *  file dialog already open on top of it. */
+    /** The folder and whose it is, as one phrase: the keystrokes show one pair at a time, taking
+     *  the same turns the heading does. */
+    pair: (path: React.ReactNode, name: string): React.ReactNode => (
+      <>
+        {path} for {name}
+      </>
+    ),
     how: {
       mac: (p) => (
         <>
@@ -614,6 +621,11 @@ const ZH: Dict = {
     osTip: (current, next) => `不是 ${current}？点一下切到 ${next} 的说明。`,
     reading: "正在读取",
     privacy: "在本页解析 · 不上传任何内容",
+    pair: (path, name) => (
+      <>
+        {name} 的 {path}
+      </>
+    ),
     how: {
       mac: (p) => (
         <>
@@ -937,6 +949,11 @@ const JA: Dict = {
     osTip: (current, next) => `${current} ではない？押すと ${next} の手順に切り替わります。`,
     reading: "読み込み中",
     privacy: "このページ内で解析 · 何もアップロードしません",
+    pair: (path, name) => (
+      <>
+        {name} なら {path}
+      </>
+    ),
     how: {
       mac: (p) => (
         <>
@@ -1273,6 +1290,11 @@ const ES: Dict = {
     osTip: (current, next) => `¿No usas ${current}? Pulsa para la ruta de ${next}.`,
     reading: "Leyendo",
     privacy: "Analizado en esta página · no se sube nada",
+    pair: (path, name) => (
+      <>
+        {path} para {name}
+      </>
+    ),
     how: {
       mac: (p) => (
         <>
@@ -1611,6 +1633,11 @@ const FR: Dict = {
     osTip: (current, next) => `Pas ${current} ? Appuyez pour la marche à suivre ${next}.`,
     reading: "Lecture",
     privacy: "Analysé dans cette page · rien n’est envoyé",
+    pair: (path, name) => (
+      <>
+        {path} pour {name}
+      </>
+    ),
     how: {
       mac: (p) => (
         <>
@@ -1949,6 +1976,11 @@ const DE: Dict = {
     osTip: (current, next) => `Nicht ${current}? Drücken für den Weg unter ${next}.`,
     reading: "Lesen",
     privacy: "In dieser Seite ausgewertet · nichts wird hochgeladen",
+    pair: (path, name) => (
+      <>
+        {path} für {name}
+      </>
+    ),
     how: {
       mac: (p) => (
         <>
