@@ -247,11 +247,7 @@ const EN = {
 
   /* the empty card */
   intake: {
-    heading: (a: React.ReactNode, b: React.ReactNode, c: React.ReactNode): React.ReactNode => (
-      <>
-        Drop your {a}, {b} or {c} folder here
-      </>
-    ),
+    heading: (a: React.ReactNode): React.ReactNode => <>Drop your {a} folder here</>,
     /** The heading on a device that probably cannot reach the folder: it says what the page does
      *  rather than what to do next. Where to go is the note at the foot of the card. */
     headingTouch: "Visualize your AI bill",
@@ -604,11 +600,7 @@ const ZH: Dict = {
       `有 ${n} 个会话记录读取失败，未计入总额；正在运行的会话会在读取过程中改动文件。`,
   },
   intake: {
-    heading: (a, b, c) => (
-      <>
-        把你的 {a}、{b} 或 {c} 文件夹拖到这里
-      </>
-    ),
+    heading: (a) => <>把你的 {a} 文件夹拖到这里</>,
     headingTouch: "把你的 AI 账单画出来",
     lede: "把 AI 账单画出来：每个工具、每条子命令、每一块钱。",
     ledeTouch:
@@ -947,11 +939,7 @@ const JA: Dict = {
       `${n} 件のトランスクリプトを読み取れず、合計に含まれていません。実行中のセッションがあるフォルダーは読み取り中に変化します。`,
   },
   intake: {
-    heading: (a, b, c) => (
-      <>
-        {a}、{b}、{c} のフォルダをここにドロップ
-      </>
-    ),
+    heading: (a) => <>{a} のフォルダをここにドロップ</>,
     headingTouch: "AI の請求を図にする",
     lede: "AI の請求を図にする：すべてのツール、すべてのサブコマンド、すべてのドル。",
     ledeTouch:
@@ -1298,11 +1286,7 @@ const ES: Dict = {
       "sesión activa cambia durante la lectura.",
   },
   intake: {
-    heading: (a, b, c) => (
-      <>
-        Suelta aquí tu carpeta de {a}, {b} o {c}
-      </>
-    ),
+    heading: (a) => <>Suelta aquí tu carpeta de {a}</>,
     headingTouch: "Visualiza tu factura de IA",
     lede: "Grafica tu factura de IA: cada herramienta, cada subcomando, cada dólar.",
     ledeTouch:
@@ -1651,11 +1635,7 @@ const FR: Dict = {
       "où une session tourne change pendant la lecture.",
   },
   intake: {
-    heading: (a, b, c) => (
-      <>
-        Déposez ici votre dossier {a}, {b} ou {c}
-      </>
-    ),
+    heading: (a) => <>Déposez ici votre dossier {a}</>,
     headingTouch: "Visualisez votre facture d’IA",
     lede: "Cartographiez votre facture d’IA : chaque outil, chaque sous-commande, chaque dollar.",
     ledeTouch:
@@ -2003,11 +1983,7 @@ const DE: Dict = {
       "einer laufenden Sitzung ändert sich während des Lesens.",
   },
   intake: {
-    heading: (a, b, c) => (
-      <>
-        Lege deinen {a}-, {b}- oder {c}-Ordner hier ab
-      </>
-    ),
+    heading: (a) => <>Lege hier deinen Ordner {a} ab</>,
     headingTouch: "Visualisiere deine KI-Rechnung",
     lede: "Zeichne deine KI-Rechnung: jedes Tool, jedes Unterkommando, jeden Dollar.",
     ledeTouch:

@@ -319,3 +319,102 @@ export function TextSwap({
     </span>
   )
 }
+
+/** How long a slot stands before the next one takes its place. */
+function holdMs(): number {
+  return cssMs("--word-cycle-hold", 2200)
+}
+
+/** How long the strip takes to travel its one line, read off the stylesheet so the face that has
+ *  gone is dropped on the frame the CSS is done with it. */
+function reelMs(): number {
+  return cssMs("--reel-dur", 320)
+}
+
+/** One of the things a cycling slot says. */
+export interface Slot {
+  /** The word it stands for, said plainly: what the still list is written from. */
+  word: string
+  /** What the cycle shows instead, where the slot is more than its word. */
+  body?: ReactNode
+}
+
+/** One slot in a sentence, refilled over and over: the slot is a window a line high, and what is
+ *  in it is one strip -- the next thing rises into the window as the last is cut off leaving it. */
+export function WordCycle({ slots }: { slots: readonly Slot[] }): React.JSX.Element {
+  const { lang } = useViewState()
+  const still = useReduced()
+  const [at, setAt] = useState(0)
+  const [gone, setGone] = useState<number | null>(null)
+  const box = useRef<HTMLSpanElement>(null)
+  const sizer = useRef<HTMLSpanElement>(null)
+  const [wide, setWide] = useState<readonly number[] | null>(null)
+
+  const rolling = !still && slots.length > 1
+
+  /* Every slot measured off to the side, rather than the arriving one measured as it lands: the
+     window starts for its next width as the strip starts to travel, and it cannot ask for a width
+     it is not already carrying. */
+  useLayoutEffect(() => {
+    const node = sizer.current
+    if (!node) return
+    const read = (): void => {
+      const now = Array.from(node.children, (c) => c.getBoundingClientRect().width)
+      setWide((was) => {
+        if (!now.length || now.some((w) => w <= 0)) return was
+        const same =
+          was && was.length === now.length && was.every((w, i) => Math.abs(w - now[i]) < 0.5)
+        return same ? was : now
+      })
+    }
+    read()
+    if (typeof ResizeObserver !== "function") return
+    /* The webfont lands after the first measure and moves every width. */
+    const ro = new ResizeObserver(read)
+    ro.observe(node)
+    return () => ro.disconnect()
+  }, [slots, lang])
+
+  useEffect(() => {
+    if (!rolling) return
+    if (gone !== null) {
+      const t = setTimeout(() => setGone(null), reelMs())
+      return () => clearTimeout(t)
+    }
+    const t = setTimeout(() => {
+      setGone(at)
+      setAt((n) => (n + 1) % slots.length)
+    }, holdMs())
+    return () => clearTimeout(t)
+  }, [gone, at, rolling, slots.length])
+
+  /* Nothing cycles for a reader who asked for stillness, and one name left standing would read as
+     the only one the page takes -- so that reader is given the list the cycle stands for, in
+     words, since the long form of a slot is only legible one at a time. */
+  if (still) {
+    const words = slots.map((s) => s.word)
+    return <>{new Intl.ListFormat(tagOf(lang), { type: "disjunction" }).format(words)}</>
+  }
+
+  const face = (i: number): ReactNode => slots[i].body ?? slots[i].word
+
+  return (
+    <span ref={box} className="t-word-cycle" style={wide ? { width: `${wide[at]}px` } : undefined}>
+      {/* Keyed by what it carries, because the strip has to be a new element to be given the
+          travel again -- the same one with new words in it would arrive already home. */}
+      <span className="t-reel" key={at}>
+        {gone === null ? null : (
+          <span className="face" data-gone="1">
+            {face(gone)}
+          </span>
+        )}
+        <span className="face">{face(at)}</span>
+      </span>
+      <span ref={sizer} className="sizer" aria-hidden="true">
+        {slots.map((s) => (
+          <span key={s.word}>{s.body ?? s.word}</span>
+        ))}
+      </span>
+    </span>
+  )
+}

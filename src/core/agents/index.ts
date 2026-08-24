@@ -31,6 +31,12 @@ export interface Store {
 export interface Agent {
   /** How the bill names it. */
   name: string
+  /** The mark it is known by, as path data in a 24-unit box -- data rather than markup, so this
+   *  side still draws nothing. */
+  mark: readonly string[]
+  /** How much larger than the others its mark has to be set to read as their size: a thin diagonal
+   *  fills its box with white space where a solid mark fills it with ink. */
+  markScale?: number
   /** Whether this agent wrote the file -- a positive test for its own markers, so no agent is
    *  another's fallback. */
   claims(head: string): boolean
@@ -65,3 +71,34 @@ export const SIDECAR_NAMES: ReadonlySet<string> = ((): ReadonlySet<string> => {
   for (const a of AGENTS) if (a.sidecarNames) for (const n of a.sidecarNames) all.add(n)
   return all
 })()
+
+/** One agent as the empty card asks for it: what to call it, the folder to point at, and the mark
+ *  that says whose that folder is. */
+export interface Folder {
+  name: string
+  /** The folder in three parts, written the way the reader would type it -- split so the page can
+   *  set the vendor's own word apart from the path around it. */
+  head: string
+  brand: string
+  tail: string
+  mark: readonly string[]
+  markScale?: number
+}
+
+/** The ask, in registry order, so a fourth agent joins the sentence by being registered rather
+ *  than by being written into it. */
+export const AGENT_FOLDERS: readonly Folder[] = AGENTS.flatMap((a) => {
+  const store = a.stores?.[0]
+  if (!store) return []
+  const dot = store.home.startsWith(".")
+  return [
+    {
+      name: a.name,
+      head: dot ? "~/." : "~/",
+      brand: dot ? store.home.slice(1) : store.home,
+      tail: `/${store.dirs[0]}/`,
+      mark: a.mark,
+      markScale: a.markScale,
+    },
+  ]
+})

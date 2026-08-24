@@ -14,11 +14,42 @@ import {
   type Analysis,
   type Scanned,
 } from "../core/engine.ts"
-import { SIDECAR_NAMES } from "../core/agents/index.ts"
+import { AGENT_FOLDERS, SIDECAR_NAMES } from "../core/agents/index.ts"
 import { useT, type Dict, type Os } from "./copy.tsx"
-import { TextSwap } from "./Motion.tsx"
+import { TextSwap, WordCycle, type Slot } from "./Motion.tsx"
 import { sampleFiles } from "../core/sample.ts"
 import { Tip } from "./Tip.tsx"
+
+/** One agent's mark, in that agent's colour where it has one and at its own optical size. */
+function Mark({ paths, scale }: { paths: readonly string[]; scale?: number }): React.JSX.Element {
+  return (
+    <svg
+      className="mark"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      style={scale ? ({ "--mark-scale": scale } as React.CSSProperties) : undefined}
+    >
+      {paths.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  )
+}
+
+/* The folder each agent keeps, under the mark of whoever fills it, with that vendor's own word in
+   that vendor's own colour. */
+const ASKS: readonly Slot[] = AGENT_FOLDERS.map((f) => ({
+  word: f.name,
+  body: (
+    <code data-brand={f.brand}>
+      <Mark paths={f.mark} scale={f.markScale} />
+      {f.head}
+      <span className="brand">{f.brand}</span>
+      {f.tail}
+    </code>
+  ),
+}))
 
 /* The three platforms, each a mark and a word. */
 function AppleMark(): React.JSX.Element {
@@ -795,9 +826,8 @@ export function Intake({
             `.jsonl` is a detail no reader needs. Loose files dragged in still work. */}
         {/* Where a folder is unlikely to be droppable, the heading names the page instead of
             asking for something the reader cannot hand over. */}
-        <h2>
-          {HANDHELD ? t.intake.headingTouch : t.intake.heading("Claude Code", "Codex", "Grok")}
-        </h2>
+        {/* One folder at a time, taking turns, rather than a list that grows a comma per agent. */}
+        <h2>{HANDHELD ? t.intake.headingTouch : t.intake.heading(<WordCycle slots={ASKS} />)}</h2>
         {/* A verb, the thing, and the three sizes the report resolves to. One line that fits on
             one line: a subtitle that wraps is a paragraph. */}
         <p className="lede">{HANDHELD ? t.intake.ledeTouch : t.intake.lede}</p>

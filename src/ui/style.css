@@ -1769,6 +1769,9 @@ tfoot .n {
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.018em;
+  /* What the path is set at against the rest of the line -- stated once, because the window the
+     path cycles in has to be as tall as the path's own line and not the heading's. */
+  --chip: 0.86;
 }
 .dropzone p {
   color: var(--ink2);
@@ -2175,9 +2178,28 @@ tfoot .n {
    as a button. */
 .dropzone h2 code {
   font-family: var(--mono);
-  font-size: 0.86em;
+  font-size: calc(var(--chip) * 1em);
   letter-spacing: -0.01em;
   user-select: all;
+}
+/* Sized in ems, so it tracks a heading that is set in a clamp rather than at one width. */
+.dropzone h2 code .mark {
+  width: calc(0.8em * var(--mark-scale, 1));
+  height: calc(0.8em * var(--mark-scale, 1));
+  margin-right: 0.42em;
+  vertical-align: -0.05em;
+  fill: var(--brand, currentColor);
+}
+/* Out of the page's own eight hues rather than each brand's exact ink, because these have to hold
+   up on both papers -- and a house with no colour of its own keeps the heading's. */
+.dropzone h2 code[data-brand="claude"] {
+  --brand: var(--c1);
+}
+.dropzone h2 code[data-brand="codex"] {
+  --brand: var(--c4);
+}
+.dropzone h2 code .brand {
+  color: var(--brand, inherit);
 }
 /* The two buttons on this face, and the only things on the page a first-time reader has to
    press, so they are sized for that rather than to the toolbar's scale: 13px on a 16/34 pad
@@ -2394,6 +2416,24 @@ kbd {
   --text-swap-translate-y: var(--distance-micro);
   --text-swap-blur: var(--blur-small);
   --text-swap-ease: var(--ease-in-out);
+  /* A cycling slot: how long one stands, how long the fold to the next takes, and how far off the
+     page the fold is seen from. */
+  --word-cycle-hold: 2200ms;
+  --word-cycle-slide: 300ms;
+  /* The box waits for the falling face to be out of the way, then travels with the one coming up
+     behind it. */
+  --word-cycle-wait: calc(var(--roll-dur) / 2);
+  /* A cycling slot: how long one thing stands, and how long the strip takes to carry the next one
+     up into the window. */
+  --word-cycle-hold: 2200ms;
+  --reel-dur: 320ms;
+  /* Even at both ends rather than front-loaded: the last of the travel is where the line leaving
+     is a two-pixel tail, and an ease that is all but home a third of the way in leaves that tail
+     standing for the rest of the trip. */
+  --reel-ease: var(--ease-in-out);
+  /* The fade runs flat rather than eased: it is what carries the swap where the window has the
+     travel hidden, and an eased one spends its middle -- the part in view -- barely changing. */
+  --reel-fade-ease: var(--ease-linear);
   /* Card resize. */
   --resize-dur: 300ms;
   --resize-ease: var(--ease-smooth-out);
@@ -2595,6 +2635,93 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .t-text-swap {
     transition: none !important;
+  }
+}
+
+/* One slot in a sentence, taking one thing after another. The slot is a window one line high and
+   the strip inside carries the next thing up into it -- clipped rather than faded, so what leaves
+   is cut off at the edge instead of dissolving over the words around it. */
+.t-word-cycle {
+  display: inline-block;
+  position: relative;
+  white-space: nowrap;
+  /* No strut of its own, so the window is the height of the strip it holds rather than of the
+     line it sits in -- the slack between the two is where both faces would be seen at once. */
+  line-height: 0;
+  /* `clip-path` rather than `overflow`, which on an inline box would move the baseline to its
+     bottom edge and drop the slot below the line it sits in. */
+  clip-path: inset(0);
+  transition: width var(--reel-dur) var(--reel-ease);
+}
+/* The slots, off to the side and measured there, since the window cannot ask one what it will be
+   worth until it is already carrying it. */
+.t-word-cycle > .sizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.t-reel {
+  display: inline-block;
+  position: relative;
+  animation: t-reel-up var(--reel-dur) var(--reel-ease) both;
+}
+/* A line of its own, tight to the type: the window is as tall as this, so any slack here is slack
+   the two faces are both seen through halfway up. Each face also thins out over its own travel --
+   held solid through the middle of the trip, since a fade that runs the whole way turns the
+   window back into a crossfade. */
+.t-reel > .face {
+  display: block;
+  line-height: 1.2;
+  animation: t-face-in var(--reel-dur) var(--reel-fade-ease) both;
+}
+@keyframes t-face-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes t-face-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* The heading's slot holds type smaller than the line it sits in, and it is that type's line the
+   window has to be cut to. */
+.dropzone h2 .t-reel > .face {
+  line-height: calc(var(--chip) * 1.2);
+}
+/* Stacked directly over the one arriving, out of the flow so the strip stays a line high -- and
+   out of the window until the strip carries it down through it. */
+.t-reel > .face[data-gone] {
+  position: absolute;
+  animation-name: t-face-out;
+  left: 0;
+  /* Clear of the window by the little the type hangs below its own line, or the tail of a `p` in
+     the folder that has gone stays behind as two marks over the one that replaced it. */
+  bottom: calc(100% + 0.12em);
+}
+@keyframes t-reel-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-word-cycle {
+    transition: none;
+  }
+  .t-reel,
+  .t-reel > .face {
+    animation: none !important;
   }
 }
 
