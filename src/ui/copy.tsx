@@ -345,8 +345,8 @@ const EN = {
     handingOver: "What you are handing over",
     handingOverBody: (
       <>
-        One <code>.jsonl</code> file per session. Everything you pick lands in one report, so pick a
-        single project’s folder if that is the bill you want.
+        The <code>.jsonl</code> files from your sessions. Everything you pick becomes one report, so
+        pick one project’s folder.
       </>
     ),
     terminal: "Prefer the terminal?",
@@ -679,8 +679,8 @@ const ZH: Dict = {
     handingOver: "你交出去的是什么",
     handingOverBody: (
       <>
-        一个会话一个 <code>.jsonl</code>{" "}
-        文件。你选中的全部会合并成一份报告，所以想看哪个项目的账单，就只选那个项目的文件夹。
+        你的会话文件，就是那些 <code>.jsonl</code>
+        。你选的全部会合并成一份报告，所以只选一个项目的文件夹。
       </>
     ),
     terminal: "更习惯用终端？",
@@ -1006,8 +1006,8 @@ const JA: Dict = {
     handingOver: "何を渡すことになるのか",
     handingOverBody: (
       <>
-        セッション 1 つにつき <code>.jsonl</code> ファイルが 1 つ。選んだものはすべて 1
-        つのレポートにまとまるので、見たいプロジェクトのフォルダだけを選んでください。
+        セッションの <code>.jsonl</code> ファイルです。選んだものは 1
+        つのレポートにまとまるので、プロジェクトのフォルダは 1 つだけ選んでください。
       </>
     ),
     terminal: "ターミナルのほうが好み？",
@@ -1347,8 +1347,8 @@ const ES: Dict = {
     handingOver: "Qué estás entregando",
     handingOverBody: (
       <>
-        Un archivo <code>.jsonl</code> por sesión. Todo lo que elijas acaba en un solo informe:
-        elige la carpeta de un proyecto si esa es la factura que quieres.
+        Los archivos <code>.jsonl</code> de tus sesiones. Todo lo que elijas se convierte en un solo
+        informe, así que elige la carpeta de un proyecto.
       </>
     ),
     terminal: "¿Prefieres la terminal?",
@@ -1690,9 +1690,8 @@ const FR: Dict = {
     handingOver: "Ce que vous confiez",
     handingOverBody: (
       <>
-        Un fichier <code>.jsonl</code> par session. Tout ce que vous choisissez atterrit dans un
-        seul rapport : choisissez le dossier d’un seul projet si c’est cette facture que vous
-        voulez.
+        Les fichiers <code>.jsonl</code> de vos sessions. Tout ce que vous choisissez devient un
+        seul rapport : choisissez le dossier d’un seul projet.
       </>
     ),
     terminal: "Vous préférez le terminal ?",
@@ -2034,8 +2033,8 @@ const DE: Dict = {
     handingOver: "Was du aus der Hand gibst",
     handingOverBody: (
       <>
-        Eine <code>.jsonl</code>-Datei pro Sitzung. Alles, was du wählst, landet in einem Bericht —
-        wähle also den Ordner eines einzelnen Projekts, wenn du dessen Rechnung willst.
+        Die <code>.jsonl</code>-Dateien deiner Sitzungen. Alles, was du wählst, wird ein Bericht —
+        wähle also den Ordner eines Projekts.
       </>
     ),
     terminal: "Lieber im Terminal?",
