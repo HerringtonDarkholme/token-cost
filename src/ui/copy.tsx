@@ -345,28 +345,26 @@ const EN = {
     handingOver: "What you are handing over",
     handingOverBody: (
       <>
-        One <code>.jsonl</code> per session, under <code>~/.claude/projects/</code> (a folder per
-        project), <code>~/.codex/sessions/</code> or <code>~/.grok/sessions/</code>. Those are
-        dotfiles, so ask for them by name. Everything you pick becomes one report, so pick one
-        project’s folder if that is the bill you want.
+        One <code>.jsonl</code> per session, under <code>~/.claude/projects/</code>,{" "}
+        <code>~/.codex/sessions/</code> or <code>~/.grok/sessions/</code> — hidden dotfiles, so type
+        the name. Everything you pick becomes one report.
       </>
     ),
     terminal: "Prefer the terminal?",
     terminalBody: (
       <>
-        The command above runs where the transcripts are, which is what an SSH session needs.{" "}
-        <code>--print</code> writes the URL instead of opening it. Node 22.18+.
+        Runs where the transcripts are, which is what SSH needs. <code>--print</code> writes the URL
+        instead of opening it. Node 22.18+.
       </>
     ),
     noUpload: "Nothing is uploaded",
     noUploadBody:
-      "The files are read and the bill worked out in this page: there is no server to send a " +
-      "transcript to, and the build fails if anything in here reaches the network. Save the page " +
-      "and it works the same from disk.",
+      "The bill is worked out in this page: no server to send a transcript to, and the build " +
+      "fails if anything here reaches the network. Save it and it works from disk.",
     linkTitle: "A shared link carries the view, not the bill",
     linkBody:
-      "The address records which lens and which block you are looking at — never the numbers. " +
-      "Whoever opens it gets an empty card and drops their own transcripts in.",
+      "The address records which lens and which block — never the numbers. Whoever opens it " +
+      "drops in their own transcripts.",
   },
 
   /* the page's own footer -- the name the page is signed with is not a word: it is what that thing
@@ -682,27 +680,24 @@ const ZH: Dict = {
     handingOver: "你交出去的是什么",
     handingOverBody: (
       <>
-        每个会话一个 <code>.jsonl</code> 文件：Claude 在 <code>~/.claude/projects/</code>{" "}
-        下按项目分文件夹，Codex 在 <code>~/.codex/sessions/</code>，Grok 在{" "}
-        <code>~/.grok/sessions/</code>
-        。都是点开头的隐藏目录，得指名要。你选的会合并成一份报告，所以只选你想看那个项目的文件夹。
+        每个会话一个 <code>.jsonl</code>，在 <code>~/.claude/projects/</code>、{" "}
+        <code>~/.codex/sessions/</code> 或 <code>~/.grok/sessions/</code>{" "}
+        下——都是隐藏目录，得输名字。你选的会合并成一份报告。
       </>
     ),
     terminal: "更习惯用终端？",
     terminalBody: (
       <>
-        上面这条命令在转录所在的机器上运行，SSH 场景正需要这样。<code>--print</code>{" "}
-        只打印链接而不打开。需要 Node 22.18+。
+        在转录所在的机器上运行，SSH 场景正需要这样。<code>--print</code> 只打印链接而不打开。需要
+        Node 22.18+。
       </>
     ),
     noUpload: "不上传任何内容",
     noUploadBody:
-      "文件的读取和账单的计算都在这个页面里完成：没有服务器可以把转录发过去，" +
-      "而且只要这里有任何东西访问网络，构建就会失败。把页面保存下来，从本地打开一样能用。",
+      "读取和计算都在这个页面里完成：没有服务器可以把转录发过去，只要这里有东西访问网络，" +
+      "构建就会失败。保存下来，从本地打开一样能用。",
     linkTitle: "分享出去的链接只带视图，不带账单",
-    linkBody:
-      "地址栏记录的是你在用哪个视角、在看哪一块 —— 从不记录数字。" +
-      "打开它的人看到的是一张空卡片，需要放进他们自己的转录文件。",
+    linkBody: "地址栏记录的是哪个视角、哪一块 —— 从不记录数字。打开它的人放进的是自己的转录文件。",
   },
   colophon: {
     madeBy: (name) => <>由 {name} 用 ❤️ 做的</>,
@@ -1015,28 +1010,27 @@ const JA: Dict = {
     handingOver: "何を渡すことになるのか",
     handingOverBody: (
       <>
-        セッションごとに <code>.jsonl</code> が 1 つ。Claude は <code>~/.claude/projects/</code>{" "}
-        にプロジェクトごとのフォルダ、Codex は <code>~/.codex/sessions/</code>、Grok は{" "}
-        <code>~/.grok/sessions/</code>{" "}
-        の下です。どれもドットファイルなので、名前で指定してください。選んだものは 1
-        つのレポートにまとまるので、見たいプロジェクトのフォルダだけを選んでください。
+        セッションごとに <code>.jsonl</code> が 1 つ。<code>~/.claude/projects/</code>、
+        <code>~/.codex/sessions/</code>、<code>~/.grok/sessions/</code>{" "}
+        の下にある隠しフォルダなので、名前を入力してください。選んだものは 1
+        つのレポートにまとまります。
       </>
     ),
     terminal: "ターミナルのほうが好み？",
     terminalBody: (
       <>
-        上のコマンドは転記のある場所で動くので、SSH 越しでも使えます。<code>--print</code>{" "}
-        を付けると開かずに URL を出力します。Node 22.18+ が必要。
+        転記のある場所で動くので、SSH 越しでも使えます。<code>--print</code> を付けると開かずに URL
+        を出力します。Node 22.18+ が必要。
       </>
     ),
     noUpload: "何もアップロードされません",
     noUploadBody:
-      "ファイルの読み込みも請求の計算もこのページの中で行われます。トランスクリプトを送る先のサーバーはなく、" +
-      "ここから少しでもネットワークに触れればビルドが失敗します。ページを保存すれば、ディスクからでも同じように動きます。",
+      "読み込みも計算もこのページの中で行われます。送る先のサーバーはなく、" +
+      "ネットワークに触れればビルドが失敗します。保存すればディスクからでも同じように動きます。",
     linkTitle: "共有リンクが運ぶのはビューであって請求ではありません",
     linkBody:
-      "アドレスに記録されるのは、どの視点でどのブロックを見ているかだけです — 数字は決して入りません。" +
-      "開いた人には空のカードが表示され、自分のトランスクリプトを渡すことになります。",
+      "アドレスに記録されるのは、どの視点でどのブロックかだけです — 数字は入りません。" +
+      "開いた人は自分のトランスクリプトを渡すことになります。",
   },
   colophon: {
     madeBy: (name) => <>{name} が ❤️ を込めて作りました</>,
@@ -1360,28 +1354,26 @@ const ES: Dict = {
     handingOver: "Qué estás entregando",
     handingOverBody: (
       <>
-        Un <code>.jsonl</code> por sesión, bajo <code>~/.claude/projects/</code> (una carpeta por
-        proyecto), <code>~/.codex/sessions/</code> o <code>~/.grok/sessions/</code>. Son dotfiles:
-        pídelos por su nombre. Todo lo que elijas se combina en un único informe, así que elige la
-        carpeta de un solo proyecto si esa es la factura que quieres.
+        Un <code>.jsonl</code> por sesión, en <code>~/.claude/projects/</code>,{" "}
+        <code>~/.codex/sessions/</code> o <code>~/.grok/sessions/</code>: carpetas ocultas, escribe
+        el nombre. Todo lo que elijas se combina en un informe.
       </>
     ),
     terminal: "¿Prefieres la terminal?",
     terminalBody: (
       <>
-        El comando de arriba se ejecuta donde están las transcripciones, que es lo que hace falta
-        por SSH. <code>--print</code> escribe la URL en vez de abrirla. Node 22.18+.
+        Se ejecuta donde están las transcripciones, que es lo que hace falta por SSH.{" "}
+        <code>--print</code> escribe la URL en vez de abrirla. Node 22.18+.
       </>
     ),
     noUpload: "No se sube nada",
     noUploadBody:
-      "Los archivos se leen y la factura se calcula en esta página: no hay servidor al que enviar " +
-      "una transcripción, y la compilación falla si algo aquí dentro toca la red. Guarda la página y " +
-      "funciona igual desde el disco.",
+      "La factura se calcula en esta página: no hay servidor al que enviar una transcripción, y " +
+      "la compilación falla si algo aquí toca la red. Guárdala y funciona desde el disco.",
     linkTitle: "Un enlace compartido lleva la vista, no la factura",
     linkBody:
-      "La dirección registra qué lente y qué bloque estás mirando, nunca los números. Quien lo abra " +
-      "verá una tarjeta vacía y soltará sus propias transcripciones.",
+      "La dirección registra qué lente y qué bloque, nunca los números. Quien lo abra suelta " +
+      "sus propias transcripciones.",
   },
   colophon: {
     madeBy: (name) => <>Hecho con ❤️ por {name}</>,
@@ -1706,28 +1698,27 @@ const FR: Dict = {
     handingOver: "Ce que vous confiez",
     handingOverBody: (
       <>
-        Un <code>.jsonl</code> par session, sous <code>~/.claude/projects/</code> (un dossier par
-        projet), <code>~/.codex/sessions/</code> ou <code>~/.grok/sessions/</code>. Ce sont des
-        dotfiles : demandez-les par leur nom. Tout ce que vous choisissez est réuni en un seul
-        rapport, donc choisissez le dossier d’un seul projet si c’est cette facture que vous voulez.
+        Un <code>.jsonl</code> par session, sous <code>~/.claude/projects/</code>,{" "}
+        <code>~/.codex/sessions/</code> ou <code>~/.grok/sessions/</code> : dossiers cachés, tapez
+        le nom. Tout ce que vous choisissez est réuni en un seul rapport.
       </>
     ),
     terminal: "Vous préférez le terminal ?",
     terminalBody: (
       <>
-        La commande ci-dessus s’exécute là où sont les transcriptions, ce qu’il faut en SSH.{" "}
-        <code>--print</code> écrit l’URL au lieu de l’ouvrir. Node 22.18+.
+        S’exécute là où sont les transcriptions, ce qu’il faut en SSH. <code>--print</code> écrit
+        l’URL au lieu de l’ouvrir. Node 22.18+.
       </>
     ),
     noUpload: "Rien n’est envoyé",
     noUploadBody:
-      "Les fichiers sont lus et la facture calculée dans cette page : il n’y a aucun serveur à qui " +
-      "envoyer une transcription, et la compilation échoue si quoi que ce soit ici touche au réseau. " +
-      "Enregistrez la page et elle fonctionne pareil depuis le disque.",
+      "La facture est calculée dans cette page : aucun serveur à qui envoyer une transcription, " +
+      "et la compilation échoue si quoi que ce soit ici touche au réseau. Enregistrez-la, elle " +
+      "fonctionne depuis le disque.",
     linkTitle: "Un lien partagé porte la vue, pas la facture",
     linkBody:
-      "L’adresse retient quelle vue et quel bloc vous regardez — jamais les chiffres. Qui l’ouvre " +
-      "obtient une carte vide et y dépose ses propres transcriptions.",
+      "L’adresse retient quelle vue et quel bloc — jamais les chiffres. Qui l’ouvre y dépose " +
+      "ses propres transcriptions.",
   },
   colophon: {
     madeBy: (name) => <>Fait avec ❤️ par {name}</>,
@@ -2052,29 +2043,27 @@ const DE: Dict = {
     handingOver: "Was du aus der Hand gibst",
     handingOverBody: (
       <>
-        Eine <code>.jsonl</code> pro Sitzung, unter <code>~/.claude/projects/</code> (ein Ordner pro
-        Projekt), <code>~/.codex/sessions/</code> oder <code>~/.grok/sessions/</code>. Alles
-        Dotfiles: verlange sie beim Namen. Alles, was du wählst, wird zu einem Bericht
-        zusammengeführt — wähle also den Ordner eines einzelnen Projekts, wenn du dessen Rechnung
-        willst.
+        Eine <code>.jsonl</code> pro Sitzung, unter <code>~/.claude/projects/</code>,{" "}
+        <code>~/.codex/sessions/</code> oder <code>~/.grok/sessions/</code> — versteckte Ordner,
+        tipp den Namen. Alles, was du wählst, wird ein Bericht.
       </>
     ),
     terminal: "Lieber im Terminal?",
     terminalBody: (
       <>
-        Der Befehl oben läuft dort, wo die Transkripte liegen — genau was per SSH nötig ist.{" "}
-        <code>--print</code> gibt die URL aus, statt sie zu öffnen. Node 22.18+.
+        Läuft dort, wo die Transkripte liegen — was per SSH nötig ist. <code>--print</code> gibt die
+        URL aus, statt sie zu öffnen. Node 22.18+.
       </>
     ),
     noUpload: "Nichts wird hochgeladen",
     noUploadBody:
-      "Die Dateien werden in dieser Seite gelesen und die Rechnung hier berechnet: Es gibt keinen " +
-      "Server, an den ein Transkript ginge, und der Build schlägt fehl, wenn hier drin irgendetwas " +
-      "das Netz berührt. Speichere die Seite, und sie funktioniert von der Festplatte genauso.",
+      "Die Rechnung wird in dieser Seite berechnet: kein Server, an den ein Transkript ginge, " +
+      "und der Build schlägt fehl, wenn hier etwas das Netz berührt. Gespeichert läuft sie von " +
+      "der Festplatte genauso.",
     linkTitle: "Ein geteilter Link trägt die Ansicht, nicht die Rechnung",
     linkBody:
-      "Die Adresse hält fest, welche Sicht und welchen Block du ansiehst — nie die Zahlen. Wer sie " +
-      "öffnet, bekommt eine leere Karte und legt seine eigenen Transkripte hinein.",
+      "Die Adresse hält fest, welche Sicht und welchen Block — nie die Zahlen. Wer sie öffnet, " +
+      "legt seine eigenen Transkripte hinein.",
   },
   colophon: {
     madeBy: (name) => <>Mit ❤️ gemacht von {name}</>,
