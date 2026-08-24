@@ -345,9 +345,8 @@ const EN = {
     handingOver: "What you are handing over",
     handingOverBody: (
       <>
-        One <code>.jsonl</code> per session, under <code>~/.claude/projects/</code>,{" "}
-        <code>~/.codex/sessions/</code> or <code>~/.grok/sessions/</code> — hidden dotfiles, so type
-        the name. Everything you pick becomes one report.
+        One <code>.jsonl</code> file per session. Everything you pick lands in one report, so pick a
+        single project’s folder if that is the bill you want.
       </>
     ),
     terminal: "Prefer the terminal?",
@@ -680,9 +679,8 @@ const ZH: Dict = {
     handingOver: "你交出去的是什么",
     handingOverBody: (
       <>
-        每个会话一个 <code>.jsonl</code>，在 <code>~/.claude/projects/</code>、{" "}
-        <code>~/.codex/sessions/</code> 或 <code>~/.grok/sessions/</code>{" "}
-        下——都是隐藏目录，得输名字。你选的会合并成一份报告。
+        一个会话一个 <code>.jsonl</code>{" "}
+        文件。你选中的全部会合并成一份报告，所以想看哪个项目的账单，就只选那个项目的文件夹。
       </>
     ),
     terminal: "更习惯用终端？",
@@ -1010,10 +1008,8 @@ const JA: Dict = {
     handingOver: "何を渡すことになるのか",
     handingOverBody: (
       <>
-        セッションごとに <code>.jsonl</code> が 1 つ。<code>~/.claude/projects/</code>、
-        <code>~/.codex/sessions/</code>、<code>~/.grok/sessions/</code>{" "}
-        の下にある隠しフォルダなので、名前を入力してください。選んだものは 1
-        つのレポートにまとまります。
+        セッション 1 つにつき <code>.jsonl</code> ファイルが 1 つ。選んだものはすべて 1
+        つのレポートにまとまるので、見たいプロジェクトのフォルダだけを選んでください。
       </>
     ),
     terminal: "ターミナルのほうが好み？",
@@ -1354,9 +1350,8 @@ const ES: Dict = {
     handingOver: "Qué estás entregando",
     handingOverBody: (
       <>
-        Un <code>.jsonl</code> por sesión, en <code>~/.claude/projects/</code>,{" "}
-        <code>~/.codex/sessions/</code> o <code>~/.grok/sessions/</code>: carpetas ocultas, escribe
-        el nombre. Todo lo que elijas se combina en un informe.
+        Un archivo <code>.jsonl</code> por sesión. Todo lo que elijas acaba en un solo informe:
+        elige la carpeta de un proyecto si esa es la factura que quieres.
       </>
     ),
     terminal: "¿Prefieres la terminal?",
@@ -1698,9 +1693,9 @@ const FR: Dict = {
     handingOver: "Ce que vous confiez",
     handingOverBody: (
       <>
-        Un <code>.jsonl</code> par session, sous <code>~/.claude/projects/</code>,{" "}
-        <code>~/.codex/sessions/</code> ou <code>~/.grok/sessions/</code> : dossiers cachés, tapez
-        le nom. Tout ce que vous choisissez est réuni en un seul rapport.
+        Un fichier <code>.jsonl</code> par session. Tout ce que vous choisissez atterrit dans un
+        seul rapport : choisissez le dossier d’un seul projet si c’est cette facture que vous
+        voulez.
       </>
     ),
     terminal: "Vous préférez le terminal ?",
@@ -2043,9 +2038,8 @@ const DE: Dict = {
     handingOver: "Was du aus der Hand gibst",
     handingOverBody: (
       <>
-        Eine <code>.jsonl</code> pro Sitzung, unter <code>~/.claude/projects/</code>,{" "}
-        <code>~/.codex/sessions/</code> oder <code>~/.grok/sessions/</code> — versteckte Ordner,
-        tipp den Namen. Alles, was du wählst, wird ein Bericht.
+        Eine <code>.jsonl</code>-Datei pro Sitzung. Alles, was du wählst, landet in einem Bericht —
+        wähle also den Ordner eines einzelnen Projekts, wenn du dessen Rechnung willst.
       </>
     ),
     terminal: "Lieber im Terminal?",
