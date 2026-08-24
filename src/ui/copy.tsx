@@ -64,9 +64,9 @@ const EN = {
 
   /* the card's header */
   card: {
-    eyebrow: "Cost attribution",
+    eyebrow: "Cost attribution · Loss Function",
     /** The browser tab, in English because the markup is written before anyone has guessed. */
-    title: "Where the money went — Claude Code, Codex & Grok cost attribution",
+    title: "Loss Function — where the money went: AI agent cost attribution",
     /** Read rather than dropped: this line stands over the figure on every device, and a phone has
      *  nothing to drop. */
     nothingYet: "Nothing read yet",
@@ -455,8 +455,8 @@ const ZH: Dict = {
     failed: "无法渲染图片",
   },
   card: {
-    eyebrow: "成本归因",
-    title: "钱花到哪儿去了 — Claude Code、Codex 与 Grok 成本归因",
+    eyebrow: "成本归因 · 智账",
+    title: "智账 — 钱花到哪儿去了：AI 智能体成本归因",
     nothingYet: "还没有读取任何记录",
     example: "示例数据",
     gap: "",
@@ -779,8 +779,8 @@ const JA: Dict = {
     failed: "画像を描画できませんでした",
   },
   card: {
-    eyebrow: "コスト配分",
-    title: "お金はどこへ — Claude Code、Codex、Grok のコスト配分",
+    eyebrow: "コスト配分 · 知能課金",
+    title: "知能課金 — お金はどこへ：AI エージェントのコスト配分",
     nothingYet: "まだ何も読み込んでいません",
     example: "サンプルデータ",
     gap: "",
@@ -1111,8 +1111,8 @@ const ES: Dict = {
     failed: "No se pudo generar la imagen",
   },
   card: {
-    eyebrow: "Atribución de costes",
-    title: "En qué se fue el dinero — Atribución de costes de Claude Code, Codex y Grok",
+    eyebrow: "Atribución de costes · IAdiós",
+    title: "IAdiós — En qué se fue el dinero: atribución de costes de agentes de IA",
     nothingYet: "Todavía no se ha leído nada",
     example: "Datos de ejemplo",
     gap: " ",
@@ -1453,8 +1453,8 @@ const FR: Dict = {
     failed: "Impossible de rendre l’image",
   },
   card: {
-    eyebrow: "Attribution des coûts",
-    title: "Où est passé l’argent — Attribution des coûts Claude Code, Codex et Grok",
+    eyebrow: "Attribution des coûts · IArgent",
+    title: "IArgent — Où est passé l’argent : attribution des coûts des agents IA",
     nothingYet: "Rien n’a encore été lu",
     example: "Données d’exemple",
     gap: " ",
@@ -1795,8 +1795,8 @@ const DE: Dict = {
     failed: "Bild konnte nicht gerendert werden",
   },
   card: {
-    eyebrow: "Kostenzuordnung",
-    title: "Wohin das Geld geflossen ist — Claude-Code-, Codex- und Grok-Kostenzuordnung",
+    eyebrow: "Kostenzuordnung · Rechenschaft",
+    title: "Rechenschaft — wohin das Geld geflossen ist: Kostenzuordnung für KI-Agenten",
     nothingYet: "Noch nichts gelesen",
     example: "Beispieldaten",
     gap: " ",
