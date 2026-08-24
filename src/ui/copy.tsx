@@ -358,8 +358,8 @@ const EN = {
     ),
     noUpload: "Nothing is uploaded",
     noUploadBody:
-      "The bill is worked out in this page: no server to send a transcript to, and the build " +
-      "fails if anything here reaches the network. Save it and it works from disk.",
+      "The bill is worked out in this page, offline: there is no server. Save it and it works " +
+      "from disk.",
     linkTitle: "A shared link carries the view, not the bill",
     linkBody:
       "The address records which lens and which block — never the numbers. Whoever opens it " +
@@ -691,9 +691,7 @@ const ZH: Dict = {
       </>
     ),
     noUpload: "不上传任何内容",
-    noUploadBody:
-      "读取和计算都在这个页面里完成：没有服务器可以把转录发过去，只要这里有东西访问网络，" +
-      "构建就会失败。保存下来，从本地打开一样能用。",
+    noUploadBody: "账单在这个页面里离线算出，没有服务器。保存下来，从本地打开一样能用。",
     linkTitle: "分享出去的链接只带视图，不带账单",
     linkBody: "地址栏记录的是哪个视角、哪一块 —— 从不记录数字。打开它的人放进的是自己的转录文件。",
   },
@@ -1021,8 +1019,7 @@ const JA: Dict = {
     ),
     noUpload: "何もアップロードされません",
     noUploadBody:
-      "読み込みも計算もこのページの中で行われます。送る先のサーバーはなく、" +
-      "ネットワークに触れればビルドが失敗します。保存すればディスクからでも同じように動きます。",
+      "請求はこのページの中でオフラインに計算されます。サーバーはありません。保存すれば、ディスクからでも同じように動きます。",
     linkTitle: "共有リンクが運ぶのはビューであって請求ではありません",
     linkBody:
       "アドレスに記録されるのは、どの視点でどのブロックかだけです — 数字は入りません。" +
@@ -1363,8 +1360,8 @@ const ES: Dict = {
     ),
     noUpload: "No se sube nada",
     noUploadBody:
-      "La factura se calcula en esta página: no hay servidor al que enviar una transcripción, y " +
-      "la compilación falla si algo aquí toca la red. Guárdala y funciona desde el disco.",
+      "La factura se calcula en esta página, sin conexión y sin servidor. Guárdala y funciona " +
+      "desde el disco.",
     linkTitle: "Un enlace compartido lleva la vista, no la factura",
     linkBody:
       "La dirección registra qué lente y qué bloque, nunca los números. Quien lo abra suelta " +
@@ -1707,8 +1704,7 @@ const FR: Dict = {
     ),
     noUpload: "Rien n’est envoyé",
     noUploadBody:
-      "La facture est calculée dans cette page : aucun serveur à qui envoyer une transcription, " +
-      "et la compilation échoue si quoi que ce soit ici touche au réseau. Enregistrez-la, elle " +
+      "La facture est calculée dans cette page, hors ligne et sans serveur. Enregistrez-la, elle " +
       "fonctionne depuis le disque.",
     linkTitle: "Un lien partagé porte la vue, pas la facture",
     linkBody:
@@ -2051,9 +2047,8 @@ const DE: Dict = {
     ),
     noUpload: "Nichts wird hochgeladen",
     noUploadBody:
-      "Die Rechnung wird in dieser Seite berechnet: kein Server, an den ein Transkript ginge, " +
-      "und der Build schlägt fehl, wenn hier etwas das Netz berührt. Gespeichert läuft sie von " +
-      "der Festplatte genauso.",
+      "Die Rechnung wird in dieser Seite offline berechnet, ohne Server. Gespeichert läuft sie " +
+      "von der Festplatte genauso.",
     linkTitle: "Ein geteilter Link trägt die Ansicht, nicht die Rechnung",
     linkBody:
       "Die Adresse hält fest, welche Sicht und welchen Block — nie die Zahlen. Wer sie öffnet, " +
