@@ -2305,7 +2305,6 @@ tfoot .n {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-width: 62ch;
 }
 .where p {
   margin: 0;
