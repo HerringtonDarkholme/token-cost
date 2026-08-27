@@ -22,8 +22,12 @@ export function cssVal(name: string, fallback: string): string {
 
 /** A duration from the stylesheet, in milliseconds. */
 export function cssMs(name: string, fallback: number): number {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name)
-  return parseFloat(value) || fallback
+  const value = cssVal(name, "")
+  const n = parseFloat(value)
+  if (!n) return fallback
+  /* The unit is read rather than assumed: the build's CSS minifier writes `2200ms` as `2.2s`, and
+     taking that for milliseconds turns a two-second hold into two. */
+  return /\ds$/.test(value) ? n * 1000 : n
 }
 
 const STILL = "(prefers-reduced-motion: reduce)"

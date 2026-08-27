@@ -2415,13 +2415,6 @@ kbd {
   --text-swap-translate-y: var(--distance-micro);
   --text-swap-blur: var(--blur-small);
   --text-swap-ease: var(--ease-in-out);
-  /* A cycling slot: how long one stands, how long the fold to the next takes, and how far off the
-     page the fold is seen from. */
-  --word-cycle-hold: 2200ms;
-  --word-cycle-slide: 300ms;
-  /* The box waits for the falling face to be out of the way, then travels with the one coming up
-     behind it. */
-  --word-cycle-wait: calc(var(--roll-dur) / 2);
   /* A cycling slot: how long one thing stands, and how long the strip takes to carry the next one
      up into the window. */
   --word-cycle-hold: 2200ms;
