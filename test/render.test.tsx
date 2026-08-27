@@ -9,7 +9,7 @@ import { analyze, type Analysis } from "../src/core/engine.ts"
 import { LANGS } from "../src/core/i18n.ts"
 import { loadFace } from "../src/ui/faces.ts"
 import { Page, type Dir } from "../src/ui/Page.tsx"
-import { originOf, type Origin } from "../src/ui/Upload.tsx"
+import { folderAt, originOf, type Origin, type Store } from "../src/ui/Upload.tsx"
 import {
   getHover,
   getState,
@@ -802,6 +802,17 @@ describe("the card's two faces", () => {
 
       const swap = box.querySelector(".swap")!
       expect(swap.getAttribute("data-face")).toBe("files")
+
+      /* The ask has been answered, so the heading says what it is doing with the folder the paths
+         named rather than going on asking for the other agents' folders. A frame, because the
+         swap puts the new line in once the old one has finished leaving. */
+      const h2 = box.querySelector(".invite h2")!
+      await act(async () => {
+        await new Promise((done) => setTimeout(done, 50))
+      })
+      expect(h2.textContent).toBe("Analyzing your ~/.claude/projects/ folder")
+      expect(h2.querySelector(".t-word-cycle")).toBeNull()
+
       // Both faces are in the box; only one of them is on show.
       expect(swap.querySelector(".howto")?.getAttribute("data-on")).toBe("0")
       const found = swap.querySelector(".found")!
@@ -825,6 +836,19 @@ describe("the card's two faces", () => {
       expect(found.getAttribute("data-on")).toBe("0")
       expect(box.querySelector(".status")?.textContent).toMatch(/-Users-me-code-thing/)
       expect(box.querySelector(".status")?.textContent).toMatch(/has been billed/)
+
+      /* And the ask it goes back to has stopped taking turns: the folder that was picked is the
+         one the heading holds, so a reader who has to pick again is not asked for someone
+         else's. */
+      const reel = h2.querySelector(".t-word-cycle .t-reel")!
+      expect(h2.textContent).toMatch(/^Drop your/)
+      expect(reel.textContent).toBe("~/.claude/projects/")
+      expect(reel.querySelectorAll(".face")).toHaveLength(1)
+      await act(async () => {
+        // Past `HOLD_MS`, which is the beat a cycle that had not been pinned would move on.
+        await new Promise((done) => setTimeout(done, 2400))
+      })
+      expect(h2.querySelector(".t-word-cycle .t-reel")?.textContent).toBe("~/.claude/projects/")
 
       /* And the panel it left behind holds what it wrote: the file named once, because the walk
          reads it once. */
@@ -1005,6 +1029,14 @@ describe("where a pick came from", () => {
     expect(at("Downloads/-Users-me-x.jsonl").store).toBe(null)
     // `sessions` without `.codex` over it is just a word.
     expect(at("notes/sessions/a.jsonl").store).toBe(null)
+  })
+
+  /* The pin the heading takes is looked up from the store's name, so every store a pick can be
+     judged to have come out of has to find its folder in the ask. */
+  it("finds every store's folder in the ask", () => {
+    const stores: Store[] = ["claude", "codex", "grok"]
+    expect(stores.map((s) => folderAt(s))).toEqual([0, 1, 2])
+    expect(folderAt(null)).toBe(null)
   })
 
   it("names one store for a pick that holds both", () => {

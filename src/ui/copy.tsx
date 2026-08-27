@@ -251,6 +251,11 @@ const EN = {
     /** The heading on a device that probably cannot reach the folder: it says what the page does
      *  rather than what to do next. Where to go is the note at the foot of the card. */
     headingTouch: "Visualize your AI bill",
+    /** The ask, answered: the folder the paths name is the one being read, so the heading names it
+     *  back rather than going on asking for the other agents' folders. */
+    headingBusy: (a: React.ReactNode): React.ReactNode => <>Analyzing your {a} folder</>,
+    /** The same line where the paths named no agent — loose transcripts, or the example. */
+    headingBusyAny: "Analyzing your transcripts",
     lede: "Chart your AI bill: every tool, every subcommand, every dollar.",
     /** The same line with the heading's words taken out, since the heading now says them, and with
      *  where the numbers come from put in. */
@@ -598,6 +603,8 @@ const ZH: Dict = {
   intake: {
     heading: (a) => <>把你的 {a} 文件夹拖到这里</>,
     headingTouch: "把你的 AI 账单画出来",
+    headingBusy: (a) => <>正在分析你的 {a} 文件夹</>,
+    headingBusyAny: "正在分析你的会话记录",
     lede: "把 AI 账单画出来：每个工具、每条子命令、每一块钱。",
     ledeTouch:
       "每个工具、每条子命令、每一块钱，都从你的 Claude Code、Codex 或 Grok 会话记录里读出来。",
@@ -929,6 +936,8 @@ const JA: Dict = {
   intake: {
     heading: (a) => <>{a} のフォルダをここにドロップ</>,
     headingTouch: "AI の請求を図にする",
+    headingBusy: (a) => <>{a} のフォルダを解析中</>,
+    headingBusyAny: "セッション記録を解析中",
     lede: "AI の請求を図にする：すべてのツール、すべてのサブコマンド、すべてのドル。",
     ledeTouch:
       "すべてのツール、すべてのサブコマンド、すべてのドルを、Claude Code、Codex、Grok のセッション記録から読み取ります。",
@@ -1270,6 +1279,8 @@ const ES: Dict = {
   intake: {
     heading: (a) => <>Suelta aquí tu carpeta de {a}</>,
     headingTouch: "Visualiza tu factura de IA",
+    headingBusy: (a) => <>Analizando tu carpeta de {a}</>,
+    headingBusyAny: "Analizando tus transcripciones",
     lede: "Grafica tu factura de IA: cada herramienta, cada subcomando, cada dólar.",
     ledeTouch:
       "Cada herramienta, cada subcomando, cada dólar, leídos de tus sesiones de Claude Code, Codex o Grok.",
@@ -1613,6 +1624,8 @@ const FR: Dict = {
   intake: {
     heading: (a) => <>Déposez ici votre dossier {a}</>,
     headingTouch: "Visualisez votre facture d’IA",
+    headingBusy: (a) => <>Analyse de votre dossier {a}</>,
+    headingBusyAny: "Analyse de vos transcriptions",
     lede: "Cartographiez votre facture d’IA : chaque outil, chaque sous-commande, chaque dollar.",
     ledeTouch:
       "Chaque outil, chaque sous-commande, chaque dollar, lus dans vos sessions Claude Code, Codex ou Grok.",
@@ -1955,6 +1968,8 @@ const DE: Dict = {
   intake: {
     heading: (a) => <>Lege hier deinen Ordner {a} ab</>,
     headingTouch: "Visualisiere deine KI-Rechnung",
+    headingBusy: (a) => <>Analysiere deinen Ordner {a}</>,
+    headingBusyAny: "Analysiere deine Transkripte",
     lede: "Zeichne deine KI-Rechnung: jedes Tool, jedes Unterkommando, jeden Dollar.",
     ledeTouch:
       "Jedes Tool, jedes Unterkommando, jeden Dollar — gelesen aus deinen Claude-Code-, Codex- oder " +

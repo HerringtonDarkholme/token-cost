@@ -235,6 +235,13 @@ export interface Origin {
   store: Store
 }
 
+/** Which folder of the ask this pick came out of, since the store its paths name is that folder's
+ *  own word -- `null` for a pick that named none. */
+export function folderAt(store: Store): number | null {
+  const at = AGENT_FOLDERS.findIndex((f) => f.brand === store)
+  return at < 0 ? null : at
+}
+
 /** Judge the pick from the paths alone, so the page never asks the reader where they just were. */
 export function originOf(paths: readonly string[]): Origin {
   const roots = new Set(paths.map((p) => (p.includes("/") ? p.slice(0, p.indexOf("/")) : "")))
@@ -573,6 +580,8 @@ export function Intake({
   const [over, setOver] = useState(false)
   const [os, setOs] = useState<Os>(guessOs)
   const [face, setFace] = useState(0)
+  /* Which agent's folder is in hand: the ask stops cycling once there is an answer to it. */
+  const [pinned, setPinned] = useState<number | null>(null)
   const still = useReduced()
   const t = useT()
   const dirPicker = useRef<HTMLInputElement>(null)
@@ -606,6 +615,9 @@ export function Intake({
     /* Judged before anything is read and kept for afterwards: both ways this comes to nothing are
        questions about the folder. */
     const where = originOf(picked.map((p) => p.path))
+    /* Settled off the paths rather than off the read, so the heading names the folder whatever the
+       walk goes on to make of it. */
+    setPinned(folderAt(where.store))
     if (!files.length) {
       stop(
         !picked.length
@@ -630,6 +642,8 @@ export function Intake({
   /** The example walked down the same path a folder takes, because a demo that took a shortcut
    *  would be demonstrating the shortcut. */
   async function example(): Promise<void> {
+    /* Invented transcripts are nobody's folder, so the ask goes back to asking. */
+    setPinned(null)
     await walkFiles(
       sampleFiles().map((f) => {
         /* Built at the read rather than at the pick, so the column has something to draw. */
@@ -814,6 +828,21 @@ export function Intake({
     await handle(out)
   }
 
+  /* The ask, and what it becomes with a folder in hand. The ask is the folder, not the files: one
+     pick catches everything under it, and `.jsonl` is a detail no reader needs -- loose files
+     dragged in still work. Where a folder is unlikely to be droppable, the heading names the page
+     instead of asking for something the reader cannot hand over. One folder at a time, taking
+     turns, rather than a list that grows a comma per agent. */
+  const asked = HANDHELD
+    ? t.intake.headingTouch
+    : t.intake.heading(<WordCycle slots={ASKS} onFace={setFace} pin={pinned} />)
+  /* The folder the paths named, standing still: the cycle has nothing left to offer once the
+     reader has answered it, and a pick whose paths named no agent has nothing to name. */
+  const reading =
+    pinned === null
+      ? t.intake.headingBusyAny
+      : t.intake.headingBusy(ASKS[pinned].body ?? ASKS[pinned].word)
+
   /* Both are written once; which of them carries the weight is decided below. */
   const folderBtn = (
     <button
@@ -867,15 +896,10 @@ export function Intake({
       {/* Two bands: the invitation on the line the report's picture takes, the privacy note on
           the rule that closes the card. */}
       <div className="invite">
-        {/* The ask is the folder, not the files: one pick catches everything under it, and
-            `.jsonl` is a detail no reader needs. Loose files dragged in still work. */}
-        {/* Where a folder is unlikely to be droppable, the heading names the page instead of
-            asking for something the reader cannot hand over. */}
-        {/* One folder at a time, taking turns, rather than a list that grows a comma per agent. */}
+        {/* The two headings swap rather than replace: it is the same line, saying what it is
+            doing now with what it was asking for. */}
         <h2>
-          {HANDHELD
-            ? t.intake.headingTouch
-            : t.intake.heading(<WordCycle slots={ASKS} onFace={setFace} />)}
+          <TextSwap token={busy ? "reading" : "ask"}>{busy ? reading : asked}</TextSwap>
         </h2>
         {/* A verb, the thing, and the three sizes the report resolves to. One line that fits on
             one line: a subtitle that wraps is a paragraph. */}

@@ -397,21 +397,27 @@ export interface Slot {
 export function WordCycle({
   slots,
   onFace,
+  pin,
 }: {
   slots: readonly Slot[]
   /** Which slot is up, for a line elsewhere on the page that has to say the same thing. */
   onFace?: (at: number) => void
+  /** The slot to stop on, once the page knows which one the reader meant. */
+  pin?: number | null
 }): React.JSX.Element {
   const { lang } = useViewState()
   const still = useReduced()
-  const [at, setAt] = useState(0)
+  /* From the pin rather than from the front, so a slot that arrives with one already settled does
+     not roll through the first agent on its way there. */
+  const held = pin != null && pin >= 0 && pin < slots.length ? pin : null
+  const [at, setAt] = useState(held ?? 0)
   const [gone, setGone] = useState<number | null>(null)
   const box = useRef<HTMLSpanElement>(null)
   const reel = useRef<HTMLSpanElement>(null)
   const sizer = useRef<HTMLSpanElement>(null)
   const [wide, setWide] = useState<readonly number[] | null>(null)
 
-  const rolling = !still && slots.length > 1
+  const rolling = !still && slots.length > 1 && held === null
 
   /* Every slot measured off to the side, rather than the arriving one measured as it lands: the
      window starts for its next width as the strip starts to travel, and it cannot ask for a width
@@ -453,15 +459,25 @@ export function WordCycle({
     return () => clearTimeout(t)
   }, [gone, at, rolling, slots.length])
 
+  /* A slot pinned while another is up is carried up into the window the way the cycle would have
+     brought it, and nothing follows it. */
+  useEffect(() => {
+    if (held === null || held === at || gone !== null) return
+    setGone(at)
+    setAt(held)
+  }, [held, at, gone])
+
+  const face = (i: number): ReactNode => slots[i].body ?? slots[i].word
+
   /* Nothing cycles for a reader who asked for stillness, and one name left standing would read as
      the only one the page takes -- so that reader is given the list the cycle stands for, in
      words, since the long form of a slot is only legible one at a time. */
   if (still) {
+    /* One slot at a time is what the long form needs, and a pinned one is exactly that. */
+    if (held !== null) return <>{face(held)}</>
     const words = slots.map((s) => s.word)
     return <>{new Intl.ListFormat(tagOf(lang), { type: "disjunction" }).format(words)}</>
   }
-
-  const face = (i: number): ReactNode => slots[i].body ?? slots[i].word
 
   return (
     <span ref={box} className="t-word-cycle" style={wide ? { width: `${wide[at]}px` } : undefined}>
