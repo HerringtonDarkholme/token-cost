@@ -7,7 +7,7 @@ import { labelOf, useT, type Dict } from "./copy.tsx"
 import { count, FOLD_MIN, ledger, money, moneyFine, pctOf } from "../core/model.ts"
 import { disarmHover, setState, useNarrow, type ViewState } from "./store.ts"
 import { Seg, type SegOption } from "./Seg.tsx"
-import { cssMs, Reveal, transition } from "./Motion.tsx"
+import { Reveal, transition } from "./Motion.tsx"
 import { HoverBar, Mosaic } from "./Mosaic.tsx"
 import { Panels } from "./Panels.tsx"
 import { Sunburst } from "./Sunburst.tsx"
@@ -128,6 +128,10 @@ export function Strip({ only }: { only?: "thesis" | "figures" }): React.JSX.Elem
   )
 }
 
+/** How long the box waits after the last keystroke before the breakdown filters itself. A
+ *  debounce rather than a duration: no rule in the stylesheet runs for it. */
+const SETTLE_MS = 150
+
 /** The query box. */
 function Find(): React.JSX.Element {
   const { state } = useReport()
@@ -153,13 +157,10 @@ function Find(): React.JSX.Element {
     const query = e.target.value
     setTyped(query)
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(
-      () => {
-        committed.current = query
-        transition(() => setState({ query }), { "data-filter": "" })
-      },
-      cssMs("--find-settle", 150),
-    )
+    timer.current = setTimeout(() => {
+      committed.current = query
+      transition(() => setState({ query }), { "data-filter": "" })
+    }, SETTLE_MS)
   }, [])
 
   return (

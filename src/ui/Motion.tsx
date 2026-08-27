@@ -168,6 +168,10 @@ export function Figure({
   )
 }
 
+/** How often the counting figure is handed a new number to roll to. A sampling rate rather than
+ *  a duration: the roll itself is the rolling figure's own. */
+const BEAT_MS = 160
+
 /** A number that is being counted up to, sampled rather than delivered. */
 export function useCountingUp(source: React.RefObject<number>, watch: boolean): number {
   const [seen, setSeen] = useState(0)
@@ -175,7 +179,7 @@ export function useCountingUp(source: React.RefObject<number>, watch: boolean): 
     if (!watch) return
     source.current = 0
     setSeen(0)
-    const id = setInterval(() => setSeen(source.current), cssMs("--figure-beat", 160))
+    const id = setInterval(() => setSeen(source.current), BEAT_MS)
     return () => clearInterval(id)
   }, [watch, source])
   return seen
@@ -324,16 +328,15 @@ export function TextSwap({
   )
 }
 
-/** How long a slot stands before the next one takes its place. */
-function holdMs(): number {
-  return cssMs("--word-cycle-hold", 2200)
-}
-
 /** How long the strip takes to travel its one line, read off the stylesheet so the face that has
  *  gone is dropped on the frame the CSS is done with it. */
 function reelMs(): number {
   return cssMs("--reel-dur", 320)
 }
+
+/** How long a slot stands before the next one takes its place: long enough to read a path and
+ *  still be there a beat after. Not a stylesheet value -- nothing in the CSS holds for it. */
+const HOLD_MS = 2200
 
 /** One of the things a cycling slot says. */
 export interface Slot {
@@ -399,7 +402,7 @@ export function WordCycle({
     const t = setTimeout(() => {
       setGone(at)
       setAt((n) => (n + 1) % slots.length)
-    }, holdMs())
+    }, HOLD_MS)
     return () => clearTimeout(t)
   }, [gone, at, rolling, slots.length])
 

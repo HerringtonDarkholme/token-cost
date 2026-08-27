@@ -2408,16 +2408,12 @@ kbd {
   /* Rolling figure. */
   --number-flow-mask-height: 0.28em;
   --number-flow-mask-width: 0.25em;
-  /* And how often the figure is given a new number to roll to, while a folder is being read. */
-  --figure-beat: 160ms;
   /* Text states swap */
   --text-swap-dur: var(--duration-quick);
   --text-swap-translate-y: var(--distance-micro);
   --text-swap-blur: var(--blur-small);
   --text-swap-ease: var(--ease-in-out);
-  /* A cycling slot: how long one thing stands, and how long the strip takes to carry the next one
-     up into the window. */
-  --word-cycle-hold: 2200ms;
+  /* How long the strip takes to carry the next thing up into the window. */
   --reel-dur: 320ms;
   /* Even at both ends rather than front-loaded: the last of the travel is where the line leaving
      is a two-pixel tail, and an ease that is all but home a third of the way in leaves that tail
@@ -2443,7 +2439,6 @@ kbd {
   /* The breakdown filtering itself. */
   --filter-dur: var(--duration-fast);
   --filter-ease: var(--ease-smooth-out);
-  --find-settle: var(--duration-quick);
 
   /* Covering the dollars. */
   --mask-dur: var(--duration-fast);
