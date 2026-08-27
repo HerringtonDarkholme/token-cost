@@ -1,41 +1,13 @@
-/* What the motion helpers promise the components above them: a duration read off the stylesheet
-   in whichever unit the build wrote it, and a phase that ends when the CSS drawing it does. */
+/* What the motion helper promises the components above it: a phase that ends when the CSS drawing
+   it does, and one that ends anyway where nothing is drawing it. */
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 import { act, useRef } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import { cssMs, useMotionEnd } from "../src/ui/Motion.tsx"
-
-const NAME = "--test-dur"
+import { useMotionEnd } from "../src/ui/Motion.tsx"
 
 beforeAll(() => {
   ;(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
-})
-
-afterEach(() => {
-  document.documentElement.style.removeProperty(NAME)
-})
-
-function read(value: string): number {
-  document.documentElement.style.setProperty(NAME, value)
-  return cssMs(NAME, 999)
-}
-
-describe("cssMs", () => {
-  it("reads milliseconds", () => {
-    expect(read("2200ms")).toBe(2200)
-    expect(read("320ms")).toBe(320)
-  })
-
-  it("reads the seconds the minifier rewrites them to", () => {
-    expect(read("2.2s")).toBe(2200)
-    expect(read(".32s")).toBeCloseTo(320)
-    expect(read("0.15s")).toBeCloseTo(150)
-  })
-
-  it("falls back where the stylesheet has not loaded", () => {
-    expect(cssMs("--absent-dur", 350)).toBe(350)
-  })
 })
 
 /** One phase, waiting on whatever the element is playing. */

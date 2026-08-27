@@ -14,22 +14,6 @@ import NumberFlow, { useIsSupported, type Format } from "@number-flow/react"
 import { tagOf } from "../core/i18n.ts"
 import { useViewState } from "./store.ts"
 
-/** A custom property off the document root, or `fallback` where the stylesheet has not loaded --
- *  which is every test run, since the suites mount into a bare DOM. */
-export function cssVal(name: string, fallback: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
-}
-
-/** A duration from the stylesheet, in milliseconds. */
-export function cssMs(name: string, fallback: number): number {
-  const value = cssVal(name, "")
-  const n = parseFloat(value)
-  if (!n) return fallback
-  /* The unit is read rather than assumed: the build's CSS minifier writes `2200ms` as `2.2s`, and
-     taking that for milliseconds turns a two-second hold into two. */
-  return /\ds$/.test(value) ? n * 1000 : n
-}
-
 /** The backstop, for motion that never reports itself finished: an animation with no end, or a
  *  browser too old to list what an element is playing. Longer than anything the page draws. */
 const MOTION_CAP = 1000
@@ -247,13 +231,6 @@ export function useCountingUp(source: React.RefObject<number>, watch: boolean): 
   return seen
 }
 
-/** How long the crossfade runs, for the one animation JS plays itself: the box's width is
- *  measured per commit, so there are no two values in the stylesheet for it to interpolate.
- *  Everything the CSS draws is waited on instead -- see `useMotionEnd`. */
-function swapMs(): number {
-  return cssMs("--text-swap-dur", 150)
-}
-
 /** Copy that crossfades: the arriving line fades up while the departing one is still fading out,
  *  rather than after it. */
 export function TextCross({
@@ -300,10 +277,22 @@ export function TextCross({
     const now = node.getBoundingClientRect().width
     const was = wide.current
     wide.current = now
-    if (was === null || Math.abs(was - now) < 0.5 || reduced()) return
+    if (was === null || Math.abs(was - now) < 0.5) return
+    /* The width travels on the fade's own timing, borrowed off the leg playing it: the box is the
+       one thing here JS has to animate itself, and this is how it does that without naming a
+       duration the stylesheet has already set. No fade -- a reader who asked for stillness -- is
+       nothing to travel with, so the width lands where it lands. */
+    const fade = node.querySelector(":scope > .leg")?.getAnimations()[0]?.effect as
+      | KeyframeEffect
+      | undefined
+    const beat = fade?.getTiming()
+    if (typeof beat?.duration !== "number") return
+    /* Off the keyframes, not the effect: a CSS animation carries its timing function on each
+       keyframe, and the effect it belongs to answers `linear`. */
+    const easing = fade?.getKeyframes?.()[0]?.easing ?? beat.easing
     node.animate([{ width: `${was}px` }, { width: `${now}px` }], {
-      duration: swapMs(),
-      easing: cssVal("--text-swap-ease", "ease-in-out"),
+      duration: beat.duration,
+      easing,
     })
   })
 
