@@ -131,6 +131,7 @@ export function Page({
   importing,
   onData,
   onReset,
+  onExited,
 }: {
   /** The analysis the card is showing, or `null` for the empty face. */
   data: Analysis | null
@@ -143,6 +144,9 @@ export function Page({
   importing: boolean
   onData: (data: Analysis, sample: boolean) => void
   onReset: () => void
+  /** The departing face has finished leaving. Only on the path with no view transition to wait
+   *  for -- see `turnTo`. */
+  onExited?: () => void
 }): React.JSX.Element {
   const state = useViewState()
   const t = useT()
@@ -257,7 +261,9 @@ export function Page({
           </header>
           {/* Keyed on the face, so the arriving one has a closed state to travel from, and
               `closed` held from outside so the departing one has somewhere to go. */}
-          <Reveal key={face} className="cardslot" closed={leaving}>
+          {/* The card's panel is the one that reports the exit: the pair close on the same
+              tokens, so a second report would say the same thing a frame later. */}
+          <Reveal key={face} className="cardslot" closed={leaving} onClosed={onExited}>
             {R ? <R.Body /> : I ? <I.Body onData={onData} sofar={sofar} /> : null}
           </Reveal>
         </section>

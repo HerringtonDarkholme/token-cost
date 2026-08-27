@@ -30,6 +30,62 @@ export function cssMs(name: string, fallback: number): number {
   return /\ds$/.test(value) ? n * 1000 : n
 }
 
+/** The backstop, for motion that never reports itself finished: an animation with no end, or a
+ *  browser too old to list what an element is playing. Longer than anything the page draws. */
+const MOTION_CAP = 1000
+
+/** The frame the motion this element is playing has finished, without knowing what it was or how
+ *  long it takes -- the stylesheet owns both, and asking it in JS is how the two clocks drift.
+ *  `on` opens the wait, `done` closes it, and a phase whose motion was dropped -- reduced motion,
+ *  a background tab, a DOM with no compositor -- closes on the next frame rather than hanging. */
+export function useMotionEnd(
+  el: React.RefObject<HTMLElement | null>,
+  on: boolean,
+  done: () => void,
+): void {
+  /* Through a ref, so a caller may pass a fresh closure per render without reopening the wait. */
+  const latest = useRef(done)
+  latest.current = done
+
+  useEffect(() => {
+    if (!on) return
+    let live = true
+    const end = (): void => {
+      if (!live) return
+      live = false
+      latest.current()
+    }
+    /* Either arm of the settlement ends the wait: an interrupted animation rejects, and a phase
+       left standing because its motion was cut short is the thing this must not do. */
+    const wait = (runs: readonly Animation[]): void => {
+      void Promise.all(runs.map((a) => a.finished)).then(end, end)
+    }
+    /* Asking flushes the style the commit just changed, so whatever this phase started is already
+       listed -- no frame of grace, which a hidden tab would never hand out anyway. */
+    const playing = (): readonly Animation[] => el.current?.getAnimations?.() ?? []
+
+    let frame = 0
+    const runs = playing()
+    if (runs.length) {
+      wait(runs)
+    } else {
+      /* An empty list is motion that was dropped -- asked once more a frame on, in case it is a
+         browser that does not flush for the question. */
+      frame = requestAnimationFrame(() => {
+        const late = playing()
+        if (late.length) wait(late)
+        else end()
+      })
+    }
+    const cap = setTimeout(end, MOTION_CAP)
+    return () => {
+      live = false
+      cancelAnimationFrame(frame)
+      clearTimeout(cap)
+    }
+  }, [el, on])
+}
+
 const STILL = "(prefers-reduced-motion: reduce)"
 
 /** Motion the reader asked not to see. */
@@ -97,19 +153,25 @@ export function vtName(key: string): React.CSSProperties {
 export function Reveal({
   className,
   closed,
+  onClosed,
   children,
 }: {
   className?: string
   closed?: boolean
+  /** The panel has finished leaving, for a caller holding it mounted to play that exit. */
+  onClosed?: () => void
   children: ReactNode
 }): React.JSX.Element {
+  const el = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   useEffect(() => {
     const id = requestAnimationFrame(() => setOpen(true))
     return () => cancelAnimationFrame(id)
   }, [])
+  useMotionEnd(el, !!closed, () => onClosed?.())
   return (
     <div
+      ref={el}
       className={className ? `${className} t-panel-slide` : "t-panel-slide"}
       data-open={open && !closed ? "true" : "false"}
       data-leaving={closed ? "1" : undefined}
@@ -185,8 +247,9 @@ export function useCountingUp(source: React.RefObject<number>, watch: boolean): 
   return seen
 }
 
-/** How long the label's exit leg runs, read off the stylesheet so the swap's three phases stay
- *  in step with the CSS that draws them. */
+/** How long the crossfade runs, for the one animation JS plays itself: the box's width is
+ *  measured per commit, so there are no two values in the stylesheet for it to interpolate.
+ *  Everything the CSS draws is waited on instead -- see `useMotionEnd`. */
 function swapMs(): number {
   return cssMs("--text-swap-dur", 150)
 }
@@ -222,11 +285,10 @@ export function TextCross({
     setShown({ token, body: children })
   }
 
-  useEffect(() => {
-    if (!gone) return
-    const t = setTimeout(() => setGone(null), swapMs())
-    return () => clearTimeout(t)
-  }, [gone])
+  /* Dropped when the fade carrying it out has finished, so the ghost is not taken off screen
+     mid-fade -- and not left standing after it either. */
+  const leg = useRef<HTMLSpanElement>(null)
+  useMotionEnd(leg, gone !== null, () => setGone(null))
 
   /* Measured on every commit rather than keyed on the token, because what has to travel is the
      layout*: the box can be resized by copy that never changed. */
@@ -250,7 +312,7 @@ export function TextCross({
       {/* `data-nosnap` because the PNG freezes every animation, and a ghost held at full
           strength would print both lines on top of each other. */}
       {gone ? (
-        <span key={gone.token} className="leg" data-gone="1" data-nosnap>
+        <span ref={leg} key={gone.token} className="leg" data-gone="1" data-nosnap>
           {gone.body}
         </span>
       ) : null}
@@ -298,14 +360,15 @@ export function TextSwap({
   }
 
   useEffect(() => {
-    if (token === shown.token) return
-    setPhase("exit")
-    const t = setTimeout(() => {
-      setShown({ token, body: latest.current })
-      setPhase("enter")
-    }, swapMs())
-    return () => clearTimeout(t)
+    if (token !== shown.token) setPhase("exit")
   }, [token, shown.token])
+
+  /* The arriving copy is put in on the frame the departing copy has finished leaving, rather than
+     one the exit's own duration was expected to land on. */
+  useMotionEnd(el, phase === "exit", () => {
+    setShown({ token, body: latest.current })
+    setPhase("enter")
+  })
 
   /* `is-enter-start` puts the new copy below its resting place with the transition suspended, so it
      needs the reflow before the class comes off again. */
@@ -326,12 +389,6 @@ export function TextSwap({
       {shown.body}
     </span>
   )
-}
-
-/** How long the strip takes to travel its one line, read off the stylesheet so the face that has
- *  gone is dropped on the frame the CSS is done with it. */
-function reelMs(): number {
-  return cssMs("--reel-dur", 320)
 }
 
 /** How long a slot stands before the next one takes its place: long enough to read a path and
@@ -361,6 +418,7 @@ export function WordCycle({
   const [at, setAt] = useState(0)
   const [gone, setGone] = useState<number | null>(null)
   const box = useRef<HTMLSpanElement>(null)
+  const reel = useRef<HTMLSpanElement>(null)
   const sizer = useRef<HTMLSpanElement>(null)
   const [wide, setWide] = useState<readonly number[] | null>(null)
 
@@ -393,12 +451,12 @@ export function WordCycle({
     onFace?.(at)
   }, [at, onFace])
 
+  /* The face that has gone is held until the strip carrying it out of the window has finished
+     travelling, and dropped on that frame. */
+  useMotionEnd(reel, gone !== null, () => setGone(null))
+
   useEffect(() => {
-    if (!rolling) return
-    if (gone !== null) {
-      const t = setTimeout(() => setGone(null), reelMs())
-      return () => clearTimeout(t)
-    }
+    if (!rolling || gone !== null) return
     const t = setTimeout(() => {
       setGone(at)
       setAt((n) => (n + 1) % slots.length)
@@ -420,7 +478,7 @@ export function WordCycle({
     <span ref={box} className="t-word-cycle" style={wide ? { width: `${wide[at]}px` } : undefined}>
       {/* Keyed by what it carries, because the strip has to be a new element to be given the
           travel again -- the same one with new words in it would arrive already home. */}
-      <span className="t-reel" key={at}>
+      <span ref={reel} className="t-reel" key={at}>
         {gone === null ? null : (
           <span className="face" data-gone="1">
             {face(gone)}

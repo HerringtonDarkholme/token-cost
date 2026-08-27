@@ -8,7 +8,7 @@ import { loadFace } from "./faces.ts"
 import { applyUrl, readPath, resetState, useViewState } from "./store.ts"
 import { useT } from "./copy.tsx"
 import { tagOf } from "../core/i18n.ts"
-import { canTransition, cssMs, reduced, transition } from "./Motion.tsx"
+import { canTransition, reduced, transition } from "./Motion.tsx"
 import { Page, type Dir } from "./Page.tsx"
 import { decodeImport, pendingImport } from "./transfer.ts"
 
@@ -18,11 +18,6 @@ import { decodeImport, pendingImport } from "./transfer.ts"
 const rename = (event: BeforeSendEvent): BeforeSendEvent | null => {
   const url = scrub(event.url)
   return url === null ? null : { ...event, url }
-}
-
-/** How long the departing face is held on the fallback path. */
-function exitMs(): number {
-  return reduced() ? 0 : cssMs("--panel-close-dur", 350)
 }
 
 /** Theme is an attribute on the root element, outside React's tree, because the stylesheet needs
@@ -74,13 +69,14 @@ export function App(): React.JSX.Element {
   useTheme()
   useLangAttr()
 
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current)
-    },
-    [],
-  )
+  /* The swap the departing face is still standing in the way of, on the path with no view
+     transition: `Reveal` says when it has finished leaving. */
+  const exit = useRef<(() => void) | null>(null)
+  const onExited = useCallback(() => {
+    const swap = exit.current
+    exit.current = null
+    swap?.()
+  }, [])
 
   /** Turn the card over to `next` -- inside a view transition where there is one, exit first
    *  where there is not. */
@@ -106,8 +102,7 @@ export function App(): React.JSX.Element {
        footnotes would shrink the document under a scroll position the browser then clamps. */
     if (home) window.scrollTo({ top: 0, behavior: reduced() ? "auto" : "smooth" })
     setTurn((t) => ({ ...t, leaving: true, dir }))
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(swap, exitMs())
+    exit.current = swap
   }, [])
 
   /* The last bill read, kept so a Forward back into `/report` has something to show: the
@@ -185,6 +180,7 @@ export function App(): React.JSX.Element {
         importing={importing}
         onData={onData}
         onReset={onReset}
+        onExited={onExited}
       />
       {import.meta.env.PROD && hosted(location.protocol, location.pathname) && (
         <Analytics beforeSend={rename} />
